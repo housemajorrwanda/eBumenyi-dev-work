@@ -1,0 +1,3636 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ======== Google Meet Style Base ======== */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: 'Inter', 'Google Sans', 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ======== Stream Video SDK - Google Meet Theme ======== */
+
+.str-video__call-stats {
+  max-width: 500px;
+  position: relative;
+}
+
+.str-video__speaker-layout__wrapper {
+  max-height: 100%;
+}
+
+.str-video__participant-details {
+  color: white;
+}
+
+.str-video__menu-container {
+  color: white;
+}
+
+.str-video__notification {
+  color: white;
+}
+
+.str-video__participant-list {
+  background-color: #202124;
+  padding: 10px;
+  border-radius: 12px;
+  color: white;
+  height: 100%;
+}
+
+.str-video__call-controls__button {
+  height: 52px;
+  width: 52px;
+}
+
+/* ======== Glassmorphism Effects ======== */
+
+.glassmorphism {
+  background: rgba(60, 64, 67, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.glassmorphism2 {
+  background: rgba(32, 33, 36, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* ======== Clerk Custom Styling ======== */
+
+.cl-userButtonPopoverActionButtonIcon {
+  color: white;
+}
+
+.cl-logoBox {
+  height: 40px;
+}
+
+.cl-dividerLine {
+  background: #3c4043;
+  height: 1px;
+}
+
+.cl-socialButtonsIconButton {
+  border: 1px solid #5f6368;
+  background: #3c4043;
+  transition: all 0.2s ease;
+}
+
+.cl-socialButtonsIconButton:hover {
+  background: #5f6368;
+}
+
+.cl-internal-wkkub3 {
+  color: white;
+}
+
+.cl-userButtonPopoverActionButton {
+  color: white;
+}
+
+/* ======== Utility Classes ======== */
+
+@layer utilities {
+  .flex-center {
+    @apply flex justify-center items-center;
+  }
+
+  .flex-between {
+    @apply flex justify-between items-center;
+  }
+
+  .text-gradient {
+    @apply bg-gradient-to-r from-blue-2 to-blue-1 bg-clip-text text-transparent;
+  }
+}
+
+/* ======== Animations ======== */
+
+.show-block {
+  width: 100%;
+  max-width: 350px;
+  display: block;
+  animation: show 0.7s forwards linear;
+}
+
+@keyframes show {
+  0% {
+    animation-timing-function: ease-in;
+    width: 0%;
+  }
+
+  100% {
+    animation-timing-function: ease-in;
+    width: 100%;
+  }
+}
+
+@keyframes float {
+
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+@keyframes ripple {
+  0% {
+    transform: scale(0);
+    opacity: 0.5;
+  }
+
+  100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
+/* ======== Google Meet Emoji Reactions ======== */
+/* Floating emoji animation - rises up and fades out */
+
+@keyframes emoji-float {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0) scale(calc(var(--emoji-scale, 1) * 0.65)) rotate(var(--emoji-rotate, 0deg));
+  }
+
+  12% {
+    opacity: 1;
+    transform: translate3d(calc(var(--emoji-drift, 0px) * 0.18), -36px, 0) scale(calc(var(--emoji-scale, 1) * 1.12)) rotate(var(--emoji-rotate, 0deg));
+  }
+
+  55% {
+    opacity: 1;
+    transform: translate3d(calc(var(--emoji-drift, 0px) * 0.72), -210px, 0) scale(calc(var(--emoji-scale, 1) * 1.02)) rotate(calc(var(--emoji-rotate, 0deg) + 5deg));
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--emoji-drift, 0px), -390px, 0) scale(calc(var(--emoji-scale, 1) * 0.88)) rotate(calc(var(--emoji-rotate, 0deg) + 10deg));
+  }
+}
+
+@keyframes emoji-pop {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+
+  70% {
+    transform: scale(1.22);
+    opacity: 1;
+  }
+
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Emoji reaction container - overlay on video */
+.emoji-reactions-container {
+  position: fixed;
+  bottom: 100px;
+  left: 0;
+  right: 0;
+  height: 80vh;
+  pointer-events: none;
+  z-index: 9999;
+  overflow: visible;
+}
+
+/* Individual floating emoji */
+.emoji-reaction {
+  position: absolute;
+  bottom: 0;
+  font-size: 48px;
+  transform-origin: center bottom;
+  animation:
+    emoji-pop 0.2s cubic-bezier(0.2, 1, 0.3, 1) var(--emoji-delay, 0s) both,
+    emoji-float var(--emoji-duration, 3s) cubic-bezier(0.2, 0.95, 0.3, 1) var(--emoji-delay, 0s) forwards;
+  pointer-events: none;
+  user-select: none;
+  will-change: transform, opacity;
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.45));
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.08);
+  z-index: 9999;
+}
+
+/* Larger emoji for emphasis */
+.emoji-reaction--large {
+  font-size: 64px;
+}
+
+/* Emoji picker button in controls */
+.emoji-picker-trigger {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background-color: #3c4043;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.15s ease, transform 0.1s ease;
+  color: white;
+  font-size: 20px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.emoji-picker-trigger:hover {
+  background-color: #5f6368;
+}
+
+.emoji-picker-trigger:active {
+  transform: scale(0.95);
+}
+
+/* Emoji picker popup */
+.emoji-picker-popup {
+  position: absolute;
+  bottom: calc(100% + 12px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 4px;
+  padding: 8px 12px;
+  background: rgba(32, 33, 36, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 24px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  animation: emoji-picker-appear 0.15s ease-out;
+  z-index: 60;
+}
+
+@keyframes emoji-picker-appear {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(8px) scale(0.95);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+}
+
+/* Individual emoji button in picker */
+.emoji-picker-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 28px;
+  transition: background-color 0.15s ease, transform 0.1s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.emoji-picker-btn:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  transform: scale(1.15);
+}
+
+.emoji-picker-btn:active {
+  transform: scale(0.9);
+}
+
+/* Mobile adjustments for emoji reactions */
+@media (max-width: 767px) {
+  .emoji-reactions-container {
+    bottom: 100px;
+    height: 180px;
+  }
+
+  .emoji-reaction {
+    font-size: 40px;
+  }
+
+  .emoji-reaction--large {
+    font-size: 52px;
+  }
+
+  .emoji-picker-trigger {
+    width: 44px;
+    height: 44px;
+    font-size: 18px;
+  }
+
+  .emoji-picker-popup {
+    gap: 2px;
+    padding: 6px 10px;
+    bottom: calc(100% + 8px);
+  }
+
+  .emoji-picker-btn {
+    width: 38px;
+    height: 38px;
+    font-size: 24px;
+  }
+}
+
+/* Extra small mobile */
+@media (max-width: 399px) {
+  .emoji-reactions-container {
+    bottom: 90px;
+  }
+
+  .emoji-reaction {
+    font-size: 36px;
+  }
+
+  .emoji-picker-btn {
+    width: 34px;
+    height: 34px;
+    font-size: 22px;
+  }
+}
+
+/* ======== Video Call Grid System - Google Meet Style ======== */
+
+/* ===== GLOBAL VIDEO STABILITY ===== */
+/* Prevent flickering, glitching, and re-rendering issues */
+
+/* Disable all Stream SDK animations for stability */
+.str-video__reaction,
+.str-video__reaction-emoji,
+.str-video__emoji-reaction {
+  animation-duration: 0s !important;
+  animation-delay: 0s !important;
+  transition-duration: 0s !important;
+  transition-delay: 0s !important;
+}
+
+/* Specifically disable emoji animations */
+.str-video__reaction-emoji {
+  transform: none !important;
+}
+
+/* Global video element stability */
+video {
+  /* Hardware acceleration for smooth playback */
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  /* Prevent layout recalculations */
+  contain: layout paint;
+  /* Prevent any flicker from browser optimizations */
+  -webkit-perspective: 1000;
+  perspective: 1000;
+}
+
+/* GPU-accelerated video container for better performance */
+.str-video__paginated-grid-layout {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 6px;
+  padding: 12px;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  justify-content: center;
+  align-content: center;
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+}
+
+.str-video__paginated-grid-layout__group {
+  display: contents;
+}
+
+/* Video Tile Styling - Google Meet Rounded Style */
+.str-video__participant-view {
+  border-radius: 12px;
+  overflow: hidden;
+  background-color: #3c4043;
+  position: relative;
+  /* Remove all transitions and animations */
+  transition: none !important;
+  animation: none !important;
+  /* GPU acceleration */
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  /* Contain for isolation - prevents layout thrashing */
+  contain: layout paint;
+  /* Let video determine its own aspect ratio */
+  min-height: 0;
+}
+
+.str-video__participant-view:hover {
+  box-shadow: 0 0 0 2px #8ab4f8;
+}
+
+/* Video element optimization - STABILITY FOCUSED */
+.str-video__participant-view video {
+  width: 100%;
+  height: 100%;
+  /* Use contain to prevent stretching/distortion which causes shaking */
+  object-fit: contain;
+  border-radius: 12px;
+  background-color: #202124;
+  /* Hardware acceleration - single transform only */
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  /* Prevent interaction during playback */
+  pointer-events: none;
+  /* No transitions or animations on video element */
+  transition: none !important;
+  animation: none !important;
+  /* Prevent layout recalculations */
+  contain: layout paint;
+  /* Smooth rendering */
+  image-rendering: auto;
+}
+
+/* Speaker Layout - Google Meet Style */
+.str-video__speaker-layout__wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  height: 100%;
+  max-height: 100%;
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+}
+
+.str-video__speaker-layout__spotlight {
+  flex: 1;
+  border-radius: 12px;
+  overflow: hidden;
+  background-color: #202124;
+  min-height: 0;
+  /* GPU acceleration */
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  /* Prevent layout thrashing */
+  contain: layout paint;
+}
+
+.str-video__speaker-layout__spotlight video {
+  border-radius: 12px;
+  /* Use contain to prevent stretching which causes shaking */
+  object-fit: contain;
+  width: 100%;
+  height: 100%;
+  background-color: #202124;
+  /* Hardware acceleration */
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  /* No transitions */
+  transition: none !important;
+  animation: none !important;
+}
+
+.str-video__speaker-layout__participants-bar {
+  display: flex;
+  gap: 6px;
+  padding: 6px 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: #5f6368 transparent;
+  -webkit-overflow-scrolling: touch;
+}
+
+.str-video__speaker-layout__participants-bar::-webkit-scrollbar {
+  height: 4px;
+}
+
+.str-video__speaker-layout__participants-bar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.str-video__speaker-layout__participants-bar::-webkit-scrollbar-thumb {
+  background: #5f6368;
+  border-radius: 2px;
+}
+
+/* Participant Name Overlay */
+.str-video__participant-details {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 6px 10px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
+  color: white;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 0 0 12px 12px;
+}
+
+/* Video Placeholder (Camera Off) */
+.str-video__video-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, #3c4043 0%, #5f6368 100%);
+  color: #e8eaed;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* ======== Google Meet Control Bar ======== */
+
+.str-video__call-controls__button {
+  height: 48px;
+  width: 48px;
+  min-width: 48px;
+  border-radius: 50%;
+  background-color: #3c4043;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  color: white;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.str-video__call-controls__button:hover {
+  background-color: #5f6368;
+}
+
+.str-video__call-controls__button:active {
+  transform: scale(0.95);
+}
+
+.str-video__call-controls__button--active {
+  background-color: #ea4335;
+}
+
+.str-video__call-controls__button--active:hover {
+  background-color: #d33828;
+}
+
+/* Hide Stream SDK's built-in reaction button - we use our own custom emoji picker */
+/* Target by various possible class names and structures */
+.str-video__reaction-button,
+.str-video__reactions-button,
+.str-video__composite-button--reaction,
+[class*="str-video"][class*="reaction"]:not(.emoji-reaction),
+.str-video__call-controls__button[aria-label*="Reaction"],
+.str-video__call-controls__button[aria-label*="reaction"] {
+  display: none !important;
+}
+
+/* Target the 3rd item (index 2) in the call controls - the reaction button */
+.str-video__call-controls>.str-video__composite-button:nth-child(3) {
+  display: none !important;
+}
+
+/* ===== GOOGLE MEET MOBILE LAYOUT ===== */
+/* Responsive mobile video call layout with tall vertical container */
+
+/* Main container - centers the video card with proper aspect ratio */
+.mobile-meet-main-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: clamp(66px, 9vh, 84px) 0 clamp(178px, 24vh, 196px);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  background: transparent;
+  z-index: 1;
+}
+
+.mobile-meet-main-video--immersive-share {
+  padding: 0 !important;
+}
+
+/* Tall vertical video container - maintains 9:16 aspect ratio */
+.mobile-meet-video-card {
+  position: relative;
+  width: 100vw;
+  max-width: none;
+  height: min(74dvh, calc(100dvh - 260px));
+  max-height: none;
+  border-radius: 0;
+  overflow: hidden;
+  background: #202124;
+  box-shadow: none;
+  z-index: 2;
+}
+
+.mobile-meet-video-card--immersive-share {
+  width: 100vw !important;
+  height: 100dvh !important;
+  max-height: 100dvh !important;
+}
+
+/* Desktop immersive screen-share should be edge-to-edge */
+.meeting-desktop-root--immersive-share .str-video,
+.meeting-desktop-root--immersive-share .str-video__call,
+.meeting-desktop-root--immersive-share .str-video__call-content,
+.meeting-desktop-root--immersive-share .str-video__call-wrapper {
+  width: 100vw !important;
+  height: 100dvh !important;
+  max-width: 100vw !important;
+  max-height: 100dvh !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+}
+
+.meeting-desktop-root--immersive-share .str-video__speaker-layout__wrapper {
+  width: 100% !important;
+  height: 100% !important;
+  max-height: none !important;
+  padding: 0 !important;
+  gap: 0 !important;
+}
+
+.meeting-desktop-root--immersive-share .str-video__speaker-layout__spotlight,
+.meeting-desktop-root--immersive-share .str-video__speaker-layout__spotlight .str-video__participant-view {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+  border-radius: 0 !important;
+}
+
+.meeting-desktop-root--immersive-share .str-video__speaker-layout__spotlight video {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+  border-radius: 0 !important;
+  object-fit: cover !important;
+}
+
+/* SDK layout override for mobile video card */
+.mobile-meet-main-video .str-video__speaker-layout__wrapper,
+.mobile-meet-main-video .str-video__paginated-grid-layout {
+  max-width: 100%;
+  max-height: 100%;
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+  overflow: hidden;
+  display: flex !important;
+  flex-direction: column;
+  padding: 0 !important;
+  gap: 2px !important;
+}
+
+.mobile-meet-main-video .str-video__paginated-grid-layout {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)) !important;
+  align-content: center;
+}
+
+.mobile-meet-main-video .str-video__speaker-layout__spotlight {
+  width: 100%;
+  height: 100%;
+  border-radius: 0 !important;
+  overflow: hidden;
+}
+
+/* Speaker spotlight forces full size, but grid should be flexible */
+.mobile-meet-main-video .str-video__speaker-layout__spotlight .str-video__participant-view {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.mobile-meet-main-video .str-video__participant-view {
+  border-radius: 0 !important;
+  min-height: 0 !important;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.mobile-meet-main-video video {
+  border-radius: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover;
+}
+
+/* When someone is sharing, force spotlight to fill the mobile card area */
+.mobile-meet-video-card--sharing .str-video__speaker-layout__wrapper {
+  padding: 0 !important;
+  gap: 0 !important;
+  align-items: stretch !important;
+  justify-content: flex-start !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.mobile-meet-video-card--sharing .str-video__speaker-layout__spotlight,
+.mobile-meet-video-card--sharing .str-video__speaker-layout__spotlight .str-video__participant-view {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+  border-radius: 0 !important;
+}
+
+.mobile-meet-video-card--sharing .str-video__speaker-layout__spotlight video {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+  object-fit: contain !important;
+  background-color: #020617 !important;
+  border-radius: 0 !important;
+}
+
+/* Hide the participants bar on speaker layout - we'll show self-view separately */
+.mobile-meet-main-video .str-video__speaker-layout__participants-bar {
+  display: none !important;
+}
+
+/* Participant name overlay - bottom left of main video */
+.mobile-meet-name-overlay {
+  position: absolute;
+  left: 16px;
+  bottom: 176px;
+  padding: 6px 12px;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 500;
+  color: white;
+  max-width: 72%;
+  z-index: 20;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.24);
+}
+
+.mobile-meet-name-overlay--share {
+  bottom: 196px;
+}
+
+/* Three-dot menu button - top right corner (Blue circle like Google Meet) */
+.mobile-meet-top-menu-btn {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #4a8cdb;
+  /* Google Meet blue */
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  cursor: pointer;
+  z-index: 30;
+  transition: background 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+  box-shadow: 0 4px 12px rgba(74, 140, 219, 0.4);
+}
+
+.mobile-meet-top-menu-btn:hover {
+  background: #3a7cc8;
+  box-shadow: 0 6px 16px rgba(74, 140, 219, 0.5);
+}
+
+.mobile-meet-top-menu-btn:active {
+  transform: scale(0.92);
+  background: #2d6bb5;
+}
+
+/* Legacy class kept for compatibility */
+.mobile-meet-more-btn {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: rgba(95, 99, 104, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  cursor: pointer;
+  z-index: 30;
+  transition: background 0.2s ease, transform 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mobile-meet-more-btn:hover,
+.mobile-meet-more-btn:active {
+  background: rgba(95, 99, 104, 1);
+}
+
+/* Self-view floating card - bottom right corner (Google Meet style) */
+.mobile-meet-self-view {
+  position: absolute;
+  top: 96px;
+  right: 16px;
+  width: 112px;
+  height: 148px;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #1a1a1a;
+  box-shadow:
+    0 8px 28px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  transform: translateZ(0);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transform: scale(0.92);
+  transform: translateZ(0) scale(1.02);
+  box-shadow:
+    0 12px 36px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+
+.mobile-meet-self-video {
+  flex: 1;
+}
+ .mobile-meet-control-btn--active:hover {
+   background-color: #669df6;
+   box-shadow: 0 6px 18px rgba(102, 157, 246, 0.4);
+ }
+
+/* Mute indicator on self-view - top right corner */
+.mobile-meet-self-mute {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  z-index: 5;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+/* Name at bottom of self-view */
+.mobile-meet-self-name {
+  padding: 10px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: white;
+  background: rgba(0, 0, 0, 0.7);
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: 0.2px;
+}
+
+/* Google Meet style bottom control bar - Mobile (responsive/fluid) */
+.mobile-meet-controls-bar {
+  position: fixed;
+  bottom: 76px;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 8px;
+  z-index: 100;
+  /* Ensure clicks are received */
+  pointer-events: auto;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.mobile-meet-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(4px, 1.5vw, 10px);
+  padding: clamp(6px, 1.8vh, 10px) clamp(8px, 2.5vw, 14px);
+  background: rgba(28, 28, 32, 0.96);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-radius: 100px;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(255, 255, 255, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  position: relative;
+  z-index: 101;
+  pointer-events: auto;
+  max-width: calc(100vw - 16px);
+  width: 100%;
+  /* keep controls on one line, allow horizontal scroll if necessary */
+  flex-wrap: nowrap;
+  overflow-x: auto;
+}
+
+.mobile-meet-side-controls {
+  --mobile-side-btn-size: clamp(32px, 9.2vw, 38px);
+  position: absolute;
+  right: 18px;
+  top: 46%;
+  transform: translateY(-50%);
+  z-index: 45;
+  width: var(--mobile-side-btn-size);
+  display: grid;
+  grid-auto-rows: var(--mobile-side-btn-size);
+  justify-items: center;
+  align-items: center;
+  gap: 18px;
+}
+
+.mobile-meet-side-btn {
+  width: var(--mobile-side-btn-size);
+  height: var(--mobile-side-btn-size);
+  min-width: var(--mobile-side-btn-size);
+  min-height: var(--mobile-side-btn-size);
+  border-radius: 50%;
+  margin: 0;
+  padding: 0;
+  position: relative;
+  left: 0;
+  transform: none;
+  border: 1px solid rgba(90, 131, 204, 0.28);
+  background: rgba(255, 255, 255, 0.96);
+  color: #4b71b6;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12);
+}
+
+.mobile-meet-side-btn svg {
+  display: block;
+}
+
+.mobile-meet-side-btn--warn {
+  color: #ffffff;
+  background: #ef4444;
+  border-color: #ef4444;
+}
+
+.mobile-meet-side-btn--active {
+  color: #2563eb;
+  background: #dbeafe;
+}
+
+.mobile-meet-side-btn--recording {
+  color: #ffffff;
+  background: #dc2626;
+  border-color: #dc2626;
+  box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.55);
+  animation: mobile-record-pulse 1.4s ease-out infinite;
+}
+
+@keyframes mobile-record-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.55);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(220, 38, 38, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0);
+  }
+}
+
+.mobile-meet-bottom-actions {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: clamp(112px, 15vh, 132px);
+  z-index: 46;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+
+.mobile-meet-bottom-btn {
+  width: clamp(30px, 8.4vw, 34px);
+  height: clamp(30px, 8.4vw, 34px);
+  border-radius: 50%;
+  border: 1px solid rgba(90, 131, 204, 0.28);
+  background: rgba(255, 255, 255, 0.96);
+  color: #4b71b6;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14);
+}
+
+.mobile-meet-bottom-btn--active {
+  color: #2563eb;
+  background: #dbeafe;
+}
+
+.mobile-meet-bottom-btn--hand-active {
+  color: #111827;
+  background: #facc15;
+  border-color: #facc15;
+}
+
+.mobile-meet-bottom-btn--emoji-active {
+  color: #ffffff;
+  background: #2563eb;
+  border-color: #2563eb;
+}
+
+.mobile-meet-end-btn {
+  width: clamp(46px, 13.8vw, 54px);
+  height: clamp(46px, 13.8vw, 54px);
+  border-radius: 50%;
+  border: none;
+  background: #c81e3d;
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 16px rgba(200, 30, 61, 0.35);
+}
+
+.mobile-meet-emoji-picker-wrap {
+  bottom: 186px;
+}
+
+.mobile-meet-page {
+  background: var(--background, #f3f4f6);
+  width: 100vw;
+  max-width: 100vw;
+  margin: 0;
+  padding: 0;
+}
+
+.mobile-meet-tap-toggle {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  border: 0;
+  background: transparent !important;
+  padding: 0;
+  margin: 0;
+  cursor: default;
+  opacity: 0;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+@media (max-width: 767px) {
+  .meeting-mobile-root {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100vw !important;
+    height: 100dvh !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .meeting-mobile-root > * {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .mobile-meet-page {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100dvh;
+    margin: 0;
+    padding: 0;
+  }
+
+  .str-video,
+  .str-video__call,
+  .str-video__call-content,
+  .str-video__call-wrapper {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+  }
+}
+
+.mobile-meet-topbar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mobile-meet-header-stack {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mobile-meet-back-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid color-mix(in oklab, var(--foreground, #1f2937) 15%, transparent);
+  background: color-mix(in oklab, var(--background, #ffffff) 85%, transparent);
+  color: var(--foreground, #1f2937);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mobile-meet-title-pill {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  min-height: clamp(36px, 5vh, 42px);
+  border-radius: 9999px;
+  border: 1px solid rgba(76, 123, 207, 0.28);
+  background: rgba(223, 232, 249, 0.9);
+  color: #4678c8;
+  font-size: clamp(12px, 3.6vw, 16px);
+  font-weight: 700;
+  box-shadow: 0 3px 12px rgba(70, 120, 200, 0.2);
+  padding: 0 10px;
+}
+
+.mobile-meet-share-pill {
+  margin-left: 44px;
+  margin-right: 6px;
+  min-height: 28px;
+  border-radius: 9999px;
+  border: 1px solid rgba(37, 99, 235, 0.35);
+  background: rgba(15, 23, 42, 0.86);
+  color: #bfdbfe;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 0 10px;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.mobile-meet-participants-strip {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: max(6px, env(safe-area-inset-bottom));
+  z-index: 90;
+  border-radius: 14px;
+  background: color-mix(in oklab, var(--background, #ffffff) 92%, transparent);
+  border: 1px solid color-mix(in oklab, var(--foreground, #1f2937) 8%, transparent);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+  padding: 10px 12px 12px;
+}
+
+.mobile-meet-participants-strip__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #4678c8;
+  font-size: 13px;
+  font-weight: 600;
+  border-bottom: 1px solid color-mix(in oklab, var(--foreground, #1f2937) 10%, transparent);
+  padding-bottom: 8px;
+  margin-bottom: 10px;
+}
+
+.mobile-meet-online-dot {
+  color: #22c55e;
+}
+
+.mobile-meet-participants-strip__avatars {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mobile-meet-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #e2e8f0;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mobile-meet-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.mobile-meet-avatar--extra {
+  background: #eef2ff;
+  color: #4f46e5;
+}
+
+/* Control button styling for mobile - fluid, clamp-based sizes */
+.mobile-meet-controls .str-video__call-controls__button {
+  width: clamp(36px, 9vw, 52px) !important;
+  height: clamp(36px, 9vw, 52px) !important;
+  min-width: clamp(28px, 8vw, 44px) !important;
+  flex-shrink: 0 !important;
+  flex: 0 0 auto !important;
+  border-radius: 50% !important;
+  background-color: #3c4043 !important;
+  border: none !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  color: white !important;
+  transition: background-color 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease !important;
+  -webkit-tap-highlight-color: transparent;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  pointer-events: auto !important;
+  cursor: pointer !important;
+  position: relative;
+  z-index: 102;
+}
+
+/* fluid svg icon sizing inside controls */
+.mobile-meet-controls .str-video__call-controls__button svg {
+  width: clamp(16px, 4.5vw, 22px) !important;
+  height: clamp(16px, 4.5vw, 22px) !important;
+}
+
+/* shrink further on very small screens */
+@media (max-width: 360px) {
+  .mobile-meet-controls {
+    gap: 6px;
+    padding: 6px 8px;
+  }
+
+  .mobile-meet-controls .str-video__call-controls__button {
+    width: 36px !important;
+    height: 36px !important;
+    min-width: 28px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .mobile-meet-controls .str-video__call-controls__button svg {
+    width: 16px !important;
+    height: 16px !important;
+  }
+}
+
+/* additional shrink breakpoint for slightly larger devices */
+@media (max-width: 420px) {
+  .mobile-meet-controls {
+    gap: 6px;
+  }
+
+  .mobile-meet-controls .str-video__call-controls__button {
+    width: 40px !important;
+    height: 40px !important;
+    min-width: 30px !important;
+  }
+
+  .mobile-meet-controls .str-video__call-controls__button svg {
+    width: 18px !important;
+    height: 18px !important;
+  }
+}
+
+.mobile-meet-controls .str-video__call-controls__button:active {
+  transform: scale(0.92) !important;
+}
+
+.mobile-meet-controls .str-video__call-controls__button:hover {
+  background-color: #5f6368 !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+/* Mic muted button - coral/salmon background like Google Meet */
+.mobile-meet-controls .str-video__call-controls__button--active {
+  background-color: #f28b82 !important;
+  color: #3c4043 !important;
+  box-shadow: 0 4px 14px rgba(242, 139, 130, 0.35);
+}
+
+.mobile-meet-controls .str-video__call-controls__button--active:hover {
+  background-color: #ee675c !important;
+  box-shadow: 0 6px 18px rgba(238, 103, 92, 0.4);
+}
+
+/* Custom control button styling for mobile - Google Meet style circles */
+.mobile-meet-control-btn {
+  width: 50px;
+  height: 50px;
+  min-width: 50px;
+  border-radius: 50%;
+  background-color: #3c4043;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* hover state for mobile buttons */
+.mobile-meet-control-btn:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+/* active press state */
+.mobile-meet-control-btn:active {
+  transform: scale(0.92);
+}
+
+/* Active toggle state (e.g. mic off) */
+.mobile-meet-control-btn--active {
+  background-color: #8ab4f8;
+  color: #202124;
+  box-shadow: 0 4px 14px rgba(138, 180, 248, 0.35);
+}
+
+.mobile-meet-control-btn--active:hover {
+  background-color: #669df6;
+  box-shadow: 0 6px 18px rgba(102, 157, 246, 0.4);
+}
+
+.mobile-meet-self-video .str-video__participant-view video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  border-radius: 0 !important;
+}
+
+.mobile-meet-self-video .str-video__participant-details {
+  display: none !important;
+}
+
+/* Mobile emoji picker overlay */
+.mobile-emoji-picker-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 100;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 100px;
+}
+
+.mobile-emoji-picker {
+  display: flex;
+  gap: 6px;
+  padding: 12px 16px;
+  background: rgba(32, 33, 36, 0.98);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 24px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  animation: emoji-picker-slide-up 0.2s ease-out;
+}
+
+@keyframes emoji-picker-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.mobile-emoji-picker .emoji-picker-btn {
+  width: 48px;
+  height: 48px;
+  font-size: 28px;
+}
+
+/* ======== Raised Hand Indicator ======== */
+/* Shows on participant videos when their hand is raised */
+
+.raised-hand-indicator {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(251, 191, 36, 0.95);
+  color: #1a1a1a;
+  z-index: 10;
+  animation: raised-hand-pulse 2s ease-in-out infinite;
+  box-shadow: 0 2px 8px rgba(251, 191, 36, 0.4);
+}
+
+.raised-hand-indicator--small {
+  width: 24px;
+  height: 24px;
+}
+
+.raised-hand-indicator--self {
+  top: 8px;
+  left: 8px;
+  width: 26px;
+  height: 26px;
+}
+
+@keyframes raised-hand-pulse {
+
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 2px 8px rgba(251, 191, 36, 0.4);
+  }
+
+  50% {
+    transform: scale(1.08);
+    box-shadow: 0 4px 16px rgba(251, 191, 36, 0.6);
+  }
+}
+
+/* Raised hand list item styling */
+.raised-hand-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: #2d2e30;
+  border-radius: 12px;
+  transition: background-color 0.15s ease;
+}
+
+.raised-hand-item:hover {
+  background: #3c4043;
+}
+
+.raised-hand-item__info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.raised-hand-item__avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #1a1a1a;
+}
+
+.raised-hand-item__name {
+  font-weight: 500;
+  color: white;
+}
+
+.raised-hand-item__order {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.raised-hand-item__button {
+  padding: 8px 16px;
+  border-radius: 20px;
+  background: #3c4043;
+  border: none;
+  color: white;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.raised-hand-item__button:hover {
+  background: rgba(234, 67, 53, 0.2);
+  color: #ea4335;
+}
+
+/* Standard mobile media query for SDK elements */
+@media (max-width: 767px) {
+
+  /* Fullscreen grid container - responsive grid */
+  .str-video__paginated-grid-layout {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    grid-template-rows: repeat(4, minmax(96px, 1fr)) !important;
+    grid-auto-rows: minmax(96px, 1fr) !important;
+    gap: 6px !important;
+    padding: 6px !important;
+    width: 100% !important;
+    height: 100% !important;
+    border-radius: 20px !important;
+    overflow: hidden !important;
+  }
+
+  /* The group should follow grid */
+  .str-video__paginated-grid-layout__group {
+    display: contents !important;
+  }
+
+  /* Each video tile - natural sizing */
+  .str-video__participant-view {
+    aspect-ratio: 16 / 9 !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 96px !important;
+    border-radius: 20px !important;
+    overflow: hidden !important;
+  }
+
+  /* Video element - natural size with max constraints */
+  .str-video__participant-view video {
+    max-width: 100% !important;
+    max-height: 100% !important;
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: contain !important;
+    border-radius: 20px !important;
+    background-color: #202124 !important;
+  }
+
+  /* Ensure video placeholder also fills */
+  .str-video__video-placeholder {
+    width: 100% !important;
+    height: 100% !important;
+    border-radius: 20px !important;
+  }
+
+  /* Smaller participant name on mobile */
+  .str-video__participant-details {
+    font-size: 12px;
+    padding: 4px 10px;
+    border-radius: 0 0 20px 20px;
+  }
+
+  /* Control buttons sized for touch */
+  .str-video__call-controls__button {
+    height: 48px;
+    width: 48px;
+    min-width: 48px;
+  }
+
+  /* Speaker layout fullscreen */
+  .str-video__speaker-layout__wrapper {
+    padding: 8px !important;
+    gap: 0 !important;
+    max-height: 100% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  .str-video__speaker-layout__spotlight {
+    border-radius: 20px !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
+    min-height: 0 !important;
+  }
+
+  .str-video__speaker-layout__spotlight video {
+    border-radius: 20px !important;
+    object-fit: contain !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
+    width: auto !important;
+    height: auto !important;
+    background-color: #202124 !important;
+  }
+
+  /* Hide pagination arrows on mobile */
+  .str-video__paginated-grid-layout__page-arrows {
+    display: none !important;
+  }
+}
+
+/* Extra Small Mobile (< 400px) - optimized for small screens */
+@media (max-width: 399px) {
+  .mobile-meet-main-video {
+    padding: 62px 0 176px;
+  }
+
+  .mobile-meet-video-card {
+    width: 100vw;
+    height: min(72dvh, calc(100dvh - 250px));
+    border-radius: 16px;
+  }
+
+  .mobile-meet-self-view {
+    width: 92px;
+    height: 124px;
+    top: 78px;
+    right: 10px;
+    border-radius: 10px;
+  }
+
+  .mobile-meet-name-overlay {
+    left: 12px;
+    bottom: 170px;
+    font-size: 11px;
+    padding: 4px 8px;
+    max-width: 58%;
+  }
+
+  .mobile-meet-name-overlay--share {
+    bottom: 188px;
+  }
+
+  .str-video__participant-details {
+    font-size: 10px;
+    padding: 3px 6px;
+  }
+
+  .mobile-meet-header-stack {
+    top: 8px;
+    left: 8px;
+    right: 8px;
+    gap: 6px;
+  }
+
+  .mobile-meet-topbar {
+    gap: 8px;
+  }
+
+  .mobile-meet-back-btn {
+    width: 30px;
+    height: 30px;
+  }
+
+  .mobile-meet-side-controls {
+    right: 10px;
+    gap: 18px;
+  }
+
+  .mobile-meet-bottom-actions {
+    bottom: 112px;
+    gap: 8px;
+  }
+
+  .mobile-meet-emoji-picker-wrap {
+    bottom: 174px;
+  }
+
+  .mobile-meet-participants-strip {
+    left: 0;
+    right: 0;
+    padding: 8px 10px 10px;
+  }
+
+  .mobile-meet-participants-strip__header {
+    font-size: 12px;
+  }
+
+  .mobile-meet-share-pill {
+    margin-left: 36px;
+    margin-right: 2px;
+    font-size: 10px;
+    min-height: 26px;
+  }
+
+  .mobile-meet-avatar {
+    width: 26px;
+    height: 26px;
+    font-size: 11px;
+  }
+}
+
+/* Landscape orientation on mobile - side by side */
+@media (max-width: 767px) and (orientation: landscape) {
+  .mobile-meet-main-video {
+    padding: 52px 8px 120px;
+  }
+
+  .mobile-meet-self-view {
+    width: 92px;
+    height: 68px;
+    top: 64px;
+    right: 10px;
+  }
+
+  .mobile-meet-bottom-actions {
+    bottom: 78px;
+  }
+
+  .mobile-meet-participants-strip {
+    padding: 6px 10px 8px;
+  }
+
+  .mobile-meet-participants-strip__avatars {
+    gap: 6px;
+  }
+
+  .str-video__paginated-grid-layout {
+    flex-direction: row !important;
+  }
+
+  .str-video__paginated-grid-layout__group {
+    flex-direction: row !important;
+  }
+}
+
+/* Desktop (1024px+) */
+@media (min-width: 1024px) {
+  .str-video__paginated-grid-layout {
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 10px;
+    padding: 16px;
+    max-width: 1600px;
+    margin: 0 auto;
+  }
+
+  .str-video__speaker-layout__wrapper {
+    max-height: calc(100vh - 100px);
+    padding: 16px;
+  }
+
+  .str-video__call-controls__button {
+    height: 52px;
+    width: 52px;
+    min-width: 52px;
+  }
+}
+
+/* Large Desktop (1440px+) */
+@media (min-width: 1440px) {
+  .str-video__paginated-grid-layout {
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    max-width: 1800px;
+  }
+}
+
+/* ======== Safe Area + Touch Optimizations ======== */
+
+/* iOS safe area support */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* Prevent touch callout on long press */
+.str-video__call-controls__button,
+.meeting-controls button {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* ======== Google Meet Floating Control Bar ======== */
+
+.meeting-controls {
+  background-color: rgba(32, 33, 36, 0.95);
+  border-radius: 100px;
+  padding: 6px 12px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+@media (min-width: 640px) {
+  .meeting-controls {
+    padding: 8px 16px;
+  }
+}
+
+/* ======== Participants Panel ======== */
+
+.participants-panel {
+  background-color: #202124;
+  border-radius: 12px;
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.3);
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+@media (max-width: 768px) {
+  .participants-panel {
+    border-radius: 0;
+    height: 100%;
+    border-left: none;
+  }
+}
+
+.str-video__participant-list {
+  background-color: #202124;
+  padding: 16px;
+  border-radius: 12px;
+  color: white;
+  height: 100%;
+}
+
+/* Participant list item */
+.str-video__participant-list-item {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  border-radius: 12px;
+  margin-bottom: 4px;
+  transition: background-color 0.15s ease;
+  gap: 12px;
+}
+
+.str-video__participant-list-item:hover {
+  background-color: #3c4043;
+}
+
+/* Participant avatar */
+.str-video__participant-list-item__avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+/* Participant name */
+.str-video__participant-list-item__name {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 500;
+  color: white;
+}
+
+/* Participant action buttons container */
+.str-video__participant-list-item__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Mic and Camera icon buttons - Default state (muted/off) */
+.str-video__participant-list-item__button,
+.str-video__participant-list-item button {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background-color: #3c4043;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.6);
+  transition: all 0.15s ease;
+}
+
+.str-video__participant-list-item__button:hover,
+.str-video__participant-list-item button:hover {
+  background-color: #5f6368;
+  color: white;
+}
+
+/* Active/Enabled state (unmuted/on) - YELLOW color */
+.str-video__participant-list-item__button--enabled,
+.str-video__participant-list-item button[data-enabled="true"],
+.str-video__participant-list-item__button.enabled,
+.str-video__participant-list-item__audio-button:not(.str-video__participant-list-item__audio-button--muted),
+.str-video__participant-list-item__video-button:not(.str-video__participant-list-item__video-button--disabled) {
+  color: #fdd835 !important;
+  background-color: rgba(253, 216, 53, 0.15) !important;
+}
+
+.str-video__participant-list-item__button--enabled:hover,
+.str-video__participant-list-item button[data-enabled="true"]:hover {
+  background-color: rgba(253, 216, 53, 0.25) !important;
+  color: #ffeb3b !important;
+}
+
+/* Muted state indicator - red tint */
+.str-video__participant-list-item__audio-button--muted {
+  color: #ea4335 !important;
+  background-color: rgba(234, 67, 53, 0.15) !important;
+}
+
+/* Video off state */
+.str-video__participant-list-item__video-button--disabled {
+  color: rgba(255, 255, 255, 0.4) !important;
+}
+
+/* SVG icons in participant buttons - ensure yellow when enabled */
+.str-video__participant-list-item__button svg,
+.str-video__participant-list-item button svg {
+  width: 18px;
+  height: 18px;
+}
+
+.str-video__participant-list-item__button--enabled svg,
+.str-video__participant-list-item button[data-enabled="true"] svg {
+  color: #fdd835;
+}
+
+/* ======== Redesigned Participant Dropdown Menu ======== */
+
+/* 3-dot menu button */
+.str-video__participant-list-item__menu-button,
+.str-video__participant-list-item [class*="menu"] {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background-color: #5f6368;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  transition: all 0.15s ease;
+}
+
+.str-video__participant-list-item__menu-button:hover {
+  background-color: #80868b;
+  transform: scale(1.05);
+}
+
+.str-video__participant-list-item__menu-button:active {
+  transform: scale(0.95);
+}
+
+/* Dropdown menu container */
+.str-video__participant-actions-dropdown,
+.str-video__menu-container,
+[class*="participant"][class*="dropdown"],
+[class*="participant"][class*="menu"] {
+  background: linear-gradient(145deg, #2d2e31 0%, #202124 100%);
+  border-radius: 16px;
+  padding: 8px;
+  min-width: 200px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5),
+    0 2px 8px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  animation: menu-appear 0.2s ease-out;
+}
+
+@keyframes menu-appear {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.95);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Menu items */
+.str-video__participant-actions-dropdown__item,
+.str-video__menu-container button,
+.str-video__menu-container [class*="item"],
+[class*="participant"][class*="dropdown"] button,
+[class*="participant"][class*="menu"] button {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 14px 16px;
+  border: none;
+  background: transparent;
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 12px;
+  transition: all 0.15s ease;
+  text-align: left;
+}
+
+.str-video__participant-actions-dropdown__item:hover,
+.str-video__menu-container button:hover,
+.str-video__menu-container [class*="item"]:hover,
+[class*="participant"][class*="dropdown"] button:hover,
+[class*="participant"][class*="menu"] button:hover {
+  background: linear-gradient(135deg, rgba(138, 180, 248, 0.15) 0%, rgba(138, 180, 248, 0.08) 100%);
+  color: #8ab4f8;
+  transform: translateX(4px);
+}
+
+.str-video__participant-actions-dropdown__item:active,
+.str-video__menu-container button:active {
+  transform: translateX(2px) scale(0.98);
+}
+
+/* Menu item icons */
+.str-video__participant-actions-dropdown__item svg,
+.str-video__menu-container button svg,
+.str-video__menu-container [class*="item"] svg,
+[class*="participant"][class*="dropdown"] button svg,
+[class*="participant"][class*="menu"] button svg {
+  width: 20px;
+  height: 20px;
+  color: rgba(255, 255, 255, 0.7);
+  transition: color 0.15s ease;
+}
+
+.str-video__participant-actions-dropdown__item:hover svg,
+.str-video__menu-container button:hover svg,
+[class*="participant"][class*="dropdown"] button:hover svg,
+[class*="participant"][class*="menu"] button:hover svg {
+  color: #8ab4f8;
+}
+
+/* Pin action specific styling */
+.str-video__participant-actions-dropdown__item[class*="pin"],
+.str-video__menu-container button[class*="pin"],
+[class*="participant"] [class*="pin"] {
+  color: white;
+}
+
+.str-video__participant-actions-dropdown__item[class*="pin"]:hover,
+.str-video__menu-container button[class*="pin"]:hover {
+  background: linear-gradient(135deg, rgba(253, 216, 53, 0.15) 0%, rgba(253, 216, 53, 0.08) 100%);
+  color: #fdd835;
+}
+
+.str-video__participant-actions-dropdown__item[class*="pin"]:hover svg {
+  color: #fdd835;
+}
+
+/* Divider in menu */
+.str-video__participant-actions-dropdown__divider,
+.str-video__menu-container hr,
+[class*="participant"][class*="dropdown"] hr {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  border: none;
+  margin: 8px 16px;
+}
+
+/* Danger actions (kick, mute all, etc.) */
+.str-video__participant-actions-dropdown__item--danger,
+.str-video__menu-container button[class*="danger"],
+[class*="participant"] [class*="remove"],
+[class*="participant"] [class*="kick"] {
+  color: #f28b82;
+}
+
+.str-video__participant-actions-dropdown__item--danger:hover,
+.str-video__menu-container button[class*="danger"]:hover {
+  background: rgba(234, 67, 53, 0.15);
+  color: #ea4335;
+}
+
+.str-video__participant-actions-dropdown__item--danger:hover svg {
+  color: #ea4335;
+}
+
+/* ======== Custom Participants List ======== */
+
+.custom-participants-list {
+  padding: 16px;
+  color: white;
+}
+
+/* Search bar */
+.custom-participants-list__search {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #3c4043;
+  border-radius: 24px;
+  padding: 10px 16px;
+  margin-bottom: 16px;
+  border: 1px solid transparent;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.custom-participants-list__search:focus-within {
+  border-color: #8ab4f8;
+  box-shadow: 0 0 0 2px rgba(138, 180, 248, 0.2);
+}
+
+.custom-participants-list__search-icon {
+  color: rgba(255, 255, 255, 0.5);
+  flex-shrink: 0;
+}
+
+.custom-participants-list__search-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: white;
+  font-size: 14px;
+}
+
+.custom-participants-list__search-input::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+/* Participants items container */
+.custom-participants-list__items {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Individual participant item */
+.custom-participant-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  transition: background-color 0.15s ease;
+}
+
+.custom-participant-item:hover {
+  background-color: #3c4043;
+}
+
+/* Participant avatar */
+.custom-participant-item__avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: white;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.custom-participant-item__avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Participant info */
+.custom-participant-item__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.custom-participant-item__name {
+  font-size: 14px;
+  font-weight: 500;
+  color: white;
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Action buttons container */
+.custom-participant-item__actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* Individual action button */
+.custom-participant-item__btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  background-color: transparent;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.custom-participant-item__btn:hover:not(:disabled) {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Active state (unmuted/camera on) - YELLOW */
+.custom-participant-item__btn--active {
+  color: #fdd835 !important;
+  background-color: rgba(253, 216, 53, 0.15) !important;
+}
+
+.custom-participant-item__btn--active:hover:not(:disabled) {
+  background-color: rgba(253, 216, 53, 0.25) !important;
+  color: #ffeb3b !important;
+}
+
+/* Muted state - RED */
+.custom-participant-item__btn--muted {
+  color: #ea4335 !important;
+  background-color: rgba(234, 67, 53, 0.15) !important;
+}
+
+.custom-participant-item__btn--muted:hover:not(:disabled) {
+  background-color: rgba(234, 67, 53, 0.25) !important;
+}
+
+/* Video off state */
+.custom-participant-item__btn--off {
+  color: rgba(255, 255, 255, 0.4) !important;
+  background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Interactive button (local participant can click) */
+.custom-participant-item__btn--interactive {
+  cursor: pointer;
+}
+
+.custom-participant-item__btn--interactive:hover:not(:disabled) {
+  transform: scale(1.1);
+}
+
+.custom-participant-item__btn--interactive:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+/* Touch optimizations for participants list on mobile */
+@media (max-width: 767px) {
+  .custom-participant-item {
+    padding: 14px 16px;
+    gap: 16px;
+  }
+
+  .custom-participant-item__btn {
+    width: 40px;
+    height: 40px;
+  }
+
+  .custom-participant-item__btn svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .custom-participants-list__search {
+    padding: 12px 18px;
+    margin-bottom: 20px;
+  }
+}
+
+/* Disabled buttons (other participants) */
+.custom-participant-item__btn:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+/* More options button */
+.custom-participant-item__btn--more {
+  background-color: #5f6368;
+  color: white;
+}
+
+.custom-participant-item__btn--more:hover {
+  background-color: #80868b !important;
+  transform: scale(1.05);
+}
+
+/* Custom participant dropdown menu */
+.custom-participant-menu {
+  background: linear-gradient(145deg, #2d2e31 0%, #202124 100%) !important;
+  border-radius: 16px !important;
+  padding: 8px !important;
+  min-width: 180px !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5),
+    0 2px 8px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  animation: menu-appear 0.2s ease-out;
+}
+
+.custom-participant-menu__item {
+  display: flex !important;
+  align-items: center !important;
+  gap: 14px !important;
+  padding: 12px 14px !important;
+  border-radius: 10px !important;
+  color: white !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+}
+
+.custom-participant-menu__item:hover {
+  background: linear-gradient(135deg, rgba(253, 216, 53, 0.15) 0%, rgba(253, 216, 53, 0.08) 100%) !important;
+  color: #fdd835 !important;
+  transform: translateX(4px);
+}
+
+.custom-participant-menu__item:hover svg {
+  color: #fdd835 !important;
+}
+
+.custom-participant-menu__item svg {
+  color: rgba(255, 255, 255, 0.7);
+  transition: color 0.15s ease;
+}
+
+/* ======== Video Preview (Setup Screen) ======== */
+
+.str-video__video-preview-container {
+  max-width: 100%;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.str-video__video-preview-container video {
+  border-radius: 12px;
+}
+
+@media (max-width: 640px) {
+  .str-video__video-preview-container {
+    max-width: 100%;
+    width: 100%;
+    border-radius: 12px;
+  }
+
+  .str-video__video-preview-container video {
+    max-height: 50vh;
+    border-radius: 12px;
+  }
+}
+
+/* ======== Device Settings ======== */
+
+.str-video__device-settings {
+  max-width: 100%;
+}
+
+@media (max-width: 640px) {
+  .str-video__device-settings__device-kind {
+    flex-direction: column;
+    gap: 8px;
+  }
+}
+
+/* ======== Call Stats Overlay ======== */
+
+.str-video__call-stats {
+  background-color: rgba(32, 33, 36, 0.95);
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(20px);
+  max-width: 400px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+@media (max-width: 640px) {
+  .str-video__call-stats {
+    max-width: calc(100% - 16px);
+    margin: 0 8px;
+  }
+}
+
+/* ======== Menus & Notifications ======== */
+
+.str-video__menu-container {
+  color: white;
+  background-color: #292a2d;
+  border-radius: 8px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.str-video__notification {
+  color: white;
+  background-color: #292a2d;
+  border-radius: 8px;
+  padding: 12px 16px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* ======== Google Meet Style Cards ======== */
+
+.meet-card {
+  background: #292a2d;
+  border-radius: 12px;
+  padding: 20px;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+.meet-card:hover {
+  background: #3c4043;
+  border-color: rgba(138, 180, 248, 0.3);
+  transform: translateY(-2px);
+}
+
+.meet-card:active {
+  transform: translateY(0);
+}
+
+/* ======== Google Meet Buttons ======== */
+
+.btn-meet {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 24px;
+  height: 48px;
+  border-radius: 24px;
+  font-weight: 500;
+  font-size: 14px;
+  transition: all 0.15s ease;
+  cursor: pointer;
+  border: none;
+  outline: none;
+}
+
+.btn-meet-primary {
+  background: #1a73e8;
+  color: white;
+}
+
+.btn-meet-primary:hover {
+  background: #1557b0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.btn-meet-primary:active {
+  background: #174ea6;
+}
+
+.btn-meet-secondary {
+  background: transparent;
+  color: #8ab4f8;
+  border: 1px solid #5f6368;
+}
+
+.btn-meet-secondary:hover {
+  background: rgba(138, 180, 248, 0.08);
+  border-color: #8ab4f8;
+}
+
+.btn-meet-danger {
+  background: #ea4335;
+  color: white;
+}
+
+.btn-meet-danger:hover {
+  background: #d33828;
+}
+
+/* ======== Google Meet Input Fields ======== */
+
+.input-meet {
+  background: #3c4043;
+  border: 1px solid #5f6368;
+  border-radius: 8px;
+  padding: 12px 16px;
+  color: white;
+  font-size: 14px;
+  transition: all 0.15s ease;
+  outline: none;
+}
+
+.input-meet:focus {
+  border-color: #8ab4f8;
+  box-shadow: 0 0 0 2px rgba(138, 180, 248, 0.2);
+}
+
+.input-meet::placeholder {
+  color: #9aa0a6;
+}
+
+/* ======== Meeting Time Display ======== */
+
+.meeting-time {
+  font-family: 'Inter', monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.5px;
+}
+
+/* ======== Avatar / Initials ======== */
+
+.avatar-initials {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #1a73e8 0%, #8ab4f8 100%);
+  color: white;
+  font-weight: 600;
+  text-transform: uppercase;
+  border-radius: 50%;
+}
+
+/* ======== Custom Scrollbar ======== */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #3c4043;
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #5f6368;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #202124;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #5f6368;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #80868b;
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #5f6368 #202124;
+}
+
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #3c4043 transparent;
+}
+
+/* ======== Focus States ======== */
+
+*:focus-visible {
+  outline: 2px solid #8ab4f8;
+  outline-offset: 2px;
+}
+
+/* ======== Selection ======== */
+
+::selection {
+  background: rgba(138, 180, 248, 0.3);
+  color: white;
+}
+
+/* ======== Google Meet Chat Panel ======== */
+
+.chat-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background-color: #202124;
+  color: white;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.3);
+}
+
+.chat-panel--mobile {
+  border-radius: 24px 24px 0 0;
+  height: 100%;
+  /* Use dvh for dynamic viewport height support to handle keyboards better */
+  max-height: 100dvh;
+}
+
+/* Chat header */
+.chat-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(32, 33, 36, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  flex-shrink: 0;
+}
+
+.chat-panel__header-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.chat-panel__header-title h3 {
+  font-size: 16px;
+  font-weight: 500;
+  color: white;
+  margin: 0;
+}
+
+.chat-panel__close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: transparent;
+  border: none;
+  color: white/70;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.chat-panel__close-btn:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.chat-panel__close-btn:active {
+  transform: scale(0.95);
+}
+
+/* Info banner */
+.chat-panel__info {
+  padding: 12px 20px;
+  background: rgba(138, 180, 248, 0.08);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  flex-shrink: 0;
+}
+
+.chat-panel__info p {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* Messages container */
+.chat-panel__messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 0;
+}
+
+/* Empty state */
+.chat-panel__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  text-align: center;
+  padding: 40px 20px;
+  gap: 12px;
+}
+
+.chat-panel__empty p {
+  font-size: 16px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.7);
+  margin: 0;
+}
+
+.chat-panel__empty span {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+/* Chat message */
+.chat-message {
+  display: flex;
+  gap: 12px;
+  padding: 2px 0;
+  animation: message-appear 0.2s ease-out;
+}
+
+@keyframes message-appear {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.chat-message--own {
+  flex-direction: row-reverse;
+}
+
+.chat-message--with-avatar {
+  margin-top: 12px;
+}
+
+.chat-message__avatar {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: white;
+  text-transform: uppercase;
+}
+
+.chat-message--own .chat-message__avatar {
+  display: none;
+}
+
+.chat-message:not(.chat-message--with-avatar) .chat-message__content {
+  margin-left: 44px;
+}
+
+.chat-message--own:not(.chat-message--with-avatar) .chat-message__content {
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.chat-message__content {
+  display: flex;
+  flex-direction: column;
+  max-width: 85%;
+}
+
+.chat-message__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.chat-message--own .chat-message__header {
+  flex-direction: row-reverse;
+}
+
+.chat-message__sender {
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.chat-message__time {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.chat-message__bubble {
+  padding: 10px 14px;
+  border-radius: 18px;
+  background: #3c4043;
+  word-wrap: break-word;
+  word-break: break-word;
+}
+
+.chat-message--own .chat-message__bubble {
+  background: #1a73e8;
+  border-bottom-right-radius: 6px;
+}
+
+.chat-message:not(.chat-message--own) .chat-message__bubble {
+  border-bottom-left-radius: 6px;
+}
+
+.chat-message__bubble p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: white;
+}
+
+/* Clickable links in chat messages */
+.chat-message__link {
+  color: #8ab4f8;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  word-break: break-all;
+  transition: color 0.15s ease, opacity 0.15s ease;
+}
+
+.chat-message__link:hover {
+  color: #aecbfa;
+  opacity: 0.9;
+}
+
+.chat-message__link:active {
+  opacity: 0.7;
+}
+
+/* Links in own messages (blue bubble) should be lighter */
+.chat-message--own .chat-message__link {
+  color: #c2e7ff;
+}
+
+.chat-message--own .chat-message__link:hover {
+  color: #ffffff;
+}
+
+/* Input area */
+.chat-panel__input-area {
+  padding: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  background: #202124;
+  flex-shrink: 0;
+}
+
+.chat-panel__input-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #3c4043;
+  border-radius: 24px;
+  padding: 6px 6px 6px 18px;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  min-height: 48px;
+}
+
+.chat-panel__input-container:focus-within {
+  border-color: #8ab4f8;
+  box-shadow: 0 0 0 2px rgba(138, 180, 248, 0.2);
+}
+
+.chat-panel__input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: white;
+  font-size: 14px;
+  padding: 8px 0;
+  min-width: 0;
+}
+
+.chat-panel__input::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.chat-panel__send-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #1a73e8;
+  border: none;
+  color: white;
+  cursor: pointer;
+  transition: background-color 0.15s ease, transform 0.1s ease, opacity 0.15s ease;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.chat-panel__send-btn:hover:not(:disabled) {
+  background: #1557b0;
+}
+
+.chat-panel__send-btn:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.chat-panel__send-btn:disabled {
+  background: #5f6368;
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Chat toggle button styling */
+.chat-toggle-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #3c4043;
+  border: none;
+  color: white;
+  cursor: pointer;
+  transition: background-color 0.15s ease, transform 0.1s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.chat-toggle-btn:hover {
+  background-color: #5f6368;
+}
+
+.chat-toggle-btn:active {
+  transform: scale(0.95);
+}
+
+.chat-toggle-btn--active {
+  background-color: #1a73e8;
+}
+
+.chat-toggle-btn--active:hover {
+  background-color: #1557b0;
+}
+
+.chat-toggle-btn__badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: #ea4335;
+  color: white;
+  font-size: 11px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: badge-pop 0.2s ease-out;
+}
+
+@keyframes badge-pop {
+  0% {
+    transform: scale(0);
+  }
+
+  70% {
+    transform: scale(1.2);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Mobile chat panel responsive */
+@media (max-width: 767px) {
+  .chat-panel__header {
+    padding: 14px 16px;
+  }
+
+  .chat-panel__header-title h3 {
+    font-size: 15px;
+  }
+
+  .chat-panel__info {
+    padding: 10px 16px;
+  }
+
+  .chat-panel__messages {
+    padding: 12px;
+  }
+
+  .chat-message__bubble {
+    padding: 8px 12px;
+  }
+
+  .chat-message__bubble p {
+    font-size: 13px;
+  }
+
+  .chat-panel__input-area {
+    padding: 10px 12px;
+  }
+
+  .chat-panel__input {
+    font-size: 16px;
+    /* Prevents iOS auto-zoom on focus */
+    padding: 12px 0;
+  }
+
+  /* Ensure the input area is pushed up by the keyboard */
+  .chat-panel__input-area {
+    padding: 12px 14px;
+    padding-bottom: max(12px, env(safe-area-inset-bottom, 0px));
+    background: #202124;
+  }
+
+  .chat-toggle-btn {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+/* Extra small mobile */
+@media (max-width: 399px) {
+  .chat-panel__header {
+    padding: 12px 14px;
+  }
+
+  .chat-panel__header-title h3 {
+    font-size: 14px;
+  }
+
+  .chat-message__avatar {
+    width: 28px;
+    height: 28px;
+    font-size: 11px;
+  }
+
+  .chat-message:not(.chat-message--with-avatar) .chat-message__content {
+    margin-left: 40px;
+  }
+
+  .chat-toggle-btn {
+    width: 42px;
+    height: 42px;
+  }
+}
+
+/* ======== Custom Participants List ======== */
+
+.custom-participants-list {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  color: white;
+}
+
+.custom-participants-list__search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.custom-participants-list__search-icon {
+  color: rgba(255, 255, 255, 0.5);
+  flex-shrink: 0;
+}
+
+.custom-participants-list__search-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: white;
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.custom-participants-list__search-input::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.custom-participants-list__items {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.custom-participant-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  transition: background-color 0.15s ease;
+}
+
+.custom-participant-item:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.custom-participant-item__avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: white;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.custom-participant-item__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.custom-participant-item__name {
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+
+.custom-participant-item__actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.custom-participant-item__btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.custom-participant-item__btn:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.custom-participant-item__btn:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.custom-participant-item__btn:disabled:hover {
+  background-color: transparent;
+}
+
+.custom-participant-item__btn--interactive {
+  cursor: pointer;
+}
+
+.custom-participant-item__btn--interactive:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+  color: white;
+  transform: scale(1.1);
+}
+
+.custom-participant-item__btn--interactive:active {
+  transform: scale(0.95);
+}
+
+.custom-participant-item__btn--active {
+  color: #34a853;
+}
+
+/* When host hovers on active mic/camera to mute */
+.custom-participant-item__btn--active.custom-participant-item__btn--interactive:hover {
+  background-color: rgba(234, 67, 53, 0.2);
+  color: #ea4335;
+}
+
+.custom-participant-item__btn--muted,
+.custom-participant-item__btn--off {
+  color: #ea4335;
+}
+
+.custom-participant-item__btn--more:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: white;
+}
+
+/* Participant dropdown menu */
+.custom-participant-menu {
+  min-width: 200px;
+  padding: 6px;
+  border-radius: 12px;
+  background: #2d2e30;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.custom-participant-menu__item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  color: white;
+  font-size: 14px;
+}
+
+.custom-participant-menu__item:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.custom-participant-menu__item:focus {
+  background-color: rgba(255, 255, 255, 0.1);
+  outline: none;
+}
+
+/* Host control menu items */
+.custom-participant-menu__item--host {
+  color: rgba(251, 191, 36, 0.95);
+}
+
+.custom-participant-menu__item--host:hover {
+  background-color: rgba(251, 191, 36, 0.1);
+}
+
+.custom-participant-menu__item--danger {
+  color: #ea4335;
+}
+
+.custom-participant-menu__item--danger:hover {
+  background-color: rgba(234, 67, 53, 0.15);
+}
+
+/* Host badge indicator */
+.custom-participant-item__host-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(26, 115, 232, 0.2);
+  color: #8ab4f8;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Participants panel container */
+.participants-panel {
+  background: #202124;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 767px) {
+  .custom-participant-item {
+    padding: 8px 10px;
+  }
+
+  .custom-participant-item__avatar {
+    width: 36px;
+    height: 36px;
+    font-size: 13px;
+  }
+
+  .custom-participant-item__name {
+    font-size: 13px;
+  }
+
+  .custom-participant-item__btn {
+    width: 30px;
+    height: 30px;
+  }
+
+  .custom-participant-menu {
+    min-width: 180px;
+  }
+
+  .custom-participant-menu__item {
+    padding: 8px 10px;
+    font-size: 13px;
+    gap: 10px;
+  }
+}
+
+/* ======== Floating Screen Share Bar (Host) ======== */
+.floating-share-bar {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: rgba(32, 33, 36, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  animation: bar-slide-down 0.3s ease-out;
+}
+
+@keyframes bar-slide-down {
+  from {
+    transform: translateX(-50%) translateY(-20px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+}
+
+.floating-share-bar__text {
+  font-size: 14px;
+  font-weight: 500;
+  color: white;
+}
+
+.floating-share-bar__btn {
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.floating-share-bar__btn--stop {
+  background-color: #ea4335;
+  color: white;
+}
+
+.floating-share-bar__btn--stop:hover {
+  background-color: #d33828;
+}
+
+.floating-share-bar__btn--view {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: white;
+}
+
+.floating-share-bar__btn--view:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Custom Screen Share Button State */
+.btn-screen-share--active {
+  background-color: #ea4335 !important;
+}
+
+.btn-screen-share--active:hover {
+  background-color: #d33828 !important;
+}
+
+/* ======== Call Settings Component Styles ======== */
+
+/* Custom scrollbar for settings panels */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(59, 130, 246, 0.4) transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(59, 130, 246, 0.4);
+  border-radius: 3px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(59, 130, 246, 0.6);
+}
+
+/* Call Settings Dialog */
+.call-settings-dialog {
+  background: linear-gradient(135deg, rgba(20, 21, 25, 0.98) 0%, rgba(32, 33, 36, 0.98) 100%);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+/* Settings tab button hover effect */
+.settings-tab-button {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.settings-tab-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  transition: left 0.5s;
+}
+
+.settings-tab-button:hover::before {
+  left: 100%;
+}
+
+/* Settings row with hover effect */
+.settings-row {
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.settings-row::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #3b82f6, transparent);
+  transition: width 0.3s ease;
+}
+
+.settings-row:hover::after {
+  width: 100%;
+}
+
+/* Slider styling for settings */
+input[type='range'] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(to right, rgba(59, 130, 246, 0.3) 0%, rgba(59, 130, 246, 0.1) 100%);
+  outline: none;
+  -webkit-slider-thumb-appearance: none;
+}
+
+input[type='range']::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #3b82f6;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
+  transition: all 0.2s ease;
+}
+
+input[type='range']::-webkit-slider-thumb:hover {
+  background: #2563eb;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.6);
+  transform: scale(1.2);
+}
+
+input[type='range']::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #3b82f6;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
+  transition: all 0.2s ease;
+}
+
+input[type='range']::-moz-range-thumb:hover {
+  background: #2563eb;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.6);
+  transform: scale(1.2);
+}
+
+/* Select dropdown styling */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 20px;
+  padding-right: 32px;
+}
+
+/* Test audio button animation */
+@keyframes pulse-audio {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.test-audio-active {
+  animation: pulse-audio 0.5s ease-in-out;
+}
+
+/* Toggle switch styles */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 48px;
+  height: 28px;
+  background: #374151;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+
+.toggle-switch.active {
+  background: #10b981;
+}
+
+.toggle-switch::after {
+  content: '';
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  background: white;
+  border-radius: 50%;
+  top: 2px;
+  left: 2px;
+  transition: left 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.toggle-switch.active::after {
+  left: 22px;
+}
+
+/* Settings header gradient */
+.settings-header-gradient {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(99, 102, 241, 0.05) 100%);
+}
+
+/* Smooth transitions */
+* {
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+/* Prevent transition on transform and opacity for performance */
+.settings-tab-button,
+input[type='range']::-webkit-slider-thumb {
+  transition: background-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}

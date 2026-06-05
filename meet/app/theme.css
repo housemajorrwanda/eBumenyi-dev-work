@@ -1,0 +1,3835 @@
+/* Light Mode Theme Variables */
+[data-theme='light'] {
+  --color-bg-primary: #ffffff;
+  --color-bg-secondary: #f8f9fa;
+  --color-bg-tertiary: #e9ecef;
+  --color-bg-quaternary: #dee2e6;
+  
+  --color-text-primary: #1a1a1a;
+  --color-text-secondary: #495057;
+  --color-text-tertiary: #6c757d;
+  
+  --color-border-primary: #dee2e6;
+  --color-border-secondary: #adb5bd;
+}
+
+/* Dark Mode Theme Variables (default) */
+[data-theme='dark'] {
+  --color-bg-primary: #0a0e27;
+  --color-bg-secondary: #1a1f3a;
+  --color-bg-tertiary: #232d4b;
+  --color-bg-quaternary: #2c3856;
+  
+  --color-text-primary: #ffffff;
+  --color-text-secondary: #e0e0e0;
+  --color-text-tertiary: #a0a0a0;
+  
+  --color-border-primary: #2c3856;
+  --color-border-secondary: #404858;
+}
+
+/* Light Mode Background Colors */
+[data-theme='light'] .bg-dark-1 {
+  background-color: #f8f9fa;
+}
+
+[data-theme='light'] .bg-dark-2 {
+  background-color: #e9ecef;
+}
+
+[data-theme='light'] .bg-dark-3 {
+  background-color: #dee2e6;
+}
+
+[data-theme='light'] .bg-dark-4 {
+  background-color: #ced4da;
+}
+
+/* Light Mode Text Colors */
+[data-theme='light'] .text-white {
+  color: #1a1a1a;
+}
+
+[data-theme='light'] .text-white\/50 {
+  color: rgba(26, 26, 26, 0.6);
+}
+
+[data-theme='light'] .text-white\/60 {
+  color: rgba(26, 26, 26, 0.7);
+}
+
+[data-theme='light'] .text-white\/70 {
+  color: rgba(26, 26, 26, 0.8);
+}
+
+[data-theme='light'] .text-white\/80 {
+  color: rgba(26, 26, 26, 0.85);
+}
+
+/* Light Mode Border Colors */
+[data-theme='light'] .border-dark-3 {
+  border-color: #dee2e6;
+}
+
+[data-theme='light'] .border-dark-4 {
+  border-color: #ced4da;
+}
+
+/* Light Mode Hover States */
+[data-theme='light'] .hover\:bg-dark-2:hover {
+  background-color: #dde1e6;
+}
+
+[data-theme='light'] .hover\:bg-dark-3:hover {
+  background-color: #ced4da;
+}
+
+[data-theme='light'] .hover\:bg-dark-4:hover {
+  background-color: #c1c7ce;
+}
+
+/* Light Mode Button Styles */
+[data-theme='light'] button {
+  color: #1a1a1a;
+  background-color: #e9ecef;
+  border-color: #dee2e6;
+  transition: all 0.2s ease;
+}
+
+[data-theme='light'] button:hover:not(:disabled) {
+  background-color: #dde1e6;
+  border-color: #ced4da;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+[data-theme='light'] button:active:not(:disabled) {
+  background-color: #ced4da;
+  transform: translateY(1px);
+}
+
+/* Light Mode Primary Buttons */
+[data-theme='light'] button.bg-blue-1,
+[data-theme='light'] .bg-blue-1 {
+  background-color: #0d6efd;
+  color: #ffffff;
+  border-color: #0d6efd;
+}
+
+[data-theme='light'] button.bg-blue-1:hover:not(:disabled),
+[data-theme='light'] .bg-blue-1:hover:not(:disabled) {
+  background-color: #0b5ed7;
+  border-color: #0a58ca;
+  box-shadow: 0 4px 8px rgba(13, 110, 253, 0.3);
+}
+
+/* Light Mode Danger Buttons */
+[data-theme='light'] button.text-red-400,
+[data-theme='light'] button.text-red-500,
+[data-theme='light'] .text-red-400,
+[data-theme='light'] .text-red-500 {
+  color: #dc2626;
+}
+
+[data-theme='light'] button.text-red-400:hover,
+[data-theme='light'] button.text-red-500:hover,
+[data-theme='light'] .text-red-400:hover,
+[data-theme='light'] .text-red-500:hover {
+  color: #b91c1c;
+  background-color: rgba(220, 38, 38, 0.1);
+}
+
+/* Light Mode Secondary Buttons */
+[data-theme='light'] .px-3.py-2.rounded-lg,
+[data-theme='light'] .px-4.py-2.rounded-lg,
+[data-theme='light'] button[type="button"],
+[data-theme='light'] button[type="submit"] {
+  background-color: #e9ecef;
+  color: #1a1a1a;
+  border-color: #dee2e6;
+}
+
+[data-theme='light'] .px-3.py-2.rounded-lg:hover,
+[data-theme='light'] .px-4.py-2.rounded-lg:hover,
+[data-theme='light'] button[type="button"]:hover:not(:disabled),
+[data-theme='light'] button[type="submit"]:hover:not(:disabled) {
+  background-color: #dde1e6;
+  border-color: #ced4da;
+}
+
+/* Light Mode Toggle/Switch */
+[data-theme='light'] .rounded-full {
+  background-color: #e9ecef;
+  color: #1a1a1a;
+  border-color: #dee2e6;
+}
+
+[data-theme='light'] .rounded-full:hover {
+  background-color: #dde1e6;
+  border-color: #ced4da;
+}
+
+/* Light Mode Background Opacities */
+[data-theme='light'] .bg-dark-2\/50 {
+  background-color: rgba(233, 236, 239, 0.5);
+}
+
+[data-theme='light'] .bg-dark-3\/50 {
+  background-color: rgba(222, 226, 230, 0.5);
+}
+
+[data-theme='light'] .bg-dark-3\/30 {
+  background-color: rgba(222, 226, 230, 0.3);
+}
+
+[data-theme='light'] .bg-dark-1\/95 {
+  background-color: rgba(248, 249, 250, 0.95);
+}
+
+/* Light Mode Blue Colors */
+[data-theme='light'] .bg-blue-1\/10 {
+  background-color: rgba(13, 110, 253, 0.1);
+}
+
+[data-theme='light'] .bg-blue-2\/10 {
+  background-color: rgba(13, 92, 230, 0.1);
+}
+
+[data-theme='light'] .bg-blue-1\/20 {
+  background-color: rgba(13, 110, 253, 0.2);
+}
+
+[data-theme='light'] .text-blue-1 {
+  color: #0d6efd;
+}
+
+[data-theme='light'] .text-blue-2 {
+  color: #0d5ce6;
+}
+
+[data-theme='light'] .border-blue-1\/30 {
+  border-color: rgba(13, 110, 253, 0.3);
+}
+
+/* Light Mode Icon Colors */
+[data-theme='light'] svg {
+  color: inherit;
+}
+
+[data-theme='light'] .text-yellow-400 {
+  color: #facc15;
+}
+
+[data-theme='light'] .text-slate-700 {
+  color: #374151;
+}
+
+[data-theme='light'] .text-red-400 {
+  color: #f87171;
+}
+
+[data-theme='light'] .text-red-500 {
+  color: #dc2626;
+}
+
+[data-theme='light'] .text-green-500 {
+  color: #22c55e;
+}
+
+[data-theme='light'] .text-gray-500 {
+  color: #6b7280;
+}
+
+[data-theme='light'] .text-gray-600 {
+  color: #4b5563;
+}
+
+[data-theme='light'] .text-gray-700 {
+  color: #374151;
+}
+
+/* Light Mode Lucide Icons in buttons */
+[data-theme='light'] button svg,
+[data-theme='light'] button [class*="lucide"] {
+  color: inherit;
+}
+
+[data-theme='light'] .text-blue-1 svg {
+  color: #0d6efd;
+}
+
+/* Light Mode Shadow */
+[data-theme='light'] .shadow {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme='light'] .shadow-lg {
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+[data-theme='light'] .shadow-xl {
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+}
+
+/* Light Mode Input/Textarea/Select */
+[data-theme='light'] input,
+[data-theme='light'] textarea,
+[data-theme='light'] select {
+  background-color: #ffffff;
+  color: #1a1a1a;
+  border-color: #dee2e6;
+}
+
+[data-theme='light'] input::placeholder,
+[data-theme='light'] textarea::placeholder {
+  color: #adb5bd;
+}
+
+[data-theme='light'] input:hover,
+[data-theme='light'] textarea:hover,
+[data-theme='light'] select:hover {
+  border-color: #ced4da;
+  background-color: #f8f9fa;
+}
+
+[data-theme='light'] input:focus,
+[data-theme='light'] textarea:focus,
+[data-theme='light'] select:focus {
+  border-color: #0d6efd;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.1);
+  background-color: #ffffff;
+}
+
+/* Light Mode Card/Border Styles */
+[data-theme='light'] .rounded-xl.border {
+  background-color: #f8f9fa;
+  border-color: #dee2e6;
+  color: #1a1a1a;
+}
+
+[data-theme='light'] .border {
+  border-color: #dee2e6;
+}
+
+/* Light Mode Scrollbar */
+[data-theme='light'] ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+[data-theme='light'] ::-webkit-scrollbar-track {
+  background: #f8f9fa;
+}
+
+[data-theme='light'] ::-webkit-scrollbar-thumb {
+  background: #dee2e6;
+  border-radius: 4px;
+}
+
+[data-theme='light'] ::-webkit-scrollbar-thumb:hover {
+  background: #ced4da;
+}
+
+/* Light Mode Loader/Spinner */
+[data-theme='light'] [class*="Loader"],
+[data-theme='light'] [class*="spinner"] {
+  color: #0d6efd;
+  border-color: rgba(13, 110, 253, 0.2);
+}
+
+/* Light Mode Badge Colors */
+[data-theme='light'] .inline-flex.items-center.gap-1.rounded-full {
+  background-color: #e9ecef;
+  color: #1a1a1a;
+}
+
+/* Light Mode Icons inside containers */
+[data-theme='light'] .rounded-xl svg {
+  color: inherit;
+}
+
+/* Light Mode Text on colored backgrounds */
+[data-theme='light'] .bg-blue-1 .text-white {
+  color: #ffffff;
+}
+
+/* Light Mode Image Brightness */
+[data-theme='light'] img {
+  opacity: 1;
+}
+
+[data-theme='light'] .brightness-75 {
+  filter: brightness(0.85);
+}
+
+[data-theme='light'] .brightness-100 {
+  filter: brightness(1);
+}
+
+[data-theme='light'] .group-hover\:brightness-100:hover {
+  filter: brightness(1);
+}
+
+/* Light Mode Scale Transform */
+[data-theme='light'] .group-hover\:scale-110:hover {
+  transform: scale(1.1);
+}
+
+/* Light Mode Utility Classes */
+[data-theme='light'] .transition-all {
+  transition: all 0.2s ease;
+}
+
+[data-theme='light'] .transition-colors {
+  transition: color 0.2s ease;
+}
+
+[data-theme='light'] .duration-200 {
+  transition-duration: 200ms;
+}
+
+/* Light Mode Max Content */
+[data-theme='light'] .max-sm\:hidden {
+  display: none;
+}
+
+@media (min-width: 640px) {
+  [data-theme='light'] .max-sm\:hidden {
+    display: block;
+  }
+}
+
+/* Light Mode No Calls Message */
+[data-theme='light'] .text-center {
+  color: #1a1a1a;
+}
+
+[data-theme='light'] .text-center .text-2xl {
+  color: #1a1a1a;
+}
+
+[data-theme='light'] .text-center .text-xl {
+  color: #1a1a1a;
+}
+
+/* Light Mode Loading State */
+[data-theme='light'] .flex.items-center.justify-center {
+  background-color: transparent;
+}
+
+/* Light Mode Empty State */
+[data-theme='light'] .flex.flex-col.items-center.justify-center.gap-6 {
+  color: #1a1a1a;
+}
+
+/* Light Mode Grid/List Container */
+[data-theme='light'] .grid {
+  gap: inherit;
+}
+
+[data-theme='light'] .grid > * {
+  background-color: #ffffff;
+  border-color: #dee2e6;
+}
+
+/* Light Mode Small/Secondary Text */
+[data-theme='light'] .text-xs,
+[data-theme='light'] .text-sm {
+  color: #495057;
+}
+
+/* Light Mode Code/Monospace */
+[data-theme='light'] code,
+[data-theme='light'] pre {
+  background-color: #e9ecef;
+  color: #1a1a1a;
+  border-color: #dee2e6;
+}
+
+/* Light Mode Table */
+[data-theme='light'] table {
+  color: #1a1a1a;
+  border-color: #dee2e6;
+}
+
+[data-theme='light'] th,
+[data-theme='light'] td {
+  border-color: #dee2e6;
+}
+
+[data-theme='light'] tr:hover {
+  background-color: #f1f3f5;
+}
+
+/* Light Mode Specific Element Overrides */
+[data-theme='light'] nav {
+  background-color: rgba(248, 249, 250, 0.95);
+}
+
+[data-theme='light'] .bg-gradient-to-br {
+  background-image: linear-gradient(to bottom right, #0d6efd, #0d5ce6);
+}
+
+[data-theme='light'] .bg-gradient-to-r {
+  background-image: linear-gradient(to right, rgba(13, 110, 253, 0.1), rgba(13, 92, 230, 0.1));
+}
+
+/* Light Mode Alert/Toast */
+[data-theme='light'] .bg-red-500\/10 {
+  background-color: rgba(239, 68, 68, 0.1);
+}
+
+[data-theme='light'] .text-red-500 {
+  color: #dc2626;
+}
+
+/* Light Mode Dropdown/Menu */
+[data-theme='light'] [role="menu"],
+[data-theme='light'] [role="menuitem"] {
+  background-color: #ffffff;
+  color: #1a1a1a;
+  border-color: #dee2e6;
+}
+
+[data-theme='light'] [role="menuitem"]:hover:not([aria-disabled="true"]) {
+  background-color: #e9ecef;
+  color: #1a1a1a;
+}
+
+[data-theme='light'] [role="menuitem"][aria-disabled="true"] {
+  color: #adb5bd;
+  cursor: not-allowed;
+}
+
+/* Light Mode Dropdown Content */
+[data-theme='light'] div[class*="DropdownMenuContent"] {
+  background-color: #ffffff;
+  border-color: #dee2e6;
+  color: #1a1a1a;
+}
+
+/* Light Mode Dropdown Items */
+[data-theme='light'] div[class*="DropdownMenuItem"] {
+  color: #1a1a1a;
+}
+
+[data-theme='light'] div[class*="DropdownMenuItem"]:hover {
+  background-color: #e9ecef;
+}
+
+/* Light Mode Dropdown Separator */
+[data-theme='light'] div[class*="DropdownMenuSeparator"] {
+  background-color: #dee2e6;
+}
+
+/* Light Mode Links */
+[data-theme='light'] a {
+  color: #0d6efd;
+}
+
+[data-theme='light'] a:hover {
+  color: #0b5ed7;
+}
+
+/* Light Mode Disabled States */
+[data-theme='light'] [disabled],
+[data-theme='light'] [aria-disabled="true"] {
+  opacity: 0.6;
+  color: #6c757d;
+}
+
+/* Light Mode Focus States */
+[data-theme='light'] button:focus-visible,
+[data-theme='light'] input:focus-visible,
+[data-theme='light'] a:focus-visible {
+  outline: 2px solid #0d6efd;
+  outline-offset: 2px;
+}
+
+/* Light Mode Badge/Tag */
+[data-theme='light'] .px-2.py-1.rounded-md,
+[data-theme='light'] .px-3.py-1.rounded-lg {
+  background-color: #e9ecef;
+  color: #1a1a1a;
+  border-color: #dee2e6;
+}
+
+[data-theme='light'] .px-2.py-1.rounded-md:hover,
+[data-theme='light'] .px-3.py-1.rounded-lg:hover {
+  background-color: #dde1e6;
+  border-color: #ced4da;
+}
+
+/* Light Mode Alert Box */
+[data-theme='light'] [role="alert"] {
+  background-color: #f8f9fa;
+  border-color: #dee2e6;
+  color: #1a1a1a;
+}
+
+[data-theme='light'] .bg-red-500\/10 {
+  background-color: rgba(220, 38, 38, 0.1);
+}
+
+/* Light Mode Card Hover */
+[data-theme='light'] .rounded-xl:hover {
+  background-color: #f1f3f5;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+/* Light Mode Link Text */
+[data-theme='light'] .font-semibold {
+  color: #1a1a1a;
+}
+
+[data-theme='light'] .font-medium {
+  color: #2d3436;
+}
+
+[data-theme='light'] .font-bold {
+  color: #1a1a1a;
+}
+
+/* Light Mode Call Cards/Lists */
+[data-theme='light'] [class*="CallList"],
+[data-theme='light'] [class*="MeetingCard"] {
+  background-color: #ffffff;
+  border-color: #dee2e6;
+  color: #1a1a1a;
+}
+
+[data-theme='light'] [class*="CallList"]:hover,
+[data-theme='light'] [class*="MeetingCard"]:hover {
+  background-color: #f8f9fa;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+/* Light Mode Calendar/Date Picker */
+[data-theme='light'] .react-datepicker {
+  background-color: #ffffff;
+  border-color: #dee2e6;
+  color: #1a1a1a;
+}
+
+[data-theme='light'] .react-datepicker__header {
+  background-color: #e9ecef;
+  border-color: #dee2e6;
+}
+
+[data-theme='light'] .react-datepicker__day {
+  color: #1a1a1a;
+}
+
+[data-theme='light'] .react-datepicker__day:hover {
+  background-color: #e9ecef;
+}
+
+[data-theme='light'] .react-datepicker__day--selected {
+  background-color: #0d6efd;
+  color: #ffffff;
+}
+
+[data-theme='light'] .react-datepicker__day--keyboard-selected {
+  background-color: #e9ecef;
+}
+
+/* Light Mode Modal/Dialog */
+[data-theme='light'] [role="dialog"] {
+  background-color: #ffffff;
+  border-color: #dee2e6;
+  color: #1a1a1a;
+}
+
+[data-theme='light'] [role="dialog"] .bg-dark-1 {
+  background-color: #f8f9fa;
+}
+
+[data-theme='light'] [role="dialog"] .bg-dark-2 {
+  background-color: #e9ecef;
+}
+
+/* Light Mode Sidebar - High Specificity Overrides */
+[data-theme='light'] section.sticky.left-0.top-0 {
+  background-color: #f8f9fa !important;
+  border-right: 1px solid #dee2e6;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 100vh;
+}
+
+[data-theme='light'] section.sticky.left-0.top-0 .text-white {
+  color: #1a1a1a;
+}
+
+[data-theme='light'] section.sticky.left-0.top-0 a {
+  color: rgba(26, 26, 26, 0.7);
+}
+
+/* Critical: Override Tailwind hover classes */
+[data-theme='light'] section.sticky.left-0.top-0 a.hover\:bg-dark-2\/60:hover,
+[data-theme='light'] section.sticky.left-0.top-0 a:not(.bg-blue-1):hover {
+  background-color: #e9ecef !important;
+  color: rgba(26, 26, 26, 0.9) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Active state (blue) */
+[data-theme='light'] section.sticky.left-0.top-0 a.bg-blue-1 {
+  background-color: #0d6efd !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3) !important;
+}
+
+[data-theme='light'] section.sticky.left-0.top-0 a.bg-blue-1:hover {
+  background-color: #0b5ed7 !important;
+  box-shadow: 0 6px 16px rgba(13, 110, 253, 0.4) !important;
+}
+
+/* Border and opacity adjustments */
+[data-theme='light'] section.sticky.left-0.top-0 .border-dark-3 {
+  border-color: #dee2e6;
+}
+
+[data-theme='light'] section.sticky.left-0.top-0 .text-white\/40 {
+  color: rgba(26, 26, 26, 0.4);
+}
+
+[data-theme='light'] section.sticky.left-0.top-0 .text-white\/70 {
+  color: rgba(26, 26, 26, 0.7);
+}
+
+/* Group hover effects */
+[data-theme='light'] section.sticky.left-0.top-0 a:hover .group-hover\:text-white {
+  color: #1a1a1a !important;
+}
+
+[data-theme='light'] section.sticky.left-0.top-0 a:hover .group-hover\:brightness-100 {
+  filter: brightness(1) !important;
+}
+
+[data-theme='light'] section.sticky.left-0.top-0 a:hover .group-hover\:scale-110 {
+  transform: scale(1.1) !important;
+}
+
+/* Version text styling in light mode */
+[data-theme='light'] section.sticky.left-0.top-0 .text-white\/40 {
+  color: rgba(26, 26, 26, 0.5);
+}
+
+[data-theme='light'] section.sticky.left-0.top-0 .border-dark-3 {
+  border-color: #dee2e6;
+}
+
+/* Light Mode Meeting Setup Button Styles */
+/* Blue button (mic/camera enabled) */
+[data-theme='light'] button.bg-blue-1\/80,
+[data-theme='light'] button:has(+ .bg-blue-1\/80) {
+  background-color: #0d6efd !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3) !important;
+}
+
+[data-theme='light'] button.bg-blue-1\/80:hover,
+[data-theme='light'] button:has(+ .hover\:bg-blue-1):hover {
+  background-color: #0b5ed7 !important;
+  box-shadow: 0 6px 16px rgba(13, 110, 253, 0.4) !important;
+}
+
+/* Red button (mic/camera disabled) */
+[data-theme='light'] button.bg-red-500 {
+  background-color: #dc3545 !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3) !important;
+}
+
+[data-theme='light'] button.bg-red-500:hover {
+  background-color: #c82333 !important;
+  box-shadow: 0 6px 16px rgba(220, 53, 69, 0.4) !important;
+}
+
+/* Generic light mode button styling for size-16 rounded-full buttons */
+[data-theme='light'] button.size-16 {
+  color: #ffffff !important;
+}
+
+[data-theme='light'] button.rounded-full {
+  color: #ffffff !important;
+}
+
+/* Light Mode Loader Styles */
+[data-theme='light'] .bg-dark-1 {
+  background-color: #f8f9fa;
+}
+
+[data-theme='light'] .flex-center {
+  background-color: #f8f9fa;
+}
+
+[data-theme='light'] .border-dark-3 {
+  border-color: #dee2e6;
+}
+
+[data-theme='light'] .text-white\/60 {
+  color: rgba(26, 26, 26, 0.6);
+}
+
+[data-theme='light'] .border-t-blue-1 {
+  border-top-color: #0d6efd;
+}
+
+/* Light Mode Meeting Room Styles */
+[data-theme='light'] section {
+  background-color: #f8f9fa;
+  color: #1a1a1a;
+}
+
+[data-theme='light'] .text-white {
+  color: #1a1a1a !important;
+}
+
+[data-theme='light'] .text-white\/5 {
+  color: rgba(26, 26, 26, 0.05);
+}
+
+[data-theme='light'] .text-white\/40 {
+  color: rgba(26, 26, 26, 0.4);
+}
+
+[data-theme='light'] .text-white\/60 {
+  color: rgba(26, 26, 26, 0.6);
+}
+
+[data-theme='light'] .text-white\/80 {
+  color: rgba(26, 26, 26, 0.8);
+}
+
+[data-theme='light'] .text-white\/90 {
+  color: rgba(26, 26, 26, 0.9);
+}
+
+/* Meeting Room Backgrounds */
+[data-theme='light'] .bg-dark-1 {
+  background-color: #f8f9fa !important;
+}
+
+[data-theme='light'] .bg-dark-2 {
+  background-color: #e9ecef !important;
+}
+
+[data-theme='light'] .bg-dark-2\/40 {
+  background-color: rgba(233, 236, 239, 0.4) !important;
+}
+
+[data-theme='light'] .bg-dark-2\/90 {
+  background-color: rgba(233, 236, 239, 0.9) !important;
+}
+
+[data-theme='light'] .bg-dark-3 {
+  background-color: #dee2e6 !important;
+}
+
+[data-theme='light'] .bg-dark-3\/80 {
+  background-color: rgba(222, 226, 230, 0.8) !important;
+}
+
+[data-theme='light'] .bg-dark-4 {
+  background-color: #ced4da !important;
+}
+
+/* Meeting Room Borders */
+[data-theme='light'] .border-dark-3 {
+  border-color: #dee2e6 !important;
+}
+
+[data-theme='light'] .border-dark-4 {
+  border-color: #ced4da !important;
+}
+
+[data-theme='light'] .border-white\/5 {
+  border-color: rgba(26, 26, 26, 0.05) !important;
+}
+
+[data-theme='light'] .border-white\/20 {
+  border-color: rgba(26, 26, 26, 0.2) !important;
+}
+
+/* Meeting Room Dropdown Menus */
+[data-theme='light'] .DropdownMenuContent {
+  background-color: #e9ecef;
+  color: #1a1a1a;
+  border-color: #dee2e6;
+}
+
+[data-theme='light'] [role="menuitem"] {
+  color: #1a1a1a;
+}
+
+[data-theme='light'] [role="menuitem"]:hover {
+  background-color: #dee2e6;
+}
+
+/* Meeting Room Sheets */
+[data-theme='light'] .SheetContent {
+  background-color: #f8f9fa;
+  color: #1a1a1a;
+  border-color: #dee2e6;
+}
+
+/* Meeting Room Buttons */
+[data-theme='light'] button {
+  color: #1a1a1a;
+  transition: all 0.2s ease;
+}
+
+[data-theme='light'] button:hover:not(:disabled) {
+  background-color: #e9ecef;
+}
+
+/* Red Badge in Meeting */
+[data-theme='light'] .bg-red-500 {
+  background-color: #dc3545 !important;
+  color: #ffffff !important;
+}
+
+/* Green/Live indicators */
+[data-theme='light'] .bg-green-500 {
+  background-color: #198754 !important;
+}
+
+/* Blue elements */
+[data-theme='light'] .bg-blue-1 {
+  background-color: #0d6efd !important;
+}
+
+[data-theme='light'] .bg-blue-1\/30 {
+  background-color: rgba(13, 110, 253, 0.3) !important;
+}
+
+/* Shadows for light mode */
+[data-theme='light'] .shadow-2xl {
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.1);
+}
+
+[data-theme='light'] .shadow-lg {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+/* Backdrop for light mode */
+[data-theme='light'] .backdrop-blur-md {
+  background-color: rgba(233, 236, 239, 0.8);
+}
+
+/* Light Mode MeetingSetupAdvanced - Gradient backgrounds */
+[data-theme='light'] .bg-gradient-to-br {
+  background: linear-gradient(to bottom right, #f8f9fa, #e9ecef, #f8f9fa) !important;
+}
+
+[data-theme='light'] .from-dark-1 {
+  --tw-gradient-from: #f8f9fa !important;
+}
+
+[data-theme='light'] .via-dark-2 {
+  --tw-gradient-stops: var(--tw-gradient-from), #e9ecef, var(--tw-gradient-to, rgba(233, 236, 239, 0)) !important;
+}
+
+[data-theme='light'] .to-dark-1 {
+  --tw-gradient-to: #f8f9fa !important;
+}
+
+/* Light Mode Card Container */
+[data-theme='light'] .rounded-2xl.bg-dark-2 {
+  background-color: #ffffff !important;
+  border-color: #dee2e6 !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08) !important;
+}
+
+[data-theme='light'] .bg-dark-3 {
+  background-color: #f0f1f3 !important;
+}
+
+/* Light Mode Status Card */
+[data-theme='light'] .bg-dark-3\/50 {
+  background-color: rgba(240, 241, 243, 0.8) !important;
+}
+
+[data-theme='light'] .border-white\/10 {
+  border-color: #dee2e6 !important;
+}
+
+/* Light Mode Overlay Gradient */
+[data-theme='light'] .bg-gradient-to-t.from-black\/80 {
+  background: linear-gradient(to top, rgba(26, 26, 26, 0.2), rgba(26, 26, 26, 0.08), transparent) !important;
+}
+
+/* Light Mode Button Overrides for MeetingSetupAdvanced */
+[data-theme='light'] button.bg-gradient-to-r {
+  background: linear-gradient(to right, #0d6efd, #0b5ed7) !important;
+  color: #ffffff !important;
+}
+
+[data-theme='light'] button.bg-gradient-to-r:hover {
+  background: linear-gradient(to right, #0b5ed7, #0a58ca) !important;
+}
+
+[data-theme='light'] button.border-white\/20 {
+  border-color: #dee2e6 !important;
+  background-color: #ffffff !important;
+  color: #1a1a1a !important;
+}
+
+[data-theme='light'] button.border-white\/20:hover {
+  background-color: #e9ecef !important;
+  border-color: #adb5bd !important;
+}
+
+/* Light Mode Animated Elements */
+[data-theme='light'] .bg-blue-1\/5 {
+  background-color: rgba(13, 110, 253, 0.03) !important;
+}
+
+/* Light Mode Text Fixes */
+[data-theme='light'] .bg-clip-text.text-transparent {
+  color: #1a1a1a !important;
+  background: none !important;
+  -webkit-background-clip: unset !important;
+  background-clip: unset !important;
+}
+
+[data-theme='light'] .text-white\/30 {
+  color: rgba(26, 26, 26, 0.4) !important;
+}
+
+[data-theme='light'] .text-white\/40 {
+  color: rgba(26, 26, 26, 0.5) !important;
+}
+
+[data-theme='light'] .text-white\/60 {
+  color: rgba(26, 26, 26, 0.65) !important;
+}
+
+/* Light Mode Shadow Fixes */
+[data-theme='light'] .shadow-blue-1\/30 {
+  box-shadow: 0 4px 12px rgba(13, 110, 253, 0.2) !important;
+}
+
+[data-theme='light'] .shadow-2xl {
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Light Mode Meeting Room Controls - EndCallButton, CustomCallControls, etc. */
+[data-theme='light'] .bg-meet-red {
+  background-color: #dc3545 !important;
+  color: #ffffff !important;
+}
+
+[data-theme='light'] .bg-meet-red:hover {
+  background-color: #c82333 !important;
+}
+
+/* Light Mode Meeting Controls - General buttons */
+[data-theme='light'] .bg-dark-3 {
+  background-color: #dee2e6 !important;
+  color: #1a1a1a !important;
+}
+
+[data-theme='light'] .bg-dark-3:hover {
+  background-color: #ced4da !important;
+}
+
+[data-theme='light'] .bg-dark-4 {
+  background-color: #ced4da !important;
+}
+
+[data-theme='light'] .bg-dark-4:hover {
+  background-color: #adb5bd !important;
+}
+
+/* Light Mode Blue buttons */
+[data-theme='light'] .bg-blue-1 {
+  background-color: #0d6efd !important;
+  color: #ffffff !important;
+}
+
+[data-theme='light'] .bg-blue-1:hover {
+  background-color: #0b5ed7 !important;
+}
+
+[data-theme='light'] .bg-blue-2 {
+  background-color: #0b5ed7 !important;
+  color: #ffffff !important;
+}
+
+/* Light Mode Yellow buttons */
+[data-theme='light'] .bg-yellow-500 {
+  background-color: #ffc107 !important;
+  color: #1a1a1a !important;
+}
+
+/* Light Mode Purple buttons */
+[data-theme='light'] .bg-purple-600 {
+  background-color: #6f42c1 !important;
+  color: #ffffff !important;
+}
+
+[data-theme='light'] .bg-purple-600:hover {
+  background-color: #5a32a3 !important;
+}
+
+[data-theme='light'] .bg-purple-700 {
+  background-color: #5a32a3 !important;
+  color: #ffffff !important;
+}
+
+/* Light Mode Button styling - all buttons */
+[data-theme='light'] button {
+  color: #1a1a1a !important;
+}
+
+[data-theme='light'] button:hover:not(:disabled) {
+  filter: brightness(0.95);
+}
+
+/* Light Mode Badge colors */
+[data-theme='light'] .bg-blue-1\/20 {
+  background-color: rgba(13, 110, 253, 0.15) !important;
+}
+
+[data-theme='light'] .bg-red-500 {
+  background-color: #dc3545 !important;
+  color: #ffffff !important;
+}
+
+[data-theme='light'] .bg-green-400 {
+  background-color: #28a745 !important;
+  color: #ffffff !important;
+}
+
+/* Light Mode Chat Panel - backgrounds */
+[data-theme='light'] .bg-dark-1 {
+  background-color: #f8f9fa !important;
+}
+
+[data-theme='light'] .bg-dark-2 {
+  background-color: #e9ecef !important;
+}
+
+/* Light Mode Text in panels */
+[data-theme='light'] .text-white {
+  color: #1a1a1a !important;
+}
+
+[data-theme='light'] .text-white\/40 {
+  color: rgba(26, 26, 26, 0.4) !important;
+}
+
+[data-theme='light'] .text-white\/50 {
+  color: rgba(26, 26, 26, 0.5) !important;
+}
+
+[data-theme='light'] .text-white\/60 {
+  color: rgba(26, 26, 26, 0.65) !important;
+}
+
+[data-theme='light'] .text-white\/70 {
+  color: rgba(26, 26, 26, 0.75) !important;
+}
+
+[data-theme='light'] .text-white\/90 {
+  color: rgba(26, 26, 26, 0.9) !important;
+}
+
+/* Light Mode Input fields - Chat panel */
+[data-theme='light'] input,
+[data-theme='light'] textarea {
+  background-color: #ffffff !important;
+  color: #1a1a1a !important;
+  border-color: #dee2e6 !important;
+}
+
+[data-theme='light'] input::placeholder,
+[data-theme='light'] textarea::placeholder {
+  color: rgba(26, 26, 26, 0.4) !important;
+}
+
+[data-theme='light'] input:focus,
+[data-theme='light'] textarea:focus {
+  border-color: #0d6efd !important;
+  box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.1) !important;
+}
+
+/* Light Mode Modal backgrounds */
+[data-theme='light'] .SheetContent,
+[data-theme='light'] [role="dialog"] {
+  background-color: #f8f9fa !important;
+  color: #1a1a1a !important;
+}
+
+[data-theme='light'] .SheetHeader,
+[data-theme='light'] [role="dialog"] > div:first-child {
+  background-color: #e9ecef !important;
+  border-color: #dee2e6 !important;
+}
+
+/* Light Mode Dropdown Menus */
+[data-theme='light'] .DropdownMenuContent,
+[data-theme='light'] [role="menu"] {
+  background-color: #ffffff !important;
+  border-color: #dee2e6 !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+[data-theme='light'] [role="menuitem"] {
+  color: #1a1a1a !important;
+}
+
+[data-theme='light'] [role="menuitem"]:hover {
+  background-color: #e9ecef !important;
+}
+
+/* Light Mode Borders */
+[data-theme='light'] .border-dark-3 {
+  border-color: #dee2e6 !important;
+}
+
+[data-theme='light'] .border-dark-4 {
+  border-color: #ced4da !important;
+}
+
+[data-theme='light'] .border-white\/10 {
+  border-color: rgba(26, 26, 26, 0.1) !important;
+}
+
+[data-theme='light'] .border-white\/20 {
+  border-color: rgba(26, 26, 26, 0.15) !important;
+}
+
+/* Light Mode Scrollbar */
+[data-theme='light'] ::-webkit-scrollbar {
+  width: 8px;
+}
+
+[data-theme='light'] ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+[data-theme='light'] ::-webkit-scrollbar-thumb {
+  background: #adb5bd;
+  border-radius: 4px;
+}
+
+[data-theme='light'] ::-webkit-scrollbar-thumb:hover {
+  background: #868e96;
+}
+
+/* Light Mode Chat Message styling */
+[data-theme='light'] .bg-blue-1\/10 {
+  background-color: rgba(13, 110, 253, 0.08) !important;
+}
+
+[data-theme='light'] .bg-dark-3\/20 {
+  background-color: rgba(222, 226, 230, 0.3) !important;
+}
+
+/* Light Mode Icon colors */
+[data-theme='light'] .text-yellow-400 {
+  color: #ffc107 !important;
+}
+
+[data-theme='light'] .text-green-400 {
+  color: #28a745 !important;
+}
+
+[data-theme='light'] .text-blue-2 {
+  color: #0b5ed7 !important;
+}
+
+/* ========== HOME PAGE & PAGE SECTIONS LIGHT MODE ========== */
+
+/* Home page hero section gradient background */
+[data-theme='light'] .bg-gradient-to-br.from-dark-2.to-dark-3 {
+  background: linear-gradient(to bottom right, #e9ecef, #dee2e6) !important;
+}
+
+/* Home page decorative blurs - light mode */
+[data-theme='light'] .bg-blue-1\/10 {
+  background-color: rgba(13, 110, 253, 0.05) !important;
+}
+
+[data-theme='light'] .bg-purple-1\/10 {
+  background-color: rgba(168, 85, 247, 0.05) !important;
+}
+
+[data-theme='light'] .bg-meet-green\/10 {
+  background-color: rgba(40, 167, 69, 0.05) !important;
+}
+
+/* Home page greeting badge - light mode */
+[data-theme='light'] .bg-blue-1\/20 {
+  background-color: rgba(13, 110, 253, 0.1) !important;
+  border-color: rgba(13, 110, 253, 0.2) !important;
+}
+
+/* Home page time display */
+[data-theme='light'] .meeting-time {
+  color: #1a1a1a !important;
+}
+
+/* Home page date text */
+[data-theme='light'] .text-white\/60 {
+  color: rgba(26, 26, 26, 0.65) !important;
+}
+
+/* Home page stat cards background */
+[data-theme='light'] .bg-dark-1\/50 {
+  background-color: rgba(248, 249, 250, 0.7) !important;
+}
+
+/* HomeCard component - light mode text */
+[data-theme='light'] .group.flex.w-full.flex-col h2.text-lg {
+  color: #1a1a1a !important;
+}
+
+[data-theme='light'] .group.flex.w-full.flex-col p {
+  color: rgba(26, 26, 26, 0.8) !important;
+}
+
+/* HomeCard component - light mode border and background */
+[data-theme='light'] .border.border-dark-3 {
+  border-color: #dee2e6 !important;
+}
+
+[data-theme='light'] .group.flex.w-full.flex-col.justify-between.overflow-hidden.rounded-2xl {
+  background-color: #f8f9fa !important;
+  border-color: #dee2e6 !important;
+}
+
+/* HomeCard hover border in light mode */
+[data-theme='light'] .hover\:border-blue-2\/30:hover {
+  border-color: rgba(11, 94, 215, 0.3) !important;
+}
+
+/* HomeCard hover shadow in light mode */
+[data-theme='light'] .group.hover\:shadow-meet:hover {
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* MeetingCard - light mode styling */
+[data-theme='light'] .bg-dark-2 {
+  background-color: #e9ecef !important;
+}
+
+[data-theme='light'] .border-dark-3 {
+  border-color: #dee2e6 !important;
+}
+
+/* MeetingCard title and date text */
+[data-theme='light'] h2.text-lg.font-semibold.text-white {
+  color: #1a1a1a !important;
+}
+
+[data-theme='light'] .flex.items-center.gap-2.text-white\/60 {
+  color: rgba(26, 26, 26, 0.65) !important;
+}
+
+[data-theme='light'] .text-sm.text-white\/60 {
+  color: rgba(26, 26, 26, 0.65) !important;
+}
+
+/* MeetingCard participants section */
+[data-theme='light'] .inline-flex.items-center.gap-1.5.rounded-full {
+  background-color: rgba(222, 226, 230, 0.5) !important;
+  color: rgba(26, 26, 26, 0.8) !important;
+}
+
+/* MeetingCard no participants state */
+[data-theme='light'] .flex.items-center.gap-2.text-sm {
+  color: rgba(26, 26, 26, 0.5) !important;
+}
+
+/* MeetingCard icon background */
+[data-theme='light'] .bg-dark-4 {
+  background-color: #ced4da !important;
+}
+
+/* MeetingCard blue icon bg for upcoming meetings */
+[data-theme='light'] .bg-blue-1\/20 {
+  background-color: rgba(13, 110, 253, 0.1) !important;
+}
+
+/* Page headers (Upcoming, Previous, Recordings) - light mode */
+[data-theme='light'] .flex.items-center.gap-3 {
+  color: #1a1a1a !important;
+}
+
+[data-theme='light'] h1.text-2xl.font-semibold {
+  color: #1a1a1a !important;
+}
+
+/* Page header icon backgrounds - light mode */
+[data-theme='light'] .flex.size-10.items-center.justify-center.rounded-xl.bg-blue-1\/20 {
+  background-color: rgba(13, 110, 253, 0.1) !important;
+}
+
+[data-theme='light'] .bg-dark-3 {
+  background-color: #dee2e6 !important;
+}
+
+[data-theme='light'] .text-white\/70 {
+  color: rgba(26, 26, 26, 0.75) !important;
+}
+
+/* Page header icons */
+[data-theme='light'] .text-blue-2 {
+  color: #0b5ed7 !important;
+}
+
+[data-theme='light'] .text-yellow-1 {
+  color: #ffc107 !important;
+}
+
+/* Empty state styling - light mode */
+[data-theme='light'] .flex.flex-col.items-center.justify-center.rounded-2xl.border.border-dark-3 {
+  background-color: #e9ecef !important;
+  border-color: #dee2e6 !important;
+}
+
+[data-theme='light'] h3.mt-4.text-xl.font-semibold.text-white {
+  color: #1a1a1a !important;
+}
+
+[data-theme='light'] p.mt-2.text-sm.text-white\/50 {
+  color: rgba(26, 26, 26, 0.5) !important;
+}
+
+/* Placeholder text in empty state */
+[data-theme='light'] .flex.size-16.items-center.justify-center.rounded-full.bg-dark-3 {
+  background-color: #dee2e6 !important;
+}
+
+/* MeetingModal and form styling - light mode */
+[data-theme='light'] .flex.flex-col.gap-4 {
+  color: #1a1a1a !important;
+}
+
+[data-theme='light'] label.text-sm.font-medium.text-white\/80 {
+  color: rgba(26, 26, 26, 0.8) !important;
+}
+
+[data-theme='light'] .border-dark-4.bg-dark-3.text-white.placeholder\:text-white\/40 {
+  background-color: #f8f9fa !important;
+  color: #1a1a1a !important;
+  border-color: #dee2e6 !important;
+}
+
+[data-theme='light'] .border-dark-4.bg-dark-3.text-white.placeholder\:text-white\/40::placeholder {
+  color: rgba(26, 26, 26, 0.4) !important;
+}
+
+/* Date picker styling - light mode */
+[data-theme='light'] .react-datepicker__input.text-white {
+  background-color: #ffffff !important;
+  color: #1a1a1a !important;
+  border-color: #dee2e6 !important;
+}
+
+/* Input field light mode */
+[data-theme='light'] input.text-white {
+  background-color: #ffffff !important;
+  color: #1a1a1a !important;
+  border-color: #dee2e6 !important;
+}
+
+[data-theme='light'] input.text-white::placeholder {
+  color: rgba(26, 26, 26, 0.4) !important;
+}
+
+[data-theme='light'] input.text-white:focus {
+  border-color: #0d6efd !important;
+  outline: none !important;
+  box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.1) !important;
+}
+
+/* Modal success state - light mode */
+[data-theme='light'] .flex.flex-col.items-center.gap-4.py-4 {
+  color: #1a1a1a !important;
+}
+
+[data-theme='light'] .flex.size-16.items-center.justify-center.rounded-full.bg-green-meet\/20 {
+  background-color: rgba(40, 167, 69, 0.1) !important;
+}
+
+[data-theme='light'] p.text-center.text-white\/70 {
+  color: rgba(26, 26, 26, 0.7) !important;
+}
+
+/* Modal input group - light mode */
+[data-theme='light'] .flex.w-full.items-center.gap-2.rounded-lg.bg-dark-3 {
+  background-color: #e9ecef !important;
+}
+
+[data-theme='light'] input\[type\=text\].text-white\/60 {
+  background-color: transparent !important;
+  color: rgba(26, 26, 26, 0.6) !important;
+}
+
+/* Section text color in light mode */
+[data-theme='light'] section.flex.size-full.flex-col {
+  color: #1a1a1a !important;
+}
+
+/* ========== HOME CARD LIGHT MODE STYLING ========== */
+
+/* HomeCard - Blue variant light mode */
+[data-theme='light'] .bg-gradient-to-br.from-\[\#1a73e8\].to-\[\#4285f4\] {
+  background: linear-gradient(to bottom right, #e3f2fd, #bbdefb) !important;
+}
+
+[data-theme='light'] .bg-gradient-to-br.from-\[\#1a73e8\].to-\[\#4285f4\]:hover {
+  background: linear-gradient(to bottom right, #bbdefb, #e3f2fd) !important;
+}
+
+/* HomeCard - Purple variant light mode */
+[data-theme='light'] .bg-gradient-to-br.from-\[\#9334e6\].to-\[\#a855f7\] {
+  background: linear-gradient(to bottom right, #f3e5f5, #e1bee7) !important;
+}
+
+[data-theme='light'] .bg-gradient-to-br.from-\[\#9334e6\].to-\[\#a855f7\]:hover {
+  background: linear-gradient(to bottom right, #e1bee7, #f3e5f5) !important;
+}
+
+/* HomeCard - Yellow variant light mode */
+[data-theme='light'] .bg-gradient-to-br.from-\[\#f59e0b\].to-\[\#fbbf24\] {
+  background: linear-gradient(to bottom right, #fff8e1, #ffe0b2) !important;
+}
+
+[data-theme='light'] .bg-gradient-to-br.from-\[\#f59e0b\].to-\[\#fbbf24\]:hover {
+  background: linear-gradient(to bottom right, #ffe0b2, #fff8e1) !important;
+}
+
+/* HomeCard - Teal variant light mode */
+[data-theme='light'] .bg-gradient-to-br.from-\[\#00796b\].to-\[\#009688\] {
+  background: linear-gradient(to bottom right, #e0f2f1, #b2dfdb) !important;
+}
+
+[data-theme='light'] .bg-gradient-to-br.from-\[\#00796b\].to-\[\#009688\]:hover {
+  background: linear-gradient(to bottom right, #b2dfdb, #e0f2f1) !important;
+}
+
+/* HomeCard title text - light mode */
+[data-theme='light'] .group.relative.overflow-hidden.rounded-2xl h2.text-xl.font-semibold.text-white {
+  color: #1a1a1a !important;
+}
+
+/* HomeCard description text - light mode */
+[data-theme='light'] .group.relative.overflow-hidden.rounded-2xl p.mt-1.text-sm.text-white\/80 {
+  color: rgba(26, 26, 26, 0.75) !important;
+}
+
+/* HomeCard icon background - light mode */
+[data-theme='light'] .bg-white\/20 {
+  background-color: rgba(26, 26, 26, 0.1) !important;
+}
+
+/* HomeCard icon brightness - light mode */
+[data-theme='light'] .brightness-0.invert {
+  filter: none !important;
+  opacity: 0.8 !important;
+}
+
+/* HomeCard arrow icon - light mode */
+[data-theme='light'] .size-6.text-white\/80 {
+  color: rgba(26, 26, 26, 0.7) !important;
+}
+
+/* HomeCard background pattern - light mode */
+[data-theme='light'] .absolute.inset-0.opacity-10 {
+  opacity: 0.05 !important;
+}
+
+/* ========== MEETING CARD LIGHT MODE FIXES ========== */
+
+/* MeetingCard icon container - light mode */
+[data-theme='light'] .flex.size-12.shrink-0.items-center.justify-center.rounded-xl.bg-blue-1\/20 {
+  background-color: rgba(13, 110, 253, 0.1) !important;
+}
+
+/* MeetingCard icon container for previous meetings - light mode */
+[data-theme='light'] .flex.size-12.shrink-0.items-center.justify-center.rounded-xl.bg-dark-4 {
+  background-color: #dee2e6 !important;
+}
+
+/* MeetingCard icon images - make visible in light mode */
+[data-theme='light'] .rounded-full.border-2.border-dark-2.bg-dark-3.object-cover {
+  border-color: #dee2e6 !important;
+  background-color: #e9ecef !important;
+}
+
+/* MeetingCard icon images with opacity - light mode */
+[data-theme='light'] img.opacity-60 {
+  opacity: 1 !important;
+  filter: brightness(0.6) !important;
+}
+
+/* MeetingCard icon images without opacity - light mode */
+[data-theme='light'] .flex.size-12.shrink-0.items-center.justify-center.rounded-xl img {
+  filter: brightness(0.3) !important;
+}
+
+/* MeetingCard participant avatar border - light mode */
+[data-theme='light'] img.rounded-full.border-2 {
+  border-color: #f8f9fa !important;
+}
+
+/* MeetingCard participant count +n badge - light mode */
+[data-theme='light'] .flex.size-8.items-center.justify-center.rounded-full.border-2.border-dark-2.bg-dark-4 {
+  border-color: #dee2e6 !important;
+  background-color: #dee2e6 !important;
+  color: #1a1a1a !important;
+}
+
+/* MeetingCard participant tag - light mode */
+[data-theme='light'] .inline-flex.items-center.gap-1.5.rounded-full.px-2.5.py-1 {
+  background-color: rgba(222, 226, 230, 0.6) !important;
+  color: rgba(26, 26, 26, 0.85) !important;
+}
+
+/* MeetingCard ended badge - light mode */
+[data-theme='light'] .flex.items-center.gap-2.rounded-full.bg-dark-4.px-3.py-1.5.text-sm {
+  background-color: #dee2e6 !important;
+  color: rgba(26, 26, 26, 0.6) !important;
+}
+
+/* MeetingCard button - Copy button light mode */
+[data-theme='light'] .h-10.gap-2.rounded-full.bg-dark-3.px-4 {
+  background-color: #e9ecef !important;
+  color: rgba(26, 26, 26, 0.7) !important;
+}
+
+[data-theme='light'] .h-10.gap-2.rounded-full.bg-dark-3.px-4.text-white\/70:hover {
+  background-color: #dee2e6 !important;
+  color: rgba(26, 26, 26, 0.9) !important;
+}
+
+/* MeetingCard Users icon in light mode */
+[data-theme='light'] .flex.items-center.gap-2.text-sm.text-white\/50 {
+  color: rgba(26, 26, 26, 0.5) !important;
+}
+
+/* MeetingCard no participants container - light mode */
+[data-theme='light'] .flex.size-8.items-center.justify-center.rounded-full.bg-dark-4 {
+  background-color: #dee2e6 !important;
+}
+
+/* ========== MEETING MODAL LIGHT MODE FIXES ========== */
+
+/* MeetingModal background - light mode */
+[data-theme='light'] .flex.w-full.max-w-\[480px\].flex-col.gap-6.border.border-dark-3.bg-dark-1.p-0.text-white {
+  background-color: #f8f9fa !important;
+  border-color: #dee2e6 !important;
+  color: #1a1a1a !important;
+}
+
+/* MeetingModal header - light mode */
+[data-theme='light'] .border-b.border-dark-3.px-6.pb-4.pt-6 {
+  border-color: #dee2e6 !important;
+  background-color: #f8f9fa !important;
+}
+
+/* MeetingModal title - light mode */
+[data-theme='light'] h1.text-xl.font-semibold.text-white {
+  color: #1a1a1a !important;
+}
+
+/* MeetingModal content area - light mode */
+[data-theme='light'] .flex.flex-col.gap-5.px-6 {
+  background-color: #f8f9fa !important;
+}
+
+/* MeetingModal footer - light mode */
+[data-theme='light'] .flex.flex-col.gap-3.border-t.border-dark-3.px-6.py-4 {
+  border-color: #dee2e6 !important;
+  background-color: #f8f9fa !important;
+}
+
+/* MeetingModal Cancel button - light mode */
+[data-theme='light'] .order-2.h-11.rounded-full.px-6.text-white\/70 {
+  background-color: transparent !important;
+  color: rgba(26, 26, 26, 0.7) !important;
+}
+
+[data-theme='light'] .order-2.h-11.rounded-full.px-6.text-white\/70:hover {
+  background-color: #e9ecef !important;
+  color: rgba(26, 26, 26, 0.9) !important;
+}
+
+/* MeetingModal action buttons container */
+[data-theme='light'] .flex.flex-col.gap-3.border-t.border-dark-3.px-6.py-4.sm\:flex-row.sm\:justify-end {
+  border-top-color: #dee2e6 !important;
+}
+
+/* MeetingModal input fields - light mode */
+[data-theme='light'] .border-dark-4.bg-dark-3.text-white.placeholder\:text-white\/40 {
+  background-color: #ffffff !important;
+  color: #1a1a1a !important;
+  border-color: #dee2e6 !important;
+}
+
+[data-theme='light'] .border-dark-4.bg-dark-3.text-white.placeholder\:text-white\/40::placeholder {
+  color: rgba(26, 26, 26, 0.4) !important;
+}
+
+[data-theme='light'] .border-dark-4.bg-dark-3.text-white.placeholder\:text-white\/40:focus {
+  border-color: #0d6efd !important;
+  outline: none !important;
+  box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.1) !important;
+}
+
+/* MeetingModal label text - light mode */
+[data-theme='light'] label.text-sm.font-medium.text-white\/80 {
+  color: rgba(26, 26, 26, 0.8) !important;
+}
+
+/* MeetingModal small text - light mode */
+[data-theme='light'] .text-xs.text-white\/40 {
+  color: rgba(26, 26, 26, 0.4) !important;
+}
+
+/* MeetingModal icon badge background - light mode */
+[data-theme='light'] .flex.size-16.items-center.justify-center.rounded-full.bg-blue-1\/20 {
+  background-color: rgba(13, 110, 253, 0.1) !important;
+}
+
+/* MeetingModal icon badge icon - light mode */
+[data-theme='light'] .size-10.text-blue-2 {
+  color: #0b5ed7 !important;
+}
+
+/* MeetingModal success checkmark icon - light mode */
+[data-theme='light'] .size-8.text-green-400 {
+  color: #28a745 !important;
+}
+
+/* MeetingModal meeting link input - light mode */
+[data-theme='light'] input\[type\=text\].bg-transparent.text-sm.text-white\/60 {
+  color: rgba(26, 26, 26, 0.6) !important;
+}
+
+/* ========== NAVBAR LIGHT MODE STYLING ========== */
+
+/* Navbar background - light mode */
+[data-theme='light'] nav.flex-between.fixed.z-50.w-full.bg-dark-1\/95 {
+  background-color: rgba(248, 249, 250, 0.95) !important;
+  border-bottom: 1px solid #dee2e6;
+}
+
+/* Navbar logo text - light mode */
+[data-theme='light'] p.text-xl.font-semibold.tracking-tight.text-white {
+  color: #1a1a1a !important;
+}
+
+/* Navbar theme toggle button - light mode */
+[data-theme='light'] .flex.items-center.justify-center.size-9.rounded-full.hover\:bg-dark-2 {
+  background-color: transparent !important;
+  border-color: rgba(26, 26, 26, 0.1) !important;
+}
+
+[data-theme='light'] .flex.items-center.justify-center.size-9.rounded-full.hover\:bg-dark-2:hover {
+  background-color: #e9ecef !important;
+  border-color: rgba(13, 110, 253, 0.3) !important;
+}
+
+/* Navbar theme toggle button sm size - light mode */
+[data-theme='light'] .flex.items-center.justify-center.size-10.rounded-full.hover\:bg-dark-2 {
+  background-color: transparent !important;
+  border-color: rgba(26, 26, 26, 0.1) !important;
+}
+
+[data-theme='light'] .flex.items-center.justify-center.size-10.rounded-full.hover\:bg-dark-2:hover {
+  background-color: #e9ecef !important;
+  border-color: rgba(13, 110, 253, 0.3) !important;
+}
+
+/* Moon icon color - light mode */
+[data-theme='light'] .text-slate-600 {
+  color: #475569 !important;
+}
+
+/* Sun icon color - light mode (already visible but ensuring) */
+[data-theme='light'] .text-yellow-400 {
+  color: #ffc107 !important;
+}
+
+/* Navbar user menu trigger - light mode */
+[data-theme='light'] .flex.items-center.gap-2.px-2.py-2.rounded-full.hover\:bg-dark-2.transition-all {
+  background-color: transparent !important;
+  border-color: rgba(26, 26, 26, 0.1) !important;
+}
+
+[data-theme='light'] .flex.items-center.gap-2.px-2.py-2.rounded-full.hover\:bg-dark-2.transition-all:hover {
+  background-color: #e9ecef !important;
+  border-color: rgba(13, 110, 253, 0.3) !important;
+}
+
+/* Navbar user avatar background - light mode */
+[data-theme='light'] .flex.items-center.justify-center.size-9.rounded-full.bg-gradient-to-br {
+  background: linear-gradient(to bottom right, #0d6efd, #0b5ed7) !important;
+}
+
+/* Navbar dropdown menu - light mode */
+[data-theme='light'] .w-64.bg-dark-2.border.border-dark-3 {
+  background-color: #f8f9fa !important;
+  border-color: #dee2e6 !important;
+}
+
+/* Navbar dropdown header - light mode */
+[data-theme='light'] .px-4.py-3.bg-gradient-to-r.from-blue-1\/10.to-blue-2\/10.border-b.border-dark-3 {
+  background: linear-gradient(to right, rgba(13, 110, 253, 0.05), rgba(11, 94, 215, 0.05)) !important;
+  border-bottom-color: #dee2e6 !important;
+}
+
+/* Navbar dropdown user name - light mode */
+[data-theme='light'] .px-4.py-3 p.text-sm.font-bold.text-white {
+  color: #1a1a1a !important;
+}
+
+/* Navbar dropdown user email - light mode */
+[data-theme='light'] .px-4.py-3 p.text-xs.text-white\/70 {
+  color: rgba(26, 26, 26, 0.7) !important;
+}
+
+/* Navbar dropdown separator - light mode */
+[data-theme='light'] .bg-dark-3\/50 {
+  background-color: rgba(222, 226, 230, 0.5) !important;
+}
+
+/* Navbar dropdown menu item disabled (role) - light mode */
+[data-theme='light'] .text-xs.flex.items-center.gap-3.px-4.py-2.5 {
+  color: rgba(26, 26, 26, 0.6) !important;
+  background-color: transparent !important;
+}
+
+[data-theme='light'] .text-xs.flex.items-center.gap-3.px-4.py-2.5:hover {
+  background-color: rgba(13, 110, 253, 0.05) !important;
+}
+
+/* Navbar dropdown role icon background - light mode */
+[data-theme='light'] .flex.items-center.justify-center.size-6.rounded-md.bg-blue-1\/20 {
+  background-color: rgba(13, 110, 253, 0.1) !important;
+}
+
+/* Navbar dropdown role text - light mode */
+[data-theme='light'] .text-xs.flex.items-center.gap-3.px-4.py-2.5 span.font-medium {
+  color: rgba(26, 26, 26, 0.8) !important;
+}
+
+/* Navbar dropdown sign out button - light mode */
+[data-theme='light'] .text-red-500.cursor-pointer.flex.items-center.gap-3.px-4.py-2.5 {
+  color: #dc3545 !important;
+  background-color: transparent !important;
+}
+
+[data-theme='light'] .text-red-500.cursor-pointer.flex.items-center.gap-3.px-4.py-2.5:hover {
+  background-color: rgba(220, 53, 69, 0.1) !important;
+  color: #c82333 !important;
+}
+
+/* ========== CUSTOM CALL CONTROLS LIGHT MODE ========== */
+
+/* Mic button - enabled (listening) light mode */
+[data-theme='light'] .bg-dark-3.text-white.hover\:bg-dark-4 {
+  background-color: #e9ecef !important;
+  color: #1a1a1a !important;
+}
+
+[data-theme='light'] .bg-dark-3.text-white.hover\:bg-dark-4:hover {
+  background-color: #dee2e6 !important;
+}
+
+/* Mic button - muted (red) light mode */
+[data-theme='light'] .bg-red-500.text-white.hover\:bg-red-600 {
+  background-color: #dc3545 !important;
+  color: #ffffff !important;
+}
+
+[data-theme='light'] .bg-red-500.text-white.hover\:bg-red-600:hover {
+  background-color: #c82333 !important;
+}
+
+/* Mic button - disabled light mode */
+[data-theme='light'] .bg-gray-500.text-white\/50.cursor-not-allowed.opacity-50 {
+  background-color: #adb5bd !important;
+  color: rgba(26, 26, 26, 0.5) !important;
+}
+
+/* Video button - enabled light mode */
+[data-theme='light'] .flex.size-12.cursor-pointer.items-center.justify-center.rounded-full.bg-dark-3.text-white {
+  background-color: #e9ecef !important;
+  color: #1a1a1a !important;
+}
+
+[data-theme='light'] .flex.size-12.cursor-pointer.items-center.justify-center.rounded-full.bg-dark-3.text-white:hover {
+  background-color: #dee2e6 !important;
+}
+
+/* Video button - disabled (off) light mode - red */
+[data-theme='light'] .flex.size-12.cursor-pointer.items-center.justify-center.rounded-full.bg-red-500.text-white {
+  background-color: #dc3545 !important;
+  color: #ffffff !important;
+}
+
+[data-theme='light'] .flex.size-12.cursor-pointer.items-center.justify-center.rounded-full.bg-red-500.text-white:hover {
+  background-color: #c82333 !important;
+}
+
+/* Screen share button - disabled fallback light mode */
+[data-theme='light'] .flex.size-12.items-center.justify-center.rounded-full.bg-dark-3\/50.text-white\/40.cursor-not-allowed {
+  background-color: rgba(233, 236, 239, 0.5) !important;
+  color: rgba(26, 26, 26, 0.4) !important;
+}
+
+/* Record call button container light mode */
+[data-theme='light'] .flex.size-12.cursor-pointer.items-center.justify-center.rounded-full.bg-dark-3.text-white.hover\:bg-dark-4.transition-all.active\:scale-95 {
+  background-color: #e9ecef !important;
+  color: #1a1a1a !important;
+}
+
+[data-theme='light'] .flex.size-12.cursor-pointer.items-center.justify-center.rounded-full.bg-dark-3.text-white.hover\:bg-dark-4.transition-all.active\:scale-95:hover {
+  background-color: #dee2e6 !important;
+}
+
+/* Cancel/Leave button light mode */
+[data-theme='light'] .flex.size-12.cursor-pointer.items-center.justify-center.rounded-full.bg-red-500.text-white {
+  background-color: #dc3545 !important;
+  color: #ffffff !important;
+}
+
+[data-theme='light'] .flex.size-12.cursor-pointer.items-center.justify-center.rounded-full.bg-red-500.text-white:hover {
+  background-color: #c82333 !important;
+}
+
+/* Stream SDK Button overrides for light mode */
+[data-theme='light'] button.str-video__button {
+  background-color: #e9ecef !important;
+  color: #1a1a1a !important;
+}
+
+[data-theme='light'] button.str-video__button:hover {
+  background-color: #dee2e6 !important;
+}
+
+[data-theme='light'] button.str-video__button--active {
+  background-color: #dc3545 !important;
+  color: #ffffff !important;
+}
+
+/* Stream SDK red button (recording, muted, etc) light mode */
+[data-theme='light'] button.str-video__button.str-video__button--enabled {
+  background-color: #dc3545 !important;
+}
+
+/* ========== RECORD AND LEAVE BUTTON LIGHT MODE ========== */
+
+/* Record button - idle state light mode */
+[data-theme='light'] .flex.size-12.cursor-pointer.items-center.justify-center.rounded-full.bg-dark-3.text-white.hover\:bg-dark-4 {
+  background-color: #e9ecef !important;
+  color: #1a1a1a !important;
+}
+
+[data-theme='light'] .flex.size-12.cursor-pointer.items-center.justify-center.rounded-full.bg-dark-3.text-white.hover\:bg-dark-4:hover {
+  background-color: #dee2e6 !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Record button - recording state light mode */
+[data-theme='light'] .flex.size-12.cursor-pointer.items-center.justify-center.rounded-full.bg-red-500.text-white.hover\:bg-red-600.shadow-lg {
+  background-color: #dc3545 !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3) !important;
+}
+
+[data-theme='light'] .flex.size-12.cursor-pointer.items-center.justify-center.rounded-full.bg-red-500.text-white.hover\:bg-red-600.shadow-lg:hover {
+  background-color: #c82333 !important;
+  box-shadow: 0 8px 20px rgba(220, 53, 69, 0.4) !important;
+}
+
+/* Leave button light mode */
+[data-theme='light'] .flex.size-12.cursor-pointer.items-center.justify-center.rounded-full.bg-red-500.text-white.hover\:bg-red-600.transition-all.active\:scale-95.shadow-lg {
+  background-color: #dc3545 !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3) !important;
+}
+
+[data-theme='light'] .flex.size-12.cursor-pointer.items-center.justify-center.rounded-full.bg-red-500.text-white.hover\:bg-red-600.transition-all.active\:scale-95.shadow-lg:hover {
+  background-color: #c82333 !important;
+  box-shadow: 0 8px 20px rgba(220, 53, 69, 0.4) !important;
+}
+
+/* ========== CALL SETTINGS & HOST SETTINGS MODALS LIGHT MODE ========== */
+
+/* Modal dialog overlay - light mode */
+[data-theme='light'] div[role='dialog'] {
+  background-color: #f8f9fa !important;
+}
+
+/* Modal content wrapper - light mode */
+[data-theme='light'] .max-w-5xl.border-dark-3.bg-dark-1.text-white.shadow-2xl {
+  background-color: #f8f9fa !important;
+  color: #1a1a1a !important;
+  border-color: #dee2e6 !important;
+}
+
+/* Modal header - light mode */
+[data-theme='light'] .flex.items-center.justify-between.p-6.border-b.border-dark-3.bg-gradient-to-r.from-dark-2.to-dark-3 {
+  background: linear-gradient(to right, #e9ecef, #dee2e6) !important;
+  border-color: #dee2e6 !important;
+  color: #1a1a1a !important;
+}
+
+/* Modal header text - light mode */
+[data-theme='light'] .flex.items-center.justify-between.p-6.border-b.border-dark-3.bg-gradient-to-r.from-dark-2.to-dark-3 h2 {
+  color: #1a1a1a !important;
+}
+
+[data-theme='light'] .flex.items-center.justify-between.p-6.border-b.border-dark-3.bg-gradient-to-r.from-dark-2.to-dark-3 p {
+  color: rgba(26, 26, 26, 0.6) !important;
+}
+
+/* Modal footer - light mode */
+[data-theme='light'] .flex.items-center.justify-between.p-6.border-t.border-dark-3.bg-dark-2 {
+  background-color: #e9ecef !important;
+  border-color: #dee2e6 !important;
+  color: #1a1a1a !important;
+}
+
+/* Modal footer text - light mode */
+[data-theme='light'] .flex.items-center.justify-between.p-6.border-t.border-dark-3.bg-dark-2 .text-xs {
+  color: rgba(26, 26, 26, 0.6) !important;
+}
+
+/* Modal sidebar - light mode */
+[data-theme='light'] .w-56.border-r.border-dark-3.p-4.overflow-y-auto.space-y-2.custom-scrollbar.bg-dark-2 {
+  background-color: #e9ecef !important;
+  border-color: #dee2e6 !important;
+}
+
+/* Tab buttons - inactive light mode */
+[data-theme='light'] .flex.items-center.gap-3.px-4.py-3.rounded-lg.text-sm.font-medium.transition-all.w-full.text-left {
+  color: rgba(26, 26, 26, 0.6) !important;
+}
+
+[data-theme='light'] .flex.items-center.gap-3.px-4.py-3.rounded-lg.text-sm.font-medium.transition-all.w-full.text-left:hover {
+  background-color: #dee2e6 !important;
+  color: #1a1a1a !important;
+}
+
+/* Tab buttons - active light mode */
+[data-theme='light'] .flex.items-center.gap-3.px-4.py-3.rounded-lg.text-sm.font-medium.transition-all.w-full.text-left.bg-blue-1 {
+  background-color: #0d6efd !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 12px rgba(13, 110, 253, 0.2) !important;
+}
+
+/* Tab content area - light mode */
+[data-theme='light'] .flex-1.overflow-y-auto.p-6.custom-scrollbar {
+  background-color: #f8f9fa !important;
+  color: #1a1a1a !important;
+}
+
+/* SettingRow - light mode */
+[data-theme='light'] .flex.items-center.justify-between.p-4.rounded-xl.bg-dark-3.border.border-white {
+  background-color: #e9ecef !important;
+  border-color: #dee2e6 !important;
+  color: #1a1a1a !important;
+}
+
+[data-theme='light'] .flex.items-center.justify-between.p-4.rounded-xl.bg-dark-3.border.border-white:hover {
+  border-color: #c8cdd2 !important;
+}
+
+/* SettingRow danger state - light mode */
+[data-theme='light'] .flex.items-center.justify-between.p-4.rounded-xl.bg-red-500.border-red-500 {
+  background-color: rgba(220, 53, 69, 0.1) !important;
+  border-color: rgba(220, 53, 69, 0.2) !important;
+}
+
+[data-theme='light'] .flex.items-center.justify-between.p-4.rounded-xl.bg-red-500.border-red-500:hover {
+  border-color: rgba(220, 53, 69, 0.3) !important;
+}
+
+/* SettingRow labels and descriptions - light mode */
+[data-theme='light'] .flex.items-center.justify-between.p-4.rounded-xl span.font-medium {
+  color: #1a1a1a !important;
+}
+
+[data-theme='light'] .flex.items-center.justify-between.p-4.rounded-xl span.text-xs {
+  color: rgba(26, 26, 26, 0.6) !important;
+}
+
+/* Section header - light mode */
+[data-theme='light'] .flex.items-center.gap-2.pb-3.border-b.border-white h3 {
+  color: #1a1a1a !important;
+  border-color: #dee2e6 !important;
+}
+
+/* Select dropdowns - light mode */
+[data-theme='light'] select.px-3.py-2.bg-dark-2.border.border-dark-3.rounded-lg.text-sm.text-white {
+  background-color: #ffffff !important;
+  border-color: #dee2e6 !important;
+  color: #1a1a1a !important;
+}
+
+[data-theme='light'] select.px-3.py-2.bg-dark-2.border.border-dark-3.rounded-lg.text-sm.text-white:focus {
+  border-color: #0d6efd !important;
+  box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.1) !important;
+}
+
+/* Range sliders - light mode */
+[data-theme='light'] input[type='range'] {
+  accent-color: #0d6efd;
+}
+
+/* Toggle switches - off state light mode */
+[data-theme='light'] .relative.w-12.h-7.rounded-full.transition-all.flex.items-center.justify-center.bg-dark-3 {
+  background-color: #dee2e6 !important;
+}
+
+/* Toggle switches - on state light mode (green) */
+[data-theme='light'] .relative.w-12.h-7.rounded-full.transition-all.flex.items-center.justify-center.bg-green-500 {
+  background-color: #198754 !important;
+}
+
+/* Toggle switch icons - light mode */
+[data-theme='light'] .relative.w-12.h-7.rounded-full.transition-all.flex.items-center.justify-center svg {
+  color: #ffffff !important;
+}
+
+/* Action buttons - light mode */
+[data-theme='light'] .w-full.px-4.py-3.bg-blue-1.text-white.rounded-lg.font-medium {
+  background-color: #0d6efd !important;
+  color: #ffffff !important;
+}
+
+[data-theme='light'] .w-full.px-4.py-3.bg-blue-1.text-white.rounded-lg.font-medium:hover {
+  background-color: #0b5ed7 !important;
+}
+
+/* Orange action buttons - light mode */
+[data-theme='light'] .w-full.px-4.py-3.bg-orange-500.text-orange-400.rounded-lg.font-medium {
+  background-color: rgba(253, 126, 20, 0.1) !important;
+  color: #fd7e14 !important;
+  border-color: rgba(253, 126, 20, 0.2) !important;
+}
+
+[data-theme='light'] .w-full.px-4.py-3.bg-orange-500.text-orange-400.rounded-lg.font-medium:hover {
+  background-color: rgba(253, 126, 20, 0.2) !important;
+  border-color: rgba(253, 126, 20, 0.3) !important;
+}
+
+/* Red action buttons - light mode */
+[data-theme='light'] .px-3.py-1.5.bg-red-500.text-red-400.rounded-lg.text-xs.font-bold {
+  background-color: rgba(220, 53, 69, 0.1) !important;
+  color: #dc3545 !important;
+  border-color: rgba(220, 53, 69, 0.2) !important;
+}
+
+[data-theme='light'] .px-3.py-1.5.bg-red-500.text-red-400.rounded-lg.text-xs.font-bold:hover {
+  background-color: rgba(220, 53, 69, 0.2) !important;
+  border-color: rgba(220, 53, 69, 0.3) !important;
+}
+
+/* Blue action buttons - light mode */
+[data-theme='light'] .px-3.py-1.5.bg-blue-1.text-blue-1.rounded-lg.text-xs.font-bold {
+  background-color: rgba(13, 110, 253, 0.1) !important;
+  color: #0d6efd !important;
+  border-color: rgba(13, 110, 253, 0.2) !important;
+}
+
+[data-theme='light'] .px-3.py-1.5.bg-blue-1.text-blue-1.rounded-lg.text-xs.font-bold:hover {
+  background-color: rgba(13, 110, 253, 0.2) !important;
+  border-color: rgba(13, 110, 253, 0.3) !important;
+}
+
+/* Alert box - blue info - light mode */
+[data-theme='light'] .p-4.rounded-xl.bg-blue-1.border-blue-1 {
+  background-color: rgba(13, 110, 253, 0.1) !important;
+  border-color: rgba(13, 110, 253, 0.2) !important;
+}
+
+[data-theme='light'] .p-4.rounded-xl.bg-blue-1.border-blue-1 p {
+  color: #0d6efd !important;
+}
+
+[data-theme='light'] .p-4.rounded-xl.bg-blue-1.border-blue-1 .text-xs {
+  color: rgba(13, 110, 253, 0.8) !important;
+}
+
+/* Stats cards - light mode */
+[data-theme='light'] .p-4.rounded-lg.bg-dark-3.border-white {
+  background-color: #e9ecef !important;
+  border-color: #dee2e6 !important;
+}
+
+[data-theme='light'] .p-4.rounded-lg.bg-dark-3.border-white .text-2xl {
+  color: #0d6efd !important;
+}
+
+[data-theme='light'] .p-4.rounded-lg.bg-dark-3.border-white .text-xs {
+  color: rgba(26, 26, 26, 0.6) !important;
+}
+
+/* Participant list - light mode */
+[data-theme='light'] .p-4.rounded-xl.border.cursor-pointer.transition-all.flex.items-center.justify-between {
+  background-color: #e9ecef !important;
+  border-color: #dee2e6 !important;
+  color: #1a1a1a !important;
+}
+
+[data-theme='light'] .p-4.rounded-xl.border.cursor-pointer.transition-all.flex.items-center.justify-between:hover {
+  border-color: #c8cdd2 !important;
+}
+
+/* Participant list - selected light mode */
+[data-theme='light'] .p-4.rounded-xl.border.cursor-pointer.transition-all.flex.items-center.justify-between.bg-blue-1 {
+  background-color: rgba(13, 110, 253, 0.1) !important;
+  border-color: rgba(13, 110, 253, 0.3) !important;
+}
+
+/* Host info section - light mode */
+[data-theme='light'] .p-4.rounded-lg.bg-dark-3.space-y-2 {
+  background-color: #e9ecef !important;
+  border-color: #dee2e6 !important;
+}
+
+[data-theme='light'] .p-4.rounded-lg.bg-dark-3.space-y-2 .flex.justify-between.text-sm span {
+  color: #1a1a1a !important;
+}
+
+[data-theme='light'] .p-4.rounded-lg.bg-dark-3.space-y-2 .flex.justify-between.text-sm span.text-white:first-child {
+  color: rgba(26, 26, 26, 0.6) !important;
+}
+
+/* ========== CHAT PANEL LIGHT MODE ========== */
+
+/* Chat panel base - light mode */
+[data-theme='light'] .chat-panel {
+  background-color: #f8f9fa !important;
+  color: #1a1a1a !important;
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Chat header - light mode */
+[data-theme='light'] .chat-panel__header {
+  background: rgba(233, 236, 239, 0.95) !important;
+  border-color: #dee2e6 !important;
+}
+
+[data-theme='light'] .chat-panel__header-title h3 {
+  color: #1a1a1a !important;
+}
+
+[data-theme='light'] .chat-panel__header-title {
+  color: rgba(26, 26, 26, 0.7) !important;
+}
+
+/* Chat close button - light mode */
+[data-theme='light'] .chat-panel__close-btn {
+  color: rgba(26, 26, 26, 0.6) !important;
+}
+
+[data-theme='light'] .chat-panel__close-btn:hover {
+  background-color: rgba(26, 26, 26, 0.08) !important;
+}
+
+/* Chat info banner - light mode */
+[data-theme='light'] .chat-panel__info {
+  background: rgba(13, 110, 253, 0.08) !important;
+  border-color: #dee2e6 !important;
+}
+
+[data-theme='light'] .chat-panel__info p {
+  color: rgba(26, 26, 26, 0.6) !important;
+}
+
+/* Chat messages container - light mode */
+[data-theme='light'] .chat-panel__messages {
+  background-color: #f8f9fa !important;
+}
+
+/* Empty state - light mode */
+[data-theme='light'] .chat-panel__empty {
+  color: rgba(26, 26, 26, 0.7) !important;
+}
+
+[data-theme='light'] .chat-panel__empty p {
+  color: rgba(26, 26, 26, 0.7) !important;
+}
+
+[data-theme='light'] .chat-panel__empty span {
+  color: rgba(26, 26, 26, 0.4) !important;
+}
+
+[data-theme='light'] .chat-panel__empty svg {
+  color: rgba(26, 26, 26, 0.15) !important;
+}
+
+/* Chat message - other's message - light mode */
+[data-theme='light'] .chat-message:not(.chat-message--own) .chat-message__bubble {
+  background: #e9ecef !important;
+  color: #1a1a1a !important;
+}
+
+/* Chat message - own message - light mode */
+[data-theme='light'] .chat-message--own .chat-message__bubble {
+  background: #0d6efd !important;
+  color: #ffffff !important;
+}
+
+/* Chat message text - light mode */
+[data-theme='light'] .chat-message__bubble p {
+  color: inherit !important;
+}
+
+/* Chat message sender name - light mode */
+[data-theme='light'] .chat-message__sender {
+  color: #1a1a1a !important;
+}
+
+/* Chat message time - light mode */
+[data-theme='light'] .chat-message__time {
+  color: rgba(26, 26, 26, 0.4) !important;
+}
+
+/* Chat links - light mode */
+[data-theme='light'] .chat-message__link {
+  color: #0d6efd !important;
+}
+
+[data-theme='light'] .chat-message__link:hover {
+  color: #0b5ed7 !important;
+}
+
+/* Chat links in own message - light mode */
+[data-theme='light'] .chat-message--own .chat-message__link {
+  color: #e7f1ff !important;
+}
+
+[data-theme='light'] .chat-message--own .chat-message__link:hover {
+  color: #ffffff !important;
+}
+
+/* Chat input area - light mode */
+[data-theme='light'] .chat-panel__input-area {
+  background: #f8f9fa !important;
+  border: none !important;
+}
+
+/* Chat input container - light mode */
+[data-theme='light'] .chat-panel__input-container {
+  background: #ffffff !important;
+  border: 1px solid #d7dde5 !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06) !important;
+}
+
+[data-theme='light'] .chat-panel__input-container:focus-within {
+  border: 1px solid #c8d2df !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06) !important;
+}
+
+/* Chat input field - light mode */
+[data-theme='light'] .chat-panel__input {
+  color: #1a1a1a !important;
+  -webkit-text-fill-color: #1a1a1a !important;
+  caret-color: #1a1a1a !important;
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+[data-theme='light'] .chat-panel__input::placeholder {
+  color: rgba(26, 26, 26, 0.55) !important;
+  -webkit-text-fill-color: rgba(26, 26, 26, 0.55) !important;
+}
+
+[data-theme='light'] .chat-panel__input:focus {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+[data-theme='light'] input.chat-panel__input,
+[data-theme='light'] input.chat-panel__input:focus,
+[data-theme='light'] input.chat-panel__input:focus-visible {
+  border: 0 !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  appearance: none !important;
+  -webkit-appearance: none !important;
+}
+
+/* Chat send button - light mode */
+[data-theme='light'] .chat-panel__send-btn {
+  background: #0d6efd !important;
+  color: #ffffff !important;
+}
+
+[data-theme='light'] .chat-panel__send-btn:hover:not(:disabled) {
+  background: #0b5ed7 !important;
+}
+
+[data-theme='light'] .chat-panel__send-btn:disabled {
+  background: #dee2e6 !important;
+  color: rgba(26, 26, 26, 0.3) !important;
+}
+
+/* Chat toggle button - light mode */
+[data-theme='light'] .chat-toggle-btn {
+  background: #e9ecef !important;
+  color: rgba(26, 26, 26, 0.6) !important;
+}
+
+[data-theme='light'] .chat-toggle-btn:hover {
+  background-color: #dee2e6 !important;
+}
+
+[data-theme='light'] .chat-toggle-btn--active {
+  background-color: #0d6efd !important;
+  color: #ffffff !important;
+}
+
+[data-theme='light'] .chat-toggle-btn--active:hover {
+  background-color: #0b5ed7 !important;
+}
+
+/* Chat badge - light mode */
+[data-theme='light'] .chat-toggle-btn__badge {
+  background: #dc3545 !important;
+}
+
+/* ========== PARTICIPANTS LIST LIGHT MODE ========== */
+
+/* Participants list - light mode */
+[data-theme='light'] .custom-participants-list {
+  color: #1a1a1a !important;
+  background-color: transparent !important;
+}
+
+/* Search bar - light mode */
+[data-theme='light'] .custom-participants-list__search {
+  background: #ffffff !important;
+  border: 1px solid #d7dde5 !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06) !important;
+}
+
+[data-theme='light'] .custom-participants-list__search:focus-within {
+  border: 1px solid #c8d2df !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06) !important;
+}
+
+[data-theme='light'] .custom-participants-list__search-icon {
+  color: rgba(26, 26, 26, 0.5) !important;
+}
+
+/* Search input - light mode */
+[data-theme='light'] .custom-participants-list__search-input {
+  color: #1a1a1a !important;
+  -webkit-text-fill-color: #1a1a1a !important;
+  caret-color: #1a1a1a !important;
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+[data-theme='light'] .custom-participants-list__search-input::placeholder {
+  color: rgba(26, 26, 26, 0.55) !important;
+  -webkit-text-fill-color: rgba(26, 26, 26, 0.55) !important;
+}
+
+[data-theme='light'] .custom-participants-list__search-input:focus {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+[data-theme='light'] input.custom-participants-list__search-input,
+[data-theme='light'] input.custom-participants-list__search-input:focus,
+[data-theme='light'] input.custom-participants-list__search-input:focus-visible {
+  border: 0 !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  appearance: none !important;
+  -webkit-appearance: none !important;
+}
+
+/* Participant item - light mode */
+[data-theme='light'] .custom-participant-item {
+  transition: background-color 0.15s ease;
+}
+
+[data-theme='light'] .custom-participant-item:hover {
+  background-color: #e9ecef !important;
+}
+
+/* Participant name - light mode */
+[data-theme='light'] .custom-participant-item__name {
+  color: #1a1a1a !important;
+}
+
+/* Participant host badge - light mode */
+[data-theme='light'] .custom-participant-item__host-badge {
+  background-color: rgba(13, 110, 253, 0.1) !important;
+  color: #0d6efd !important;
+  border-color: rgba(13, 110, 253, 0.2) !important;
+}
+
+/* Participant button - light mode */
+[data-theme='light'] .custom-participant-item__btn {
+  color: rgba(26, 26, 26, 0.5) !important;
+}
+
+[data-theme='light'] .custom-participant-item__btn:hover:not(:disabled) {
+  background-color: rgba(26, 26, 26, 0.08) !important;
+}
+
+/* Participant button - active (unmuted/camera on) - light mode */
+[data-theme='light'] .custom-participant-item__btn--active {
+  color: #ffc107 !important;
+  background-color: rgba(255, 193, 7, 0.15) !important;
+}
+
+[data-theme='light'] .custom-participant-item__btn--active:hover:not(:disabled) {
+  background-color: rgba(255, 193, 7, 0.25) !important;
+  color: #ffb300 !important;
+}
+
+/* Participant button - muted - light mode */
+[data-theme='light'] .custom-participant-item__btn--muted {
+  color: #dc3545 !important;
+  background-color: rgba(220, 53, 69, 0.15) !important;
+}
+
+[data-theme='light'] .custom-participant-item__btn--muted:hover:not(:disabled) {
+  background-color: rgba(220, 53, 69, 0.25) !important;
+}
+
+/* Participant button - off state - light mode */
+[data-theme='light'] .custom-participant-item__btn--off {
+  color: rgba(26, 26, 26, 0.3) !important;
+  background-color: rgba(26, 26, 26, 0.05) !important;
+}
+
+/* Participant button - more options - light mode */
+[data-theme='light'] .custom-participant-item__btn--more {
+  background-color: #dee2e6 !important;
+  color: #1a1a1a !important;
+}
+
+[data-theme='light'] .custom-participant-item__btn--more:hover {
+  background-color: #c8cdd2 !important;
+}
+
+/* Participant dropdown menu - light mode */
+[data-theme='light'] .custom-participant-menu {
+  background: linear-gradient(145deg, #f0f2f5 0%, #e9ecef 100%) !important;
+  border-color: #dee2e6 !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08),
+    0 2px 8px rgba(0, 0, 0, 0.05),
+    inset 0 1px 0 rgba(26, 26, 26, 0.05) !important;
+}
+
+/* Participant menu item - light mode */
+[data-theme='light'] .custom-participant-menu__item {
+  color: #1a1a1a !important;
+}
+
+[data-theme='light'] .custom-participant-menu__item:hover {
+  background: linear-gradient(135deg, rgba(13, 110, 253, 0.1) 0%, rgba(13, 110, 253, 0.05) 100%) !important;
+  color: #0d6efd !important;
+}
+
+[data-theme='light'] .custom-participant-menu__item:hover svg {
+  color: #0d6efd !important;
+}
+
+[data-theme='light'] .custom-participant-menu__item svg {
+  color: rgba(26, 26, 26, 0.6);
+}
+
+/* ========== INPUT FIELDS LIGHT MODE ========== */
+
+/* Generic input styling - light mode */
+[data-theme='light'] input[type='text'],
+[data-theme='light'] input[type='email'],
+[data-theme='light'] input[type='password'],
+[data-theme='light'] input[type='search'],
+[data-theme='light'] input[type='number'],
+[data-theme='light'] textarea {
+  background-color: #ffffff !important;
+  border-color: #dee2e6 !important;
+  color: #1a1a1a !important;
+}
+
+[data-theme='light'] input[type='text']:focus,
+[data-theme='light'] input[type='email']:focus,
+[data-theme='light'] input[type='password']:focus,
+[data-theme='light'] input[type='search']:focus,
+[data-theme='light'] input[type='number']:focus,
+[data-theme='light'] textarea:focus {
+  border-color: #0d6efd !important;
+  box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.1) !important;
+}
+
+[data-theme='light'] input::placeholder,
+[data-theme='light'] textarea::placeholder {
+  color: rgba(26, 26, 26, 0.4) !important;
+}
+
+/* Google Meet input class - light mode */
+[data-theme='light'] .input-meet {
+  background: #ffffff !important;
+  border: 1px solid #dee2e6 !important;
+  color: #1a1a1a !important;
+}
+
+[data-theme='light'] .input-meet:focus {
+  border-color: #0d6efd !important;
+  box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.1) !important;
+}
+
+[data-theme='light'] .input-meet::placeholder {
+  color: rgba(26, 26, 26, 0.4) !important;
+}
+
+/* Select dropdowns - light mode */
+[data-theme='light'] select {
+  background-color: #ffffff !important;
+  border: 1px solid #dee2e6 !important;
+  color: #1a1a1a !important;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%231a1a1a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e") !important;
+}
+
+[data-theme='light'] select:focus {
+  border-color: #0d6efd !important;
+  box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.1) !important;
+  outline: none !important;
+}
+
+[data-theme='light'] select option {
+  background-color: #ffffff !important;
+  color: #1a1a1a !important;
+}
+
+/* Radio buttons - light mode */
+[data-theme='light'] input[type='radio'] {
+  accent-color: #0d6efd !important;
+}
+
+/* Checkboxes - light mode */
+[data-theme='light'] input[type='checkbox'] {
+  accent-color: #0d6efd !important;
+  border-color: #dee2e6 !important;
+  background-color: #ffffff !important;
+}
+
+/* Search input styling - light mode */
+[data-theme='light'] input[type='search'] {
+  background-color: #ffffff !important;
+  border-color: #dee2e6 !important;
+}
+
+/* Disabled input states - light mode */
+[data-theme='light'] input:disabled,
+[data-theme='light'] select:disabled,
+[data-theme='light'] textarea:disabled {
+  background-color: #e9ecef !important;
+  border-color: #dee2e6 !important;
+  color: rgba(26, 26, 26, 0.5) !important;
+  cursor: not-allowed !important;
+  opacity: 0.6 !important;
+}
+
+/* ============================================================
+   MOBILE RESPONSIVENESS & ACCESSIBILITY
+   ============================================================ */
+
+/* Support touch events and hover states */
+@media (hover: none) and (pointer: coarse) {
+  button,
+  a,
+  input[type='button'],
+  input[type='submit'],
+  [role='button'] {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 12px 16px;
+  }
+
+  /* Increase tap targets */
+  .mobile-meet-control-btn {
+    min-height: 48px !important;
+    min-width: 48px !important;
+  }
+
+  /* Better touch feedback */
+  button:active {
+    opacity: 0.85 !important;
+    transform: scale(0.98) !important;
+  }
+}
+
+/* Portrait orientation (vertical) */
+@media (orientation: portrait) and (max-width: 768px) {
+  /* Maximize vertical space */
+  body {
+    font-size: 16px;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  /* Home page responsive */
+  .home-page-hero h1 {
+    font-size: 2rem !important;
+    line-height: 1.2 !important;
+  }
+
+  .home-page-hero p {
+    font-size: 0.875rem !important;
+  }
+
+  /* Cards grid - 1 column on small portrait */
+  .meeting-cards-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  /* Personal room cards stack */
+  .room-info-cards {
+    gap: 12px !important;
+  }
+
+  .room-info-card {
+    flex-direction: column !important;
+    gap: 8px !important;
+  }
+
+  /* Action buttons full width */
+  .room-action-buttons {
+    flex-direction: column !important;
+  }
+
+  .room-action-buttons button {
+    width: 100% !important;
+  }
+
+  /* Modal responsive */
+  .modal-content {
+    max-height: 80vh !important;
+    border-radius: 20px 20px 0 0 !important;
+  }
+
+  /* Meeting room controls at bottom */
+  .meeting-controls {
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    padding: 12px !important;
+    background: rgba(15, 15, 18, 0.95) !important;
+    border-radius: 16px 16px 0 0 !important;
+    z-index: 50 !important;
+  }
+
+  /* Input fields full width */
+  input[type='text'],
+  input[type='email'],
+  input[type='password'],
+  input[type='number'],
+  textarea,
+  select {
+    width: 100% !important;
+    font-size: 16px !important;
+    padding: 12px !important;
+  }
+
+  /* Prevent zoom on input focus */
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+
+  /* Chat input responsive */
+  .chat-panel__input-area {
+    min-height: 40px !important;
+    padding: 8px !important;
+  }
+
+  /* Participants list */
+  .participants-panel {
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  /* Navigation responsive */
+  .sidebar {
+    display: none !important;
+  }
+
+  .mobile-nav {
+    display: flex !important;
+  }
+
+  /* Drawer/Sheet components */
+  [role='dialog'] {
+    max-height: 90vh !important;
+    border-radius: 24px 24px 0 0 !important;
+  }
+}
+
+/* Landscape orientation (horizontal) */
+@media (orientation: landscape) and (max-width: 768px) {
+  /* Compact layout for landscape */
+  body {
+    font-size: 14px !important;
+  }
+
+  /* Reduce padding in landscape */
+  section,
+  main {
+    padding: 8px !important;
+    gap: 8px !important;
+  }
+
+  h1, h2, h3 {
+    font-size: 1.25rem !important;
+  }
+
+  /* Hero section compact */
+  .home-page-hero {
+    padding: 12px !important;
+    gap: 8px !important;
+  }
+
+  .home-page-hero h1 {
+    font-size: 1.5rem !important;
+  }
+
+  /* Cards - 2 columns on landscape */
+  .meeting-cards-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+  }
+
+  /* Meeting room optimized for landscape */
+  .meeting-room-container {
+    display: flex !important;
+    flex-direction: row !important;
+  }
+
+  /* Video area takes most space */
+  .meeting-video-area {
+    flex: 1 !important;
+  }
+
+  /* Controls horizontal */
+  .meeting-controls {
+    gap: 4px !important;
+    overflow-x: auto !important;
+  }
+
+  /* Compact buttons */
+  .mobile-meet-control-btn {
+    min-width: 40px !important;
+    min-height: 40px !important;
+    padding: 8px !important;
+  }
+}
+
+/* Tablet devices (768px - 1024px) */
+@media (min-width: 768px) and (max-width: 1024px) {
+  /* Optimize for tablet */
+  .meeting-cards-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  input[type='text'],
+  input[type='email'],
+  input[type='password'],
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
+/* Small devices (max 480px) */
+@media (max-width: 480px) {
+  /* Aggressive mobile optimization */
+  body {
+    font-size: 14px !important;
+    line-height: 1.4 !important;
+  }
+
+  /* Larger touch targets */
+  button,
+  a,
+  input[type='button'],
+  input[type='submit'],
+  [role='button'] {
+    min-height: 48px !important;
+    min-width: 48px !important;
+    padding: 12px 16px !important;
+  }
+
+  /* Stack everything */
+  .flex-row {
+    flex-direction: column !important;
+  }
+
+  /* Full width elements */
+  .room-action-buttons button {
+    width: 100% !important;
+  }
+
+  /* Meeting modals */
+  .meeting-modal {
+    margin: 0 !important;
+    width: 100vw !important;
+    max-height: 90vh !important;
+    border-radius: 24px 24px 0 0 !important;
+  }
+
+  /* Input focus prevention of zoom */
+  input[type='text'],
+  input[type='email'],
+  input[type='password'],
+  input[type='number'],
+  textarea,
+  select {
+    font-size: 16px !important;
+    padding: 12px !important;
+  }
+
+  /* Meeting room buttons */
+  .meeting-control-btn {
+    font-size: 12px !important;
+  }
+
+  /* Reduce gaps */
+  .gap-3 {
+    gap: 8px !important;
+  }
+
+  .gap-4 {
+    gap: 12px !important;
+  }
+
+  .gap-6 {
+    gap: 16px !important;
+  }
+
+  /* Hero section mobile */
+  .home-hero {
+    padding: 16px !important;
+    border-radius: 16px !important;
+  }
+
+  .home-hero h1 {
+    font-size: 1.75rem !important;
+  }
+
+  /* Personal room layout */
+  .personal-room-header {
+    gap: 12px !important;
+  }
+
+  /* Card text truncation */
+  .room-info-card p {
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  /* Message notifications */
+  .toast {
+    max-width: 90vw !important;
+    margin: 8px !important;
+  }
+
+  /* Dropdown menus mobile friendly */
+  [role='menu'] {
+    position: fixed !important;
+    max-height: 80vh !important;
+    overflow-y: auto !important;
+  }
+}
+
+/* Support for notch/safe area */
+@supports (padding: max(0px)) {
+  .meeting-controls {
+    padding-bottom: max(12px, env(safe-area-inset-bottom)) !important;
+  }
+
+  .mobile-nav {
+    padding-bottom: max(12px, env(safe-area-inset-bottom)) !important;
+  }
+}
+
+/* Touch device optimizations */
+@media (hover: none) {
+  /* Disable hover effects on touch devices */
+  button:hover,
+  a:hover {
+    background-color: inherit !important;
+    color: inherit !important;
+  }
+
+  /* Add active state instead */
+  button:active,
+  a:active,
+  [role='button']:active {
+    opacity: 0.7 !important;
+    transform: scale(0.98) !important;
+    transition: all 0.15s ease-out !important;
+  }
+
+  /* Increase clickable areas */
+  [role='button'],
+  button,
+  a[role='button'] {
+    padding: 12px 16px !important;
+    min-height: 44px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+}
+
+/* Reduce motion for accessibility */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Dark color scheme - ensure OLED optimization */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark !important;
+  }
+
+  html,
+  body {
+    background-color: #000000 !important;
+    color: #ffffff !important;
+  }
+}
+
+/* Retina display optimization */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  /* Slightly bolder text on high DPI */
+  body {
+    -webkit-font-smoothing: antialiased !important;
+    -moz-osx-font-smoothing: grayscale !important;
+  }
+}
+
+/* ============================================================
+   COMPONENT-LEVEL MOBILE OPTIMIZATIONS
+   ============================================================ */
+
+/* HomeCard mobile responsive */
+@media (max-width: 640px) {
+  .home-card {
+    min-height: 140px !important;
+    padding: 12px !important;
+    gap: 8px !important;
+  }
+
+  .home-card h2 {
+    font-size: 0.95rem !important;
+  }
+
+  .home-card p {
+    font-size: 0.75rem !important;
+    line-height: 1.2 !important;
+  }
+
+  .home-card__icon {
+    size: 32px !important;
+  }
+}
+
+/* Meeting card mobile optimizations */
+@media (max-width: 640px) {
+  .meeting-card {
+    padding: 12px !important;
+  }
+
+  .meeting-card h3 {
+    font-size: 0.95rem !important;
+    line-height: 1.3 !important;
+  }
+
+  .meeting-card p {
+    font-size: 0.75rem !important;
+  }
+
+  .meeting-card__date {
+    font-size: 0.7rem !important;
+  }
+
+  .meeting-card__participants {
+    gap: 4px !important;
+  }
+
+  .meeting-card__avatar {
+    size: 24px !important;
+  }
+
+  .meeting-card__actions {
+    gap: 4px !important;
+  }
+
+  .meeting-card__action-btn {
+    padding: 6px 10px !important;
+    font-size: 0.7rem !important;
+  }
+}
+
+/* Meeting modal mobile full-screen */
+@media (max-width: 640px) {
+  .meeting-modal {
+    max-height: 95vh !important;
+    max-width: calc(100vw - 16px) !important;
+    margin: 8px auto !important;
+    border-radius: 16px !important;
+  }
+
+  .meeting-modal__header {
+    padding: 12px 16px !important;
+  }
+
+  .meeting-modal__header h1 {
+    font-size: 1.1rem !important;
+  }
+
+  .meeting-modal__content {
+    padding: 12px 16px !important;
+    gap: 12px !important;
+  }
+
+  .meeting-modal__footer {
+    padding: 12px 16px !important;
+    gap: 8px !important;
+  }
+
+  .meeting-modal__footer button {
+    padding: 10px 12px !important;
+    font-size: 0.85rem !important;
+  }
+}
+
+/* Input fields mobile */
+@media (max-width: 640px) {
+  input[type='text'],
+  input[type='email'],
+  input[type='password'],
+  input[type='number'],
+  input[type='search'],
+  textarea,
+  select {
+    font-size: 16px !important; /* Prevent zoom on iOS */
+    padding: 12px 10px !important;
+    border-radius: 8px !important;
+  }
+
+  textarea {
+    min-height: 80px !important;
+    resize: vertical !important;
+  }
+
+  .react-datepicker__input {
+    font-size: 16px !important;
+  }
+}
+
+/* Button mobile - ensure 48px minimum touch targets */
+@media (max-width: 640px) {
+  button,
+  [role='button'],
+  input[type='button'],
+  input[type='submit'] {
+    min-height: 44px !important;
+    min-width: 44px !important;
+    padding: 10px 14px !important;
+    font-size: 0.9rem !important;
+    border-radius: 8px !important;
+  }
+
+  .touch-target {
+    min-height: 48px !important;
+    min-width: 48px !important;
+  }
+
+  /* Increase spacing around touch targets */
+  button + button {
+    margin-left: 8px !important;
+  }
+}
+
+/* Chat panel mobile */
+@media (max-width: 640px) {
+  .chat-panel {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 60 !important;
+    border-radius: 0 !important;
+    max-width: 100% !important;
+    height: 100% !important;
+  }
+
+  .chat-panel__header {
+    padding: 12px 14px !important;
+  }
+
+  .chat-panel__header h3 {
+    font-size: 1rem !important;
+  }
+
+  .chat-panel__messages {
+    padding: 12px 8px !important;
+    gap: 8px !important;
+  }
+
+  .chat-message {
+    max-width: 85% !important;
+    font-size: 0.9rem !important;
+  }
+
+  .chat-message__bubble {
+    padding: 8px 10px !important;
+    border-radius: 12px !important;
+  }
+
+  .chat-panel__input-area {
+    padding: 8px 10px !important;
+    gap: 6px !important;
+  }
+
+  .chat-panel__input {
+    font-size: 14px !important;
+    padding: 8px 10px !important;
+  }
+
+  .chat-panel__send-btn {
+    padding: 8px 10px !important;
+    min-height: 40px !important;
+    min-width: 40px !important;
+  }
+}
+
+/* Participants list mobile */
+@media (max-width: 640px) {
+  .custom-participants-list {
+    max-height: 100vh !important;
+  }
+
+  .custom-participants-list__search {
+    padding: 8px 12px !important;
+    margin: 8px 8px !important;
+  }
+
+  .custom-participants-list__search-input {
+    font-size: 14px !important;
+  }
+
+  .custom-participant-item {
+    padding: 10px 12px !important;
+    margin: 4px 8px !important;
+  }
+
+  .custom-participant-item__name {
+    font-size: 0.95rem !important;
+  }
+
+  .custom-participant-item__btn {
+    padding: 6px 8px !important;
+    min-height: 36px !important;
+    min-width: 36px !important;
+  }
+
+  .custom-participant-menu {
+    right: 0 !important;
+    left: auto !important;
+  }
+}
+
+/* Call settings modal mobile */
+@media (max-width: 640px) {
+  .call-settings-modal {
+    max-height: 90vh !important;
+    border-radius: 20px 20px 0 0 !important;
+  }
+
+  .call-settings-modal__sidebar {
+    display: none !important;
+  }
+
+  .call-settings-modal__header {
+    padding: 12px 14px !important;
+  }
+
+  .call-settings-modal__content {
+    padding: 12px 14px !important;
+    gap: 12px !important;
+  }
+
+  .setting-row {
+    padding: 10px 12px !important;
+    gap: 8px !important;
+  }
+
+  .setting-row label {
+    font-size: 0.9rem !important;
+  }
+
+  .setting-row input,
+  .setting-row select {
+    font-size: 14px !important;
+  }
+}
+
+/* Meeting setup mobile */
+@media (max-width: 640px) {
+  .meeting-setup {
+    padding: 0 !important;
+  }
+
+  .meeting-setup__cards {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+    padding: 12px !important;
+  }
+
+  .meeting-setup__card {
+    padding: 14px !important;
+    gap: 10px !important;
+  }
+
+  .meeting-setup__header {
+    gap: 8px !important;
+  }
+
+  .meeting-setup__device-select {
+    width: 100% !important;
+  }
+
+  .meeting-setup__join-btn {
+    width: 100% !important;
+    padding: 12px 14px !important;
+    font-size: 0.95rem !important;
+  }
+
+  .meeting-setup__setup-btn {
+    width: 100% !important;
+    padding: 12px 14px !important;
+    font-size: 0.95rem !important;
+  }
+}
+
+/* Navbar mobile */
+@media (max-width: 640px) {
+  nav {
+    padding: 10px 12px !important;
+    gap: 8px !important;
+    height: auto !important;
+    min-height: 52px !important;
+  }
+
+  nav p {
+    font-size: 0.9rem !important;
+  }
+
+  .navbar-menu {
+    position: fixed !important;
+    top: 52px !important;
+    right: 0 !important;
+    width: auto !important;
+    max-width: calc(100vw - 16px) !important;
+    z-index: 40 !important;
+    border-radius: 8px !important;
+  }
+
+  .navbar-menu p {
+    font-size: 0.85rem !important;
+  }
+
+}
+
+/* Meeting room mobile - responsive layout */
+@media (max-width: 640px) {
+  .meeting-room {
+    flex-direction: column !important;
+    padding: 0 !important;
+  }
+
+  .meeting-room__main {
+    flex: 1 !important;
+    min-height: 0 !important;
+  }
+
+  .meeting-room__video {
+    aspect-ratio: 16 / 9 !important;
+    height: auto !important;
+  }
+
+  .meeting-room__controls {
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    padding: 10px !important;
+    background: rgba(15, 15, 18, 0.98) !important;
+    border-radius: 12px 12px 0 0 !important;
+    z-index: 40 !important;
+  }
+
+  .meeting-room__sidebar {
+    display: none !important;
+  }
+
+  .meeting-room__drawer-trigger {
+    position: fixed !important;
+    bottom: 70px !important;
+    right: 10px !important;
+    z-index: 30 !important;
+  }
+}
+
+/* Personal room mobile */
+@media (max-width: 640px) {
+  .personal-room {
+    padding: 12px 10px !important;
+    gap: 12px !important;
+  }
+
+  .personal-room__header {
+    gap: 8px !important;
+  }
+
+  .personal-room__title {
+    font-size: 1.3rem !important;
+  }
+
+  .personal-room__info {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+
+  .personal-room__info-card {
+    padding: 12px !important;
+    gap: 6px !important;
+  }
+
+  .personal-room__info-card h3 {
+    font-size: 0.85rem !important;
+  }
+
+  .personal-room__info-card p {
+    font-size: 0.9rem !important;
+  }
+
+  .personal-room__copy-btn {
+    width: 100% !important;
+    padding: 10px 12px !important;
+  }
+
+  .personal-room__actions {
+    flex-direction: column !important;
+    gap: 10px !important;
+  }
+
+  .personal-room__actions button {
+    width: 100% !important;
+    padding: 11px 12px !important;
+  }
+}
+
+/* Grid breakpoints mobile */
+@media (max-width: 480px) {
+  /* Extra small devices */
+  .grid {
+    grid-template-columns: 1fr !important;
+    gap: 8px !important;
+  }
+
+  /* Larger fonts to prevent zoom */
+  input,
+  select,
+  textarea,
+  button {
+    font-size: 16px !important;
+  }
+
+  /* Maximize space */
+  section,
+  main {
+    padding: 8px !important;
+  }
+
+  h1 {
+    font-size: 1.3rem !important;
+  }
+
+  h2 {
+    font-size: 1.1rem !important;
+  }
+
+  h3 {
+    font-size: 0.95rem !important;
+  }
+
+  /* Remove unnecessary spacing */
+  .gap-4 {
+    gap: 8px !important;
+  }
+
+  .gap-6 {
+    gap: 10px !important;
+  }
+
+  /* Full width critical buttons */
+  .btn-primary,
+  .btn-secondary,
+  .btn-danger {
+    width: 100% !important;
+  }
+
+  /* Stack form elements */
+  .flex.flex-col {
+    gap: 8px !important;
+  }
+
+  /* Hide non-essential UI */
+  .hidden-mobile {
+    display: none !important;
+  }
+}
+
+/* Tablet optimizations (768px-1024px) */
+@media (min-width: 768px) and (max-width: 1024px) {
+  .meeting-cards-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  .personal-room__info {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  .meeting-setup__cards {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+/* Large devices (1024px+) */
+@media (min-width: 1024px) {
+  .meeting-cards-grid {
+    grid-template-columns: repeat(4, 1fr) !important;
+  }
+
+  .personal-room__info {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+
+  .meeting-setup__cards {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  .meeting-room {
+    flex-direction: row !important;
+  }
+
+  .meeting-room__sidebar {
+    width: 320px !important;
+    display: flex !important;
+  }
+}
+
+/* Safe area and notch support */
+@supports (padding: max(0px)) {
+  .meeting-room__controls {
+    padding-bottom: max(10px, calc(env(safe-area-inset-bottom) + 10px)) !important;
+  }
+
+  .chat-panel {
+    padding-bottom: max(8px, env(safe-area-inset-bottom)) !important;
+  }
+}
+
+/* Reduced motion accessibility */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Keep essential transforms */
+  button:active {
+    transform: none !important;
+  }
+
+  .hover\:scale-110:hover {
+    transform: none !important;
+  }
+}
+
+/* Rotation support - landscape */
+@media (orientation: landscape) and (max-height: 500px) {
+  .navbar {
+    padding: 6px 10px !important;
+  }
+
+  section,
+  main {
+    padding: 6px 8px !important;
+  }
+
+  .meeting-room__controls {
+    padding: 6px !important;
+    gap: 4px !important;
+  }
+
+  button {
+    padding: 6px 10px !important;
+    font-size: 0.8rem !important;
+  }
+
+  h1 {
+    font-size: 1rem !important;
+  }
+
+  h2 {
+    font-size: 0.9rem !important;
+  }
+
+  .home-card h2 {
+    font-size: 0.85rem !important;
+  }
+
+  .meeting-modal {
+    max-height: 85vh !important;
+  }
+}
+
+/* ============================================================
+   SIDEBAR LIGHT MODE STYLING
+   ============================================================ */
+
+/* Hide sidebar on mobile in light mode */
+[data-theme='light'] [data-sidebar="main"] {
+  display: none !important;
+}
+
+/* Show sidebar on sm and up in light mode */
+@media (min-width: 640px) {
+  [data-theme='light'] [data-sidebar="main"] {
+    display: flex !important;
+  }
+}
+
+/* Sidebar base - light mode */
+[data-theme='light'] [data-sidebar="main"] {
+  background-color: #f8f9fa !important;
+  border-right: 1px solid #dee2e6 !important;
+}
+
+/* Sidebar text - light mode */
+[data-theme='light'] [data-sidebar="main"] .text-white {
+  color: #1a1a1a !important;
+}
+
+/* Sidebar link - inactive state - light mode */
+[data-theme='light'] [data-sidebar="main"] a {
+  color: rgba(26, 26, 26, 0.7) !important;
+  background-color: transparent !important;
+}
+
+[data-theme='light'] [data-sidebar="main"] a:hover {
+  background-color: #e9ecef !important;
+  color: rgba(26, 26, 26, 0.9) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Sidebar link - active state (blue) - light mode */
+[data-theme='light'] [data-sidebar="main"] a.bg-blue-1 {
+  background-color: #0d6efd !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3) !important;
+}
+
+[data-theme='light'] [data-sidebar="main"] a.bg-blue-1:hover {
+  background-color: #0b5ed7 !important;
+  box-shadow: 0 6px 16px rgba(13, 110, 253, 0.4) !important;
+}
+
+/* Sidebar icon - light mode */
+[data-theme='light'] [data-sidebar="main"] img {
+  filter: brightness(0.3) !important;
+  opacity: 1 !important;
+}
+
+/* Sidebar icon - active state (blue link) - light mode */
+[data-theme='light'] [data-sidebar="main"] a.bg-blue-1 img {
+  filter: brightness(1) !important;
+}
+
+/* Sidebar link text - inactive - light mode */
+[data-theme='light'] [data-sidebar="main"] a p.text-base {
+  color: rgba(26, 26, 26, 0.7) !important;
+}
+
+/* Sidebar link text - active (blue) - light mode */
+[data-theme='light'] [data-sidebar="main"] a.bg-blue-1 p.text-base {
+  color: #ffffff !important;
+}
+
+/* Sidebar hover effects - light mode */
+[data-theme='light'] [data-sidebar="main"] a:hover .group-hover\:scale-110 {
+  transform: scale(1.1) !important;
+}
+
+[data-theme='light'] [data-sidebar="main"] a:hover .group-hover\:brightness-100 {
+  filter: brightness(0.6) !important;
+}
+
+/* Sidebar border and separator - light mode */
+[data-theme='light'] [data-sidebar="main"] .border-dark-3 {
+  border-color: #dee2e6 !important;
+}
+
+/* Sidebar version text - light mode */
+[data-theme='light'] [data-sidebar="main"] .text-xs {
+  color: rgba(26, 26, 26, 0.5) !important;
+}
+
+[data-theme='light'] [data-sidebar="main"] .text-white\/40 {
+  color: rgba(26, 26, 26, 0.4) !important;
+}
+
+/* Sidebar scrollbar - light mode */
+[data-theme='light'] [data-sidebar="main"]::-webkit-scrollbar {
+  width: 8px;
+}
+
+[data-theme='light'] [data-sidebar="main"]::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+[data-theme='light'] [data-sidebar="main"]::-webkit-scrollbar-thumb {
+  background: #adb5bd;
+  border-radius: 4px;
+}
+
+[data-theme='light'] [data-sidebar="main"]::-webkit-scrollbar-thumb:hover {
+  background: #868e96;
+}
+
+/* ============================================================
+   FINAL INPUT OVERRIDES (LIGHT MODE)
+   Keep chat/search fields free from generic blue focus rings.
+   ============================================================ */
+[data-theme='light'] .chat-panel__input-container:focus-within,
+[data-theme='light'] .custom-participants-list__search:focus-within {
+  border-color: #c8d2df !important;
+  box-shadow: none !important;
+}
+
+[data-theme='light'] .chat-panel__input,
+[data-theme='light'] input.chat-panel__input,
+[data-theme='light'] input.chat-panel__input[type='text'],
+[data-theme='light'] .chat-panel__input:focus,
+[data-theme='light'] .chat-panel__input:focus-visible,
+[data-theme='light'] input.chat-panel__input:focus,
+[data-theme='light'] input.chat-panel__input:focus-visible,
+[data-theme='light'] .custom-participants-list__search-input,
+[data-theme='light'] input.custom-participants-list__search-input,
+[data-theme='light'] input.custom-participants-list__search-input[type='text'],
+[data-theme='light'] .custom-participants-list__search-input:focus,
+[data-theme='light'] .custom-participants-list__search-input:focus-visible,
+[data-theme='light'] input.custom-participants-list__search-input:focus,
+[data-theme='light'] input.custom-participants-list__search-input:focus-visible {
+  border: 0 !important;
+  outline: none !important;
+  box-shadow: none !important;
+  -webkit-box-shadow: none !important;
+  background: transparent !important;
+}
+
+/* Accessibility toggles from Call Settings */
+html[data-high-contrast='true'] {
+  filter: contrast(1.15) saturate(1.05);
+}
+
+html[data-reduce-motion='true'] *,
+html[data-reduce-motion='true'] *::before,
+html[data-reduce-motion='true'] *::after {
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}
+
+/* Keep CallSettings selects stable while interacting inside dialogs */
+.call-settings-select {
+  pointer-events: auto !important;
+  transition: none !important;
+  transform: none !important;
+}
+
+/* Meeting mobile layout must remain edge-to-edge */
+@media (max-width: 768px) {
+  .meeting-mobile-root {
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100vw !important;
+    max-width: 100vw !important;
+  }
+
+  .meeting-mobile-root .mobile-meet-page {
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100vw !important;
+    max-width: 100vw !important;
+  }
+
+  .meeting-mobile-root .mobile-meet-main-video,
+  .meeting-mobile-root .mobile-meet-video-card {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    margin: 0 !important;
+  }
+
+  .meeting-mobile-root section,
+  .meeting-mobile-root main {
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .meeting-mobile-root .mobile-meet-page button + button,
+  .meeting-mobile-root .mobile-meet-side-controls .mobile-meet-side-btn + .mobile-meet-side-btn {
+    margin-left: 0 !important;
+  }
+}
