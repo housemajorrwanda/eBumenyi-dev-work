@@ -328,20 +328,163 @@ async function seedUsers(hospitalIds: Record<string, string>) {
       gender: "Female",
       hospitalId: hospitalIds["Rwanda Military Hospital"],
     },
+    {
+      id: "user-seed-trainee6",
+      email: "trainee.yvonne@chwplatform.rw",
+      fullNames: "Yvonne Mukamana",
+      phoneNumber: "250788666001",
+      district: "Gasabo",
+      sector: "Gisozi",
+      cell: "Bumbogo",
+      village: "Rukaranka",
+      NID: "1199080000000014",
+      gender: "Female",
+      hospitalId: hospitalIds["King Faisal Hospital"],
+    },
+    {
+      id: "user-seed-trainee7",
+      email: "trainee.pascal@chwplatform.rw",
+      fullNames: "Pascal Niyongabo",
+      phoneNumber: "250788666002",
+      district: "Gasabo",
+      sector: "Kacyiru",
+      cell: "Kamatamu",
+      village: "Amahoro",
+      NID: "1199080000000015",
+      gender: "Male",
+      hospitalId: hospitalIds["King Faisal Hospital"],
+    },
+    {
+      id: "user-seed-trainee8",
+      email: "trainee.solange@chwplatform.rw",
+      fullNames: "Solange Umutoniwase",
+      phoneNumber: "250788666003",
+      district: "Kicukiro",
+      sector: "Niboye",
+      cell: "Gikondo",
+      village: "Agatare",
+      NID: "1199080000000016",
+      gender: "Female",
+      hospitalId: hospitalIds["Rwanda Military Hospital"],
+    },
+    {
+      id: "user-seed-trainee9",
+      email: "trainee.emmanuel@chwplatform.rw",
+      fullNames: "Emmanuel Nshuti",
+      phoneNumber: "250788666004",
+      district: "Nyarugenge",
+      sector: "Nyakabanda",
+      cell: "Karuruma",
+      village: "Nyabugogo",
+      NID: "1199080000000017",
+      gender: "Male",
+      hospitalId: hospitalIds["Muhima District Hospital"],
+    },
+    {
+      id: "user-seed-trainee10",
+      email: "trainee.chantal@chwplatform.rw",
+      fullNames: "Chantal Uwimana",
+      phoneNumber: "250788666005",
+      district: "Gasabo",
+      sector: "Kimironko",
+      cell: "Kibagabaga",
+      village: "Karama",
+      NID: "1199080000000018",
+      gender: "Female",
+      hospitalId: hospitalIds["King Faisal Hospital"],
+    },
+    {
+      id: "user-seed-trainee11",
+      email: "trainee.olivier@chwplatform.rw",
+      fullNames: "Olivier Habimana",
+      phoneNumber: "250788666006",
+      district: "Kicukiro",
+      sector: "Kagarama",
+      cell: "Nyanza",
+      village: "Rwezamenyo",
+      NID: "1199080000000019",
+      gender: "Male",
+      hospitalId: hospitalIds["Rwanda Military Hospital"],
+    },
+    {
+      id: "user-seed-trainee12",
+      email: "trainee.vestine@chwplatform.rw",
+      fullNames: "Vestine Mukagasana",
+      phoneNumber: "250788666007",
+      district: "Nyarugenge",
+      sector: "Nyamirambo",
+      cell: "Kimisagara",
+      village: "Kigarama",
+      NID: "1199080000000020",
+      gender: "Female",
+      hospitalId: hospitalIds["Muhima District Hospital"],
+    },
+    {
+      id: "user-seed-trainee13",
+      email: "trainee.celestin@chwplatform.rw",
+      fullNames: "Celestin Nzeyimana",
+      phoneNumber: "250788666008",
+      district: "Gasabo",
+      sector: "Remera",
+      cell: "Rukiri I",
+      village: "Nyagatovu",
+      NID: "1199080000000021",
+      gender: "Male",
+      hospitalId: hospitalIds["King Faisal Hospital"],
+    },
+    {
+      id: "user-seed-trainee14",
+      email: "trainee.diane@chwplatform.rw",
+      fullNames: "Diane Umutesi",
+      phoneNumber: "250788666009",
+      district: "Kicukiro",
+      sector: "Gahanga",
+      cell: "Kabuga",
+      village: "Nyabisindu",
+      NID: "1199080000000022",
+      gender: "Female",
+      hospitalId: hospitalIds["Rwanda Military Hospital"],
+    },
+    {
+      id: "user-seed-trainee15",
+      email: "trainee.justin@chwplatform.rw",
+      fullNames: "Justin Hakizimana",
+      phoneNumber: "250788666010",
+      district: "Gasabo",
+      sector: "Gisozi",
+      cell: "Bumbogo",
+      village: "Rukaranka",
+      NID: "1199080000000023",
+      gender: "Male",
+      hospitalId: hospitalIds["King Faisal Hospital"],
+    },
   ];
 
   const traineeUsers: Array<{ id: string; userId: string }> = [];
   for (const t of trainees) {
     const { email, ...rest } = t;
     const u = await upsertUser(email, { ...rest, industry: "WELTEL" });
-    await ensureRole(u.id, roles.TESTER);
+    await ensureRole(u.id, roles.TRAINEE);
     const student = await prisma.student.upsert({
       where: { userId: u.id },
-      update: { status: "ACTIVE" },
-      create: { userId: u.id, role: roles.TESTER, status: "ACTIVE" },
+      update: { role: roles.TRAINEE, status: "ACTIVE" },
+      create: { userId: u.id, role: roles.TRAINEE, status: "ACTIVE" },
     });
     traineeUsers.push({ id: student.id, userId: u.id });
   }
+
+  // Create Student records for CHO supervisors
+  const choStudent1 = await prisma.student.upsert({
+    where: { userId: supervisor1.id },
+    update: { role: roles.CHO, status: "ACTIVE" },
+    create: { userId: supervisor1.id, role: roles.CHO, status: "ACTIVE" },
+  });
+
+  const choStudent2 = await prisma.student.upsert({
+    where: { userId: supervisor2.id },
+    update: { role: roles.CHO, status: "ACTIVE" },
+    create: { userId: supervisor2.id, role: roles.CHO, status: "ACTIVE" },
+  });
 
   const staffRecords = await prisma.staff.findMany({
     where: { userId: { in: [trainer1.id, trainer2.id] } },
@@ -355,6 +498,8 @@ async function seedUsers(hospitalIds: Record<string, string>) {
     trainer2,
     supervisor1,
     supervisor2,
+    choStudent1,
+    choStudent2,
     tester1,
     trainees: traineeUsers,
     staffRecords,
@@ -1446,6 +1591,62 @@ async function seedSystemReview(userId: string) {
   });
 }
 
+async function seedCHOGroups(
+  choStudent1: { id: string },
+  choStudent2: { id: string },
+  traineeUsers: Array<{ id: string }>,
+) {
+  // Group 1 — Grace Uwase leads, 4 members
+  const group1 = await prisma.cHOGroup.upsert({
+    where: { choId: choStudent1.id },
+    update: { name: "Nyamirambo CHW Group", sector: "Nyamirambo", description: "CHW group managed by Grace Uwase" },
+    create: {
+      name: "Nyamirambo CHW Group",
+      choId: choStudent1.id,
+      sector: "Nyamirambo",
+      description: "CHW group managed by Grace Uwase",
+    },
+  });
+
+  for (let i = 0; i < Math.min(4, traineeUsers.length); i++) {
+    await prisma.cHOGroupMember.upsert({
+      where: { studentId: traineeUsers[i].id },
+      update: {},
+      create: {
+        groupId: group1.id,
+        studentId: traineeUsers[i].id,
+      },
+    });
+  }
+
+  // Group 2 — James Nshimiyimana leads, 3 members (Yvonne, Pascal, Solange)
+  const group2 = await prisma.cHOGroup.upsert({
+    where: { choId: choStudent2.id },
+    update: { name: "Gisozi CHW Group", sector: "Gisozi", description: "CHW group managed by James Nshimiyimana" },
+    create: {
+      name: "Gisozi CHW Group",
+      choId: choStudent2.id,
+      sector: "Gisozi",
+      description: "CHW group managed by James Nshimiyimana",
+    },
+  });
+
+  // Add trainees[5..7] (Yvonne, Pascal, Solange) to Gisozi group
+  for (let i = 5; i <= 7 && i < traineeUsers.length; i++) {
+    await prisma.cHOGroupMember.upsert({
+      where: { studentId: traineeUsers[i].id },
+      update: {},
+      create: {
+        groupId: group2.id,
+        studentId: traineeUsers[i].id,
+      },
+    });
+  }
+
+  // traineeUsers[4] (Hope) and trainees[8..14] (Emmanuel, Chantal, Olivier, Vestine,
+  // Celestin, Diane, Justin) are left ungrouped — 8 free CHWs for testing noGroup filter
+}
+
 async function main() {
   try {
     console.log("🌱 Starting seed...");
@@ -1466,6 +1667,8 @@ async function main() {
       trainer2,
       supervisor1,
       supervisor2,
+      choStudent1,
+      choStudent2,
       tester1,
       trainees,
       staffRecords,
@@ -1571,6 +1774,13 @@ async function main() {
       console.warn("  ⚠ System review seed failed (non-fatal):", e);
     }
 
+    try {
+      console.log("  → Seeding CHO groups...");
+      await seedCHOGroups(choStudent1, choStudent2, trainees);
+    } catch (e) {
+      console.warn("  ⚠ CHO groups seed failed (non-fatal):", e);
+    }
+
     console.log("\n✅ Seed complete!");
     console.log("\n🔑 Login credentials (all use password: Password123!)");
     console.log("   developer@gmail.com     → DEVELOPER");
@@ -1581,11 +1791,21 @@ async function main() {
     console.log("   supervisor.grace@chwplatform.rw → CHO");
     console.log("   supervisor.james@chwplatform.rw → CHO");
     console.log("   tester.jean@chwplatform.rw   → TESTER");
-    console.log("   trainee.amina@chwplatform.rw  → TRAINEE");
-    console.log("   trainee.eric@chwplatform.rw   → TRAINEE");
-    console.log("   trainee.fatuma@chwplatform.rw → TRAINEE");
-    console.log("   trainee.david@chwplatform.rw  → TRAINEE");
-    console.log("   trainee.hope@chwplatform.rw   → TRAINEE");
+    console.log("   trainee.amina@chwplatform.rw    → TRAINEE (Nyamirambo group)");
+    console.log("   trainee.eric@chwplatform.rw     → TRAINEE (Nyamirambo group)");
+    console.log("   trainee.fatuma@chwplatform.rw   → TRAINEE (Nyamirambo group)");
+    console.log("   trainee.david@chwplatform.rw    → TRAINEE (Nyamirambo group)");
+    console.log("   trainee.yvonne@chwplatform.rw   → TRAINEE (Gisozi group)");
+    console.log("   trainee.pascal@chwplatform.rw   → TRAINEE (Gisozi group)");
+    console.log("   trainee.solange@chwplatform.rw  → TRAINEE (Gisozi group)");
+    console.log("   trainee.hope@chwplatform.rw     → TRAINEE (NO GROUP)");
+    console.log("   trainee.emmanuel@chwplatform.rw → TRAINEE (NO GROUP)");
+    console.log("   trainee.chantal@chwplatform.rw  → TRAINEE (NO GROUP)");
+    console.log("   trainee.olivier@chwplatform.rw  → TRAINEE (NO GROUP)");
+    console.log("   trainee.vestine@chwplatform.rw  → TRAINEE (NO GROUP)");
+    console.log("   trainee.celestin@chwplatform.rw → TRAINEE (NO GROUP)");
+    console.log("   trainee.diane@chwplatform.rw    → TRAINEE (NO GROUP)");
+    console.log("   trainee.justin@chwplatform.rw   → TRAINEE (NO GROUP)");
   } catch (error) {
     console.error("❌ Seed failed:", error);
     throw error;

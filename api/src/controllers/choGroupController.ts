@@ -96,6 +96,24 @@ export class CHOGroupController {
     }
   }
 
+  // ─── CHO: update own group ────────────────────────────────────────────────────
+  @Patch("/mine")
+  @Security("jwt")
+  @Middlewares(loggerMiddleware, checkRole(roles.CHO))
+  public async updateMyGroup(
+    @Request() req: ExpressRequest,
+    @Body() body: { name?: string; sector?: string; description?: string },
+  ): Promise<any> {
+    try {
+      const userId = req.user?.id as string;
+      const group = await CHOGroupService.updateMyGroup(userId, body);
+      return { statusCode: 200, message: "Group updated successfully", data: group };
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      throw new AppError("Failed to update group", 500);
+    }
+  }
+
   // ─── CHO: get own group ───────────────────────────────────────────────────────
   @Get("/mine")
   @Security("jwt")
@@ -192,6 +210,37 @@ export class CHOGroupController {
     } catch (error) {
       if (error instanceof AppError) throw error;
       throw new AppError("Failed to retrieve candidates", 500);
+    }
+  }
+
+  // ─── Admin: update a group ───────────────────────────────────────────────────
+  @Patch("/{groupId}")
+  @Security("jwt")
+  @Middlewares(loggerMiddleware, checkRole(roles.ADMIN))
+  public async updateGroup(
+    @Path() groupId: string,
+    @Body() body: { name?: string; sector?: string; description?: string },
+  ): Promise<any> {
+    try {
+      const group = await CHOGroupService.updateGroup(groupId, body);
+      return { statusCode: 200, message: "Group updated successfully", data: group };
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      throw new AppError("Failed to update group", 500);
+    }
+  }
+
+  // ─── Admin: delete a group ────────────────────────────────────────────────────
+  @Delete("/{groupId}")
+  @Security("jwt")
+  @Middlewares(loggerMiddleware, checkRole(roles.ADMIN))
+  public async deleteGroup(@Path() groupId: string): Promise<any> {
+    try {
+      await CHOGroupService.deleteGroup(groupId);
+      return { statusCode: 200, message: "Group deleted successfully" };
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      throw new AppError("Failed to delete group", 500);
     }
   }
 

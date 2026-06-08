@@ -33,17 +33,17 @@ export class CalendarEmailService {
       timezone,
     } = data;
 
-    const subject = `Meeting Invitation: ${title}`;
+    const subject = `Ubutumire bw'inama: ${title}`;
 
     const formatDateTime = (date: Date): string => {
-      return date.toLocaleString("en-US", {
+      return date.toLocaleString("fr-RW", {
         timeZone: timezone,
         year: "numeric",
         month: "long",
         day: "numeric",
         hour: "2-digit",
         minute: "2-digit",
-        hour12: true,
+        hour12: false,
       });
     };
 
@@ -52,30 +52,30 @@ export class CalendarEmailService {
 
     const rolesText =
       roles && Object.keys(roles).length > 0
-        ? `\n\nRoles:\n${Object.entries(roles)
+        ? `\n\nInshingano:\n${Object.entries(roles)
             .map(([role, name]) => `• ${role}: ${name}`)
             .join("\n")}`
         : "";
 
     const body = `
-Hello ${participantName || "Participant"},
+Muraho ${participantName || "Uwitabiriwe"},
 
-You have been invited to the following meeting:
+Utumiwe gutabira inama ikurikira:
 
-Meeting Title: ${title}
-${description ? `Description: ${description}` : ""}
-Start Time: ${startDateTime}
-${endDateTime ? `End Time: ${endDateTime}` : ""}
-${location ? `Location/Meeting Link: ${location}` : ""}
-${hostEmail ? `Host: ${hostEmail}` : ""}
-Organizer: ${organizerName}
-Timezone: ${timezone}${rolesText}
+Inama: ${title}
+${description ? `Ibisobanuro: ${description}` : ""}
+Itangira: ${startDateTime}
+${endDateTime ? `Isozwa: ${endDateTime}` : ""}
+${location ? `Aho bahuriranye/Uhuze: ${location}` : ""}
+${hostEmail ? `Umutumiza: ${hostEmail}` : ""}
+Umunyamabanga: ${organizerName}
+Itangazamwanya: ${timezone}${rolesText}
 
-Please join the meeting at the specified time.
+Mwinginge mutabire inama igihe cyagenwe.
 
-Best regards,
+Murakoze,
 ${organizerName}
-CHW Training Platform
+Urubuga rw'amahugurwa ya CHW
     `.trim();
 
     try {
@@ -93,17 +93,17 @@ CHW Training Platform
   static async sendMeetingUpdate(
     data: MeetingInvitationData & { changes: string[] },
   ): Promise<void> {
-    const subject = `Meeting Updated: ${data.title}`;
+    const subject = `Inama ivuguruwe: ${data.title}`;
 
     const formatDateTime = (date: Date): string => {
-      return date.toLocaleString("en-US", {
+      return date.toLocaleString("fr-RW", {
         timeZone: data.timezone,
         year: "numeric",
         month: "long",
         day: "numeric",
         hour: "2-digit",
         minute: "2-digit",
-        hour12: true,
+        hour12: false,
       });
     };
 
@@ -111,22 +111,21 @@ CHW Training Platform
     const endDateTime = data.endTime ? formatDateTime(data.endTime) : null;
 
     const body = `
-Hello ${data.participantName || "Participant"},
+Muraho ${data.participantName || "Uwitabiriwe"},
 
-The following meeting has been updated:
+Inama ikurikira yavuguruwe:
 
-Meeting Title: ${data.title}
-${data.description ? `Description: ${data.description}` : ""}
-Start Time: ${startDateTime}
-${endDateTime ? `End Time: ${endDateTime}` : ""}
-${data.location ? `Location/Meeting Link: ${data.location}` : ""}
+Inama: ${data.title}
+${data.description ? `Ibisobanuro: ${data.description}` : ""}
+Itangira: ${startDateTime}
+${endDateTime ? `Isozwa: ${endDateTime}` : ""}
+${data.location ? `Aho bahuriranye/Uhuze: ${data.location}` : ""}
 
+Reba amakuru mashya y'inama.
 
-Please review the updated meeting details.
-
-Best regards,
+Murakoze,
 ${data.organizerName}
-CHW Training Platform
+Urubuga rw'amahugurwa ya CHW
     `.trim();
 
     try {
@@ -144,21 +143,21 @@ CHW Training Platform
   static async sendMeetingCancellation(
     data: MeetingInvitationData,
   ): Promise<void> {
-    const subject = `Meeting Cancelled: ${data.title}`;
+    const subject = `Inama ihagaritswe: ${data.title}`;
 
     const body = `
-Hello ${data.participantName || "Participant"},
+Muraho ${data.participantName || "Uwitabiriwe"},
 
-The following meeting has been cancelled:
+Inama ikurikira ihagaritswe:
 
-Meeting Title: ${data.title}
-${data.description ? `Description: ${data.description}` : ""}
+Inama: ${data.title}
+${data.description ? `Ibisobanuro: ${data.description}` : ""}
 
-If you have any questions, please contact the organizer.
+Niba ufite ibibazo, vugana n'umunyamabanga w'inama.
 
-Best regards,
+Murakoze,
 ${data.organizerName}
-CHW Training Platform
+Urubuga rw'amahugurwa ya CHW
     `.trim();
 
     try {

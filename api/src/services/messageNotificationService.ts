@@ -79,8 +79,8 @@ export class MessageNotificationService {
     totalUnread: number,
     io?: SocketIOServer,
   ) {
-    const title = "New messages";
-    const message = `You have ${totalUnread} unread messages`;
+    const title = "Ubutumwa bushya";
+    const message = `Ufite ${totalUnread} ubutumwa butasomwe`;
     const actionUrl = `/chat/${conversationId}`;
     const entityType = kind === "direct" ? "direct_chat" : "group_chat";
     const dedupKey = `chat:${conversationId}:${userId}`;

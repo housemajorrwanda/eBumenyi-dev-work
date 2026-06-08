@@ -235,7 +235,16 @@ export class CHOGroupService {
 
     const group = await prisma.cHOGroup.findUnique({
       where: { choId: student.id },
-      include: { _count: { select: { members: true } } },
+      include: {
+        _count: { select: { members: true } },
+        cho: {
+          include: {
+            user: {
+              select: { id: true, fullNames: true, photo: true, phoneNumber: true },
+            },
+          },
+        },
+      },
     });
     if (!group) throw new AppError("You do not lead any group yet", 404);
     return group;
@@ -325,6 +334,75 @@ export class CHOGroupService {
     await prisma.cHOGroupMember.delete({ where: { id: member.id } });
   }
 
+  // ─── Admin: update a group ───────────────────────────────────────────────────
+
+  static async updateGroup(groupId: string, data: { name?: string; sector?: string; description?: string }) {
+    const group = await prisma.cHOGroup.findUnique({ where: { id: groupId } });
+    if (!group) throw new AppError("Group not found", 404);
+
+    return prisma.cHOGroup.update({
+      where: { id: groupId },
+      data: {
+        ...(data.name ? { name: data.name } : {}),
+        ...(data.sector !== undefined ? { sector: data.sector || null } : {}),
+        ...(data.description !== undefined ? { description: data.description || null } : {}),
+      },
+      include: {
+        cho: {
+          include: {
+            user: { select: { id: true, fullNames: true, photo: true, phoneNumber: true, district: true, sector: true } },
+          },
+        },
+        _count: { select: { members: true } },
+      },
+    });
+  }
+
+  // ─── Admin: delete a group (revokes CHO role, removes all memberships) ────────
+
+  static async deleteGroup(groupId: string) {
+    const group = await prisma.cHOGroup.findUnique({
+      where: { id: groupId },
+      include: { cho: { include: { user: true } } },
+    });
+    if (!group) throw new AppError("Group not found", 404);
+
+    return prisma.$transaction(async (tx) => {
+      await tx.cHOGroupMember.deleteMany({ where: { groupId } });
+      await tx.userRole.deleteMany({ where: { userId: group.cho.userId, name: RoleType.CHO } });
+      await tx.student.update({ where: { id: group.choId }, data: { role: RoleType.TRAINEE } });
+      await tx.cHOGroup.delete({ where: { id: groupId } });
+      return { success: true };
+    });
+  }
+
+  // ─── CHO: update own group ────────────────────────────────────────────────────
+
+  static async updateMyGroup(choUserId: string, data: { name?: string; sector?: string; description?: string }) {
+    const student = await prisma.student.findUnique({ where: { userId: choUserId } });
+    if (!student) throw new AppError("Student record not found", 404);
+
+    const group = await prisma.cHOGroup.findUnique({ where: { choId: student.id } });
+    if (!group) throw new AppError("You do not lead any group", 404);
+
+    return prisma.cHOGroup.update({
+      where: { id: group.id },
+      data: {
+        ...(data.name ? { name: data.name } : {}),
+        ...(data.sector !== undefined ? { sector: data.sector || null } : {}),
+        ...(data.description !== undefined ? { description: data.description || null } : {}),
+      },
+      include: {
+        _count: { select: { members: true } },
+        cho: {
+          include: {
+            user: { select: { id: true, fullNames: true, photo: true, phoneNumber: true } },
+          },
+        },
+      },
+    });
+  }
+
   // ─── CHO: search CHW candidates in same area (max 10) ────────────────────────
 
   static async searchCHWCandidates(choUserId: string, search?: string) {
@@ -340,7 +418,9 @@ export class CHOGroupService {
     const userWhere: any = {
       userRoles: { some: { name: RoleType.TRAINEE } },
     };
-    if (choStudent.user.district) {
+    // Without a search term, show suggestions from the CHO's district only.
+    // When the CHO searches, remove the district restriction so they can find anyone.
+    if (choStudent.user.district && !search) {
       userWhere.district = choStudent.user.district;
     }
     if (search) {
@@ -356,7 +436,7 @@ export class CHOGroupService {
         groupMembership: null,
         user: userWhere,
       },
-      take: 10,
+      take: search ? 30 : 10,
       include: {
         user: {
           select: { id: true, fullNames: true, photo: true, phoneNumber: true, district: true, sector: true },

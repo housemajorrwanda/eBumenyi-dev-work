@@ -385,11 +385,8 @@ export class UnifiedExportService {
       exportOptions.includeChapterReviews = true;
     }
 
-    // Auto-detect format based on expected data size
-    // Use CSV for large exports (streaming), Excel for smaller ones
-    const shouldUseStreaming = true; // OPTIMIZED: Always use streaming for consistency and performance
-    if (shouldUseStreaming && res) {
-      return this.exportToStreamingCSV(exportOptions, filters, res);
+    if (res) {
+      return this.exportToExcel(exportOptions, filters, res);
     }
 
     // Fall back to Excel (legacy method) if streaming not needed
@@ -503,6 +500,69 @@ export class UnifiedExportService {
       console.error("Error during unified export:", error);
       throw error;
     }
+  }
+
+  private static async exportToExcel(
+    exportOptions: UnifiedExportOptions,
+    filters: FilterOptions | undefined,
+    res: Response,
+  ): Promise<void> {
+    const workbook = ExcelExporter.createMultiSheetWorkbook();
+    let sheetsAdded = 0;
+
+    if (exportOptions.includeFeedbacks) {
+      const result = await FeedbackOnSlideService.getAllFeedbacks(filters);
+      if (result.data && result.data.length > 0) {
+        const tpl = ExcelExporter.createFeedbackExcelTemplate(result.data);
+        ExcelExporter.addSheetToWorkbook(workbook, tpl, "Slide Feedbacks");
+        sheetsAdded++;
+      }
+    }
+
+    if (exportOptions.includeSystemReviews) {
+      const result = await SystemReviewService.getAllSystemReviews(filters);
+      if (result.data && result.data.length > 0) {
+        const tpl = ExcelExporter.createReviewExcelTemplate(result.data, "system");
+        ExcelExporter.addSheetToWorkbook(workbook, tpl, "System Reviews");
+        sheetsAdded++;
+      }
+    }
+
+    if (exportOptions.includeCourseReviews) {
+      const result = await CourseReviewService.getAllCourseReviews(filters);
+      if (result.data && result.data.length > 0) {
+        const tpl = ExcelExporter.createReviewExcelTemplate(result.data, "course");
+        ExcelExporter.addSheetToWorkbook(workbook, tpl, "Course Reviews");
+        sheetsAdded++;
+      }
+    }
+
+    if (exportOptions.includeSectionReviews) {
+      const result = await SectionReviewService.getAllSectionReviews(filters);
+      if (result.data && result.data.length > 0) {
+        const tpl = ExcelExporter.createReviewExcelTemplate(result.data, "section");
+        ExcelExporter.addSheetToWorkbook(workbook, tpl, "Section Reviews");
+        sheetsAdded++;
+      }
+    }
+
+    if (exportOptions.includeChapterReviews) {
+      const result = await ChapterReviewService.getAllChapterReviews(filters);
+      if (result.data && result.data.length > 0) {
+        const tpl = ExcelExporter.createReviewExcelTemplate(result.data, "chapter");
+        ExcelExporter.addSheetToWorkbook(workbook, tpl, "Chapter Reviews");
+        sheetsAdded++;
+      }
+    }
+
+    if (sheetsAdded === 0) {
+      throw new Error(
+        "No data found for the selected export options with current filters",
+      );
+    }
+
+    const filename = this.generateFilename(exportOptions, "xlsx");
+    await ExcelExporter.exportMultiSheetToExcel(workbook, filename, res);
   }
 
   public static async getUnifiedExportSummary(
