@@ -1,5 +1,5 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, useWindowDimensions, Alert, Modal, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -57,6 +57,10 @@ export default function CourseContentScreen() {
   const [, setIsCurrentSlidePinned] = useState<boolean>(false);
   const [slidesPinStatus, setSlidesPinStatus] = useState<{ [slideId: string]: boolean }>({});
   const documentViewerRefs = useRef<{ [key: string]: any }>({});
+  // Tracks which slide IDs have been marked complete (mirrors web's completedSlideIds Set)
+  const [completedSlideIds, setCompletedSlideIds] = useState<Set<string>>(new Set());
+  // Prevents concurrent slide-progress API calls (mirrors web's markingRef)
+  const markingRef = useRef(false);
    // State and helpers for top-toolbar download/share
   const [topDownloading, setTopDownloading] = useState(false);
   // State to track current page within documents (PDFs, slides)
@@ -215,7 +219,7 @@ export default function CourseContentScreen() {
     load();
   }, [courseId, chapterId]);
 
-  // Sync completed chapters from server to AsyncStorage after login or on mount
+  // Sync completed chapters + slide IDs from server on mount (same pattern as web's getCourseProgress call)
   useEffect(() => {
     const syncCompletedChaptersFromServer = async () => {
       if (!courseId) return;
@@ -224,6 +228,10 @@ export default function CourseContentScreen() {
         const completedChapters = response.data.chapterProgress.filter(ch => ch.isCompleted);
         for (const ch of completedChapters) {
           await StorageService.markChapterCompleted(ch.chapterId);
+        }
+        // Populate the in-memory Set with already-completed slide IDs so we don't re-submit them
+        if (Array.isArray(response.data.completedSlideIds)) {
+          setCompletedSlideIds(new Set(response.data.completedSlideIds));
         }
       } catch (error) {
         console.log('Error syncing completed chapters:', error);
@@ -292,16 +300,30 @@ export default function CourseContentScreen() {
     }
   }, [slideId, transformedData, hasNavigatedToSlideId, currentPage]);
 
-  const handleSlideProgress = async (slideId: string) => {
+  // Mirrors web's markCurrentComplete: dedup via Set, concurrency guard, auto-marks chapter done
+  // when every content slide in this chapter has been visited.
+  const markCurrentSlideComplete = useCallback(async (slideId: string) => {
+    if (!slideId || completedSlideIds.has(slideId) || markingRef.current) return;
+    markingRef.current = true;
     try {
-      await createSlideProgressById({
-        slideId: slideId,
-        isCompleted: true
+      await createSlideProgressById({ slideId, isCompleted: true });
+      setCompletedSlideIds(prev => {
+        const next = new Set(prev).add(slideId);
+        // Auto-mark chapter complete in local cache when all content slides are done
+        const contentSlides = transformedData.filter(
+          item => item.type === 'content' || item.type === 'image' || item.type === 'video'
+        );
+        if (contentSlides.length > 0 && contentSlides.every(s => next.has(s.id))) {
+          if (chapterId) StorageService.markChapterCompleted(chapterId as string);
+        }
+        return next;
       });
     } catch (error) {
-      console.log('Error recording progress:', error);
+      console.log('Error recording slide progress:', error);
+    } finally {
+      markingRef.current = false;
     }
-  };
+  }, [completedSlideIds, transformedData, chapterId]);
 
   // Navigation handlers with feedback modal blocking
   const handleNext = async () => {
@@ -315,7 +337,7 @@ export default function CourseContentScreen() {
       }
       const currentItem = transformedData[currentPage];
       if (currentItem.type === "content" || currentItem.type === "image" || currentItem.type === "video") {
-        handleSlideProgress(currentItem.id);
+        await markCurrentSlideComplete(currentItem.id);
       }
 
       // Check if we can navigate within the current document
@@ -345,15 +367,16 @@ export default function CourseContentScreen() {
         setCurrentPage(prev => prev + 1);
       }
     } else {
-      // Last slide: mark chapter as completed
-      if (chapterId) {
-        await StorageService.markChapterCompleted(chapterId as string);
+      // On the last slide — mark it complete (dedup inside markCurrentSlideComplete prevents re-submission).
+      // Auto-chapter-complete fires inside the Set update callback when all content slides are done.
+      const lastItem = transformedData[currentPage];
+      if (lastItem && (lastItem.type === "content" || lastItem.type === "image" || lastItem.type === "video")) {
+        await markCurrentSlideComplete(lastItem.id);
       }
-      // Optionally navigate away or show a message
     }
   };
 
-  const handlePrevious = () => {
+  const handlePrevious = async () => {
     if (feedbackModalOpen) return; // Block navigation when feedback is open
     if (currentPage > 0) {
       const currentItem = transformedData[currentPage];
@@ -362,7 +385,8 @@ export default function CourseContentScreen() {
       const currentDocPage = documentPages[currentItem.id] || 1;
 
       if ((currentItem.type === 'content' || currentItem.type === 'image' || currentItem.type === 'video') && currentDocPage > 1) {
-        // Navigate to previous page within the document
+        // Navigating within a document page — mark the slide as viewed (like web's goToSlide)
+        markCurrentSlideComplete(currentItem.id);
         const viewer = documentViewerRefs.current[currentItem.id];
         if (viewer && typeof viewer.goToPage === 'function') {
           const prevDocPage = currentDocPage - 1;
@@ -372,7 +396,10 @@ export default function CourseContentScreen() {
         }
       }
 
-      // If we can't navigate within document or at beginning of document, navigate to previous slide
+      // Changing slides — mark current slide as viewed before going back (mirrors web's goToSlide)
+      if (currentItem.type === 'content' || currentItem.type === 'image' || currentItem.type === 'video') {
+        markCurrentSlideComplete(currentItem.id);
+      }
       // Pause any media in the current viewer before navigating
       const viewer = documentViewerRefs.current[currentItem.id];
       if (viewer && typeof viewer.pauseMedia === 'function') {
@@ -646,6 +673,14 @@ export default function CourseContentScreen() {
 
   const onLastSlideFinish = async () => {
     try {
+      // Mark the last content slide before finishing (mirrors web's handleNextChapter calling markCurrentComplete first)
+      const lastContentSlide = [...transformedData].reverse().find(
+        item => item.type === 'content' || item.type === 'image' || item.type === 'video'
+      );
+      if (lastContentSlide) {
+        await markCurrentSlideComplete(lastContentSlide.id);
+      }
+
       if (!course || !chapterId) {
         handleFinishChapter();
         return;
@@ -730,30 +765,21 @@ export default function CourseContentScreen() {
   if (!chapter) return <View style={{flex:1, justifyContent:'center', alignItems:'center'}}><Text>Chapter ntabwo ibonetse</Text></View>;
   if (transformedData.length === 0) return <View style={{flex:1, justifyContent:'center', alignItems:'center'}}><Text>Nta byatangajwe</Text></View>;
 
-  // PagerView onPageSelected handler
+  // PagerView onPageSelected handler — fires on swipe between slides
   const onPageSelected = (e: any) => {
     const page = e.nativeEvent.position;
-    // Pause any media playing in the previous viewer
+    // Mark the slide being LEFT as complete before moving (mirrors web's goToSlide)
     const prevItem = transformedData[currentPage];
+    if (prevItem && (prevItem.type === 'content' || prevItem.type === 'image' || prevItem.type === 'video')) {
+      markCurrentSlideComplete(prevItem.id);
+    }
+    // Pause any media playing in the previous viewer
     const prevViewer = documentViewerRefs.current[prevItem?.id];
     if (prevViewer && typeof prevViewer.pauseMedia === 'function') {
       try { prevViewer.pauseMedia(); } catch (err) { console.log('pause prev viewer error', err); }
     }
 
     setCurrentPage(page);
-    // If user lands on last slide by swipe, mark as completed
-    if (
-      transformedData.length > 0 &&
-      page === transformedData.length - 1 &&
-      chapterId
-    ) {
-      StorageService.markChapterCompleted(chapterId as string);
-    }
-    // Track slide progress for content slides on swipe
-    const currentItem = transformedData[page];
-    if (currentItem && currentItem.type !== 'test-question' && currentItem.type !== 'result-slide') {
-      handleSlideProgress(currentItem.id);
-    }
   };
 
   // Current item and state

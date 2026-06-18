@@ -373,7 +373,7 @@ export default function DirectChatInfoScreen() {
             <TouchableOpacity style={styles.listItem}>
               <Building2 size={22} color="#6b7280" />
               <View style={styles.listItemContent}>
-                <Text style={styles.listItemTitle}>Ibitaro</Text>
+                <Text style={styles.listItemTitle}>Ivuriro</Text>
                 <Text style={styles.listItemSubtitle}>
                   {otherUser.hospital.name}
                 </Text>

@@ -81,6 +81,10 @@ export class GlobalReminderService {
     this.alarmCallback = cb;
   }
 
+  static getEventById(id: string): ICalendarEvent | undefined {
+    return this.events.find(e => e.id === id);
+  }
+
   static unmarkAlarm(alarmId: string) {
     this.shownAlarms.delete(alarmId);
   }

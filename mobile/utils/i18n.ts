@@ -257,12 +257,34 @@ const resources = {
       // Cards
       'splash.cemr.title': 'cEMR',
       'splash.cemr.subtitle': 'Primary aid and patient basic diagnosis.',
+      'splash.ebumenyi.title': 'eBumenyi',
+      'splash.ebumenyi.subtitle':
+        'Access all content for Community Health Workers.',
       'splash.etraining.title': 'eBumenyi',
       'splash.etraining.subtitle':
         'Access all content for Community Health Workers.',
-      'splash.weltel.title': 'WelTel',
+      'splash.egenzura.title': 'eGenzura',
+      'splash.egenzura.subtitle':
+        'Messaging and communication between community health workers and patients.',
+      'splash.egenzura.loading': 'Opening eGenzura...',
+      'splash.weltel.title': 'eGenzura',
       'splash.weltel.subtitle':
-        'Communication channel to engage CHWs, supervisors and trainers.',
+        'Messaging and communication between community health workers and patients.',
+      'splash.weltel.loading': 'Opening eGenzura...',
+
+      'egenzura.error.missingLogin':
+        'eGenzura login link is missing. Open eGenzura from the home screen again.',
+      'egenzura.error.loadFailed': 'Failed to load eGenzura',
+
+      'moduleSwitcher.title': 'Switch application',
+      'moduleSwitcher.current': 'Current',
+      'moduleSwitcher.open': 'Switch application',
+      'moduleSwitcher.validating': 'Validating access...',
+
+      'cemr.comingSoon.badge': 'Coming soon',
+      'cemr.comingSoon.message':
+        'cEMR is under development. Check back soon for primary aid and patient diagnosis tools.',
+      'cemr.comingSoon.switchApp': 'Switch to another app',
 
       // Onboarding flow
       'button.continue': 'Continue',
@@ -437,8 +459,8 @@ const resources = {
       'signup.gender.male': 'Gabo',
       'signup.gender.female': 'Gore',
       'signup.dob': "Itariki y'Amavuko",
-      'signup.hospital': 'Ibitaro',
-      'signup.hospital.placeholder': 'Hitamo ibitaro',
+      'signup.hospital': 'Ivuriro',
+      'signup.hospital.placeholder': 'Hitamo ivuriro',
       'signup.hospital.none': 'Nta bitaro biboneka',
       'signup.role': 'Inshingano',
       'signup.role.placeholder': 'Hitamo Inshingano',
@@ -669,12 +691,34 @@ const resources = {
       // Cards
       'splash.cemr.title': 'cEMR',
       'splash.cemr.subtitle': "Ubuvuzi bw'ibanze n'isuzuma ry'umurwayi.",
+      'splash.ebumenyi.title': 'eBumenyi',
+      'splash.ebumenyi.subtitle':
+        "Injira mu masomo yose y'abajyanama b'ubuzima.",
       'splash.etraining.title': 'eBumenyi',
       'splash.etraining.subtitle':
         "Injira mu masomo yose y'abajyanama b'ubuzima.",
-      'splash.weltel.title': 'c-Messaging',
+      'splash.egenzura.title': 'eGenzura',
+      'splash.egenzura.subtitle':
+        "Ubutumwa n'itumanaho hagati y'abajyanama b'ubuzima n'abarwayi.",
+      'splash.egenzura.loading': 'Gufungura eGenzura...',
+      'splash.weltel.title': 'eGenzura',
       'splash.weltel.subtitle':
-        "Uburyo bwo gukurikirana abarwayi",
+        "Ubutumwa n'itumanaho hagati y'abajyanama b'ubuzima n'abarwayi.",
+      'splash.weltel.loading': 'Gufungura eGenzura...',
+
+      'egenzura.error.missingLogin':
+        'Ihuza ryo kwinjira muri eGenzura ntiryabonetse. Fungura eGenzura uva ku rupapuro rw\'ibanze.',
+      'egenzura.error.loadFailed': 'eGenzura yananiwe gufungura',
+
+      'moduleSwitcher.title': 'Hitamo porogaramu',
+      'moduleSwitcher.current': 'Ubu',
+      'moduleSwitcher.open': 'Hitamo porogaramu',
+      'moduleSwitcher.validating': 'Gusuzuma uburenganzira...',
+
+      'cemr.comingSoon.badge': 'Bizaza vuba',
+      'cemr.comingSoon.message':
+        "cEMR iracyategurwa. Subira vuba kugira ngo ubone ubuvuzi bw'ibanze n'isuzuma ry'umurwayi.",
+      'cemr.comingSoon.switchApp': 'Hindukira ku yindi porogaramu',
 
       // Onboarding flow
       'button.continue': 'Komeza',
@@ -1070,12 +1114,34 @@ const resources = {
       'splash.cemr.title': 'cEMR',
       'splash.cemr.subtitle':
         'Premiers soins et diagnostic de base du patient.',
+      'splash.ebumenyi.title': 'eBumenyi',
+      'splash.ebumenyi.subtitle':
+        'Accédez à tout le contenu pour les agents de santé communautaires.',
       'splash.etraining.title': 'eBumenyi',
       'splash.etraining.subtitle':
         'Accédez à tout le contenu pour les agents de santé communautaires.',
-      'splash.weltel.title': 'WelTel',
+      'splash.egenzura.title': 'eGenzura',
+      'splash.egenzura.subtitle':
+        'Messagerie et communication entre les agents de santé communautaires et les patients.',
+      'splash.egenzura.loading': "Ouverture d'eGenzura...",
+      'splash.weltel.title': 'eGenzura',
       'splash.weltel.subtitle':
-        'Canal de communication pour engager les ASC, les superviseurs et formateurs.',
+        'Messagerie et communication entre les agents de santé communautaires et les patients.',
+      'splash.weltel.loading': "Ouverture d'eGenzura...",
+
+      'egenzura.error.missingLogin':
+        "Le lien de connexion eGenzura est manquant. Ouvrez eGenzura depuis l'écran d'accueil.",
+      'egenzura.error.loadFailed': 'Échec du chargement de eGenzura',
+
+      'moduleSwitcher.title': "Changer d'application",
+      'moduleSwitcher.current': 'Actuel',
+      'moduleSwitcher.open': "Changer d'application",
+      'moduleSwitcher.validating': 'Validation de l\'accès...',
+
+      'cemr.comingSoon.badge': 'Bientôt disponible',
+      'cemr.comingSoon.message':
+        'cEMR est en cours de développement. Revenez bientôt pour les outils de premiers soins et de diagnostic.',
+      'cemr.comingSoon.switchApp': 'Passer à une autre application',
 
       // Onboarding flow
       'button.continue': 'Continuer',

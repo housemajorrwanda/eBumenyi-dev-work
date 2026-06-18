@@ -1,18 +1,20 @@
 import React, { useRef, useMemo } from 'react';
 import { Tabs } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
-import { Home, BookOpen, Award, Users } from 'lucide-react-native';
+import { Home, BookOpen, Award, Users, Handshake } from 'lucide-react-native';
 import { View, Text, Animated, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useUnreadCount } from '@/hooks/useUnreadCount';
 import { useQuery } from '@tanstack/react-query';
 import * as MessagingAPI from '@/services/messaging.api';
+import { useAuth } from '@/hooks/useAuth';
 
-const TAB_CONFIG = [
+const ALL_TAB_CONFIG = [
   { name: 'index', icon: Home, label: 'Ahabanza' },
   { name: 'training', icon: BookOpen, label: 'Amasomo' },
   { name: 'certificate', icon: Award, label: 'Icyemezo' },
+  { name: 'itsinda', icon: Handshake, label: 'Itsinda' },
   { name: 'community', icon: Users, label: 'Kominote' },
 ];
 
@@ -20,6 +22,14 @@ function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const { isDark, themeColors } = useTheme();
   const insets = useSafeAreaInsets();
   const { getConversationUnread } = useUnreadCount();
+  const { user } = useAuth();
+
+  const isCHO = user?.roles?.includes('CHO') ?? false;
+
+  const TAB_CONFIG = useMemo(
+    () => (isCHO ? ALL_TAB_CONFIG : ALL_TAB_CONFIG.filter((t) => t.name !== 'itsinda')),
+    [isCHO],
+  );
 
   // Read the same cached conversation lists that community.tsx keeps warm.
   // staleTime: Infinity so this never triggers its own network request —
@@ -49,27 +59,33 @@ function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   }, [directChats, groupChats, communities, getConversationUnread]);
 
   const tabWidth = Dimensions.get('window').width / TAB_CONFIG.length;
-  const underlineAnim = useRef(new Animated.Value(state.index * tabWidth)).current;
+
+  // Find the focused index within our visible TAB_CONFIG
+  const focusedTabName = state.routes[state.index]?.name;
+  const focusedIdx = TAB_CONFIG.findIndex((t) => t.name === focusedTabName);
+  const effectiveIdx = focusedIdx >= 0 ? focusedIdx : 0;
+
+  const underlineAnim = useRef(new Animated.Value(effectiveIdx * tabWidth)).current;
 
   React.useEffect(() => {
     Animated.spring(underlineAnim, {
-      toValue: state.index * tabWidth,
+      toValue: effectiveIdx * tabWidth,
       useNativeDriver: true,
       speed: 20,
       bounciness: 10,
     }).start();
-  }, [state.index, tabWidth, underlineAnim]);
+  }, [effectiveIdx, tabWidth, underlineAnim]);
 
   return (
     <View style={[
-      styles.tabBar, 
-      { 
-        backgroundColor: isDark ? '#1f2937' : '#fff', 
+      styles.tabBar,
+      {
+        backgroundColor: isDark ? '#1f2937' : '#fff',
         borderTopColor: isDark ? '#374151' : '#e5e7eb',
         paddingBottom: Math.max(insets.bottom + 4, 12),
         minHeight: 60 + insets.bottom,
       }
-    ]}> 
+    ]}>
       <Animated.View
         style={{
           position: 'absolute',
@@ -83,7 +99,7 @@ function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
         }}
       />
       {TAB_CONFIG.map((tab, idx) => {
-        const isFocused = state.index === idx;
+        const isFocused = effectiveIdx === idx;
         const color = isFocused ? themeColors.primary : (isDark ? '#9ca3af' : '#6b7280');
         return (
           <TouchableOpacity
@@ -133,6 +149,7 @@ export default function TabLayout() {
       <Tabs.Screen name="index" options={{ title: 'Ahabanza' }} />
       <Tabs.Screen name="training" options={{ title: 'Amasomo' }} />
       <Tabs.Screen name="certificate" options={{ title: 'Icyemezo' }} />
+      <Tabs.Screen name="itsinda" options={{ title: 'Itsinda' }} />
       <Tabs.Screen name="community" options={{ title: 'Kominote' }} />
     </Tabs>
   );
