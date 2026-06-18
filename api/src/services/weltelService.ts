@@ -12,6 +12,7 @@ export { normalizeRwandaPhone as normalizePhoneForWeltel };
 export type WeltelLoginJwtPayload = {
   name: string;
   phone: string;
+  locale: "en" | "rw";
 };
 
 type WeltelTokenPayload = {
@@ -605,8 +606,14 @@ export class WeltelService {
     return "https://rw-chw1.weltelhealth.net/login";
   }
 
+  private static normalizeWeltelLocale(
+    language: string | null | undefined,
+  ): "en" | "rw" {
+    return language === "en" ? "en" : "rw";
+  }
+
   /**
-   * Sign and AES-256-GCM-encrypt a jwtKey for WelTel SSO login (payload: name + phone).
+   * Sign and AES-256-GCM-encrypt a jwtKey for WelTel SSO login (payload: name + phone + locale).
    */
   public static generateLoginJwtKey(payload: WeltelLoginJwtPayload): string {
     const secret = process.env.WELTEL_SECRET;
@@ -628,6 +635,7 @@ export class WeltelService {
       {
         name: payload.name,
         phone,
+        locale: payload.locale,
       },
       secret,
       options,
@@ -636,10 +644,14 @@ export class WeltelService {
     return encryptJwt(rawJwt, WeltelService.getWeltelEncryptionKey());
   }
 
-  public static buildLoginUrl(jwtKey: string): string {
+  public static buildLoginUrl(
+    jwtKey: string,
+    locale: "en" | "rw",
+  ): string {
     const base = WeltelService.getWeltelLoginBaseUrl();
     const url = new URL(base);
     url.searchParams.set("jwtKey", jwtKey);
+    url.searchParams.set("locale", locale);
     return url.toString();
   }
 
@@ -654,10 +666,16 @@ export class WeltelService {
       );
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { fullNames: true, phoneNumber: true },
-    });
+    const [user, userSettings] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: { fullNames: true, phoneNumber: true },
+      }),
+      prisma.userSettings.findUnique({
+        where: { userId },
+        select: { language: true },
+      }),
+    ]);
 
     if (!user) {
       throw new AppError("User not found", 404);
@@ -679,12 +697,15 @@ export class WeltelService {
       });
     }
 
+    const locale = WeltelService.normalizeWeltelLocale(userSettings?.language);
+
     const jwtKey = WeltelService.generateLoginJwtKey({
       name: user.fullNames.trim(),
       phone,
+      locale,
     });
 
-    const loginUrl = WeltelService.buildLoginUrl(jwtKey);
+    const loginUrl = WeltelService.buildLoginUrl(jwtKey, locale);
 
     return {
       message: "WelTel login URL generated",

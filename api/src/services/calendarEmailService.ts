@@ -58,20 +58,20 @@ export class CalendarEmailService {
         : "";
 
     const body = `
-Muraho ${participantName || "Uwitabiriwe"},
+Muraho ${participantName || "Umutumirwa"},
 
-Utumiwe gutabira inama ikurikira:
+Utumiwe kwitabira inama ikurikira:
 
 Inama: ${title}
 ${description ? `Ibisobanuro: ${description}` : ""}
-Itangira: ${startDateTime}
-${endDateTime ? `Isozwa: ${endDateTime}` : ""}
-${location ? `Aho bahuriranye/Uhuze: ${location}` : ""}
-${hostEmail ? `Umutumiza: ${hostEmail}` : ""}
+Iratangira: ${startDateTime}
+${endDateTime ? `Irasozwa: ${endDateTime}` : ""}
+${location ? `Icyerekezo: ${location}` : ""}
+${hostEmail ? `Imeyili y'umuyobozi: ${hostEmail}` : ""}
 Umunyamabanga: ${organizerName}
-Itangazamwanya: ${timezone}${rolesText}
+Akarere k'igihe: ${timezone}${rolesText}
 
-Mwinginge mutabire inama igihe cyagenwe.
+Turabinginze mwitabire inama mu igihe cyagenwe.
 
 Murakoze,
 ${organizerName}

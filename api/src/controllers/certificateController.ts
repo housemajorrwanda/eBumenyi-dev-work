@@ -166,6 +166,11 @@ export class CertificateController {
     return CertificateService.getMyCertificateByCourseId(student.id, courseId);
   }
 
+  @Get("/verify/{code}")
+  public async verifyCertificate(@Path() code: string) {
+    return CertificateService.verifyCertificate(code);
+  }
+
   @Get("/{id}")
   @Security("jwt")
   @Middlewares(
