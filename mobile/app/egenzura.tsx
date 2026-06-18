@@ -1,13 +1,22 @@
 import React from 'react';
-import { View, ActivityIndicator, TouchableOpacity, Text, PanResponder } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import {
+  View,
+  ActivityIndicator,
+  TouchableOpacity,
+  Text,
+} from 'react-native';
+import { useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
+import { LayoutGrid } from 'lucide-react-native';
 import { buildWeltelLoginUrl } from '@/services/weltel.api';
+import { useModuleSwitcher } from '@/contexts/ModuleSwitcherContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 
-export default function WelTelScreen() {
-  const router = useRouter();
+export default function EGenzuraScreen() {
   const insets = useSafeAreaInsets();
+  const { open: openModuleSwitcher } = useModuleSwitcher();
+  const { t } = useLanguage();
   const params = useLocalSearchParams<{
     loginUrl?: string | string[];
     jwtKey?: string | string[];
@@ -17,7 +26,7 @@ export default function WelTelScreen() {
   const [error, setError] = React.useState<string | null>(null);
   const loaderTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const weltelUri = React.useMemo(() => {
+  const webUri = React.useMemo(() => {
     const loginUrlParam = Array.isArray(params.loginUrl)
       ? params.loginUrl[0]
       : params.loginUrl;
@@ -41,29 +50,12 @@ export default function WelTelScreen() {
     }
   }, []);
 
-  const goToSplashAuth = React.useCallback(() => {
-    router.replace('/auth/splash-auth');
-  }, [router]);
-
-  const swipeToCloseResponder = React.useMemo(
-    () =>
-      PanResponder.create({
-        onMoveShouldSetPanResponder: (_, gestureState) =>
-          Math.abs(gestureState.dy) > 18 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
-        onPanResponderRelease: (_, gestureState) => {
-          const strongVerticalSwipe =
-            Math.abs(gestureState.dy) > 90 && Math.abs(gestureState.vy) > 0.35;
-          if (strongVerticalSwipe) {
-            goToSplashAuth();
-          }
-        },
-      }),
-    [goToSplashAuth],
-  );
-
   React.useEffect(() => {
-    if (!weltelUri) {
-      setError('WelTel login link is missing. Open WelTel from the home screen again.');
+    if (!webUri) {
+      setError(
+        t('egenzura.error.missingLogin') ||
+          'eGenzura login link is missing. Open eGenzura from the home screen again.',
+      );
       setIsLoading(false);
       return;
     }
@@ -77,14 +69,46 @@ export default function WelTelScreen() {
         clearTimeout(loaderTimeoutRef.current);
       }
     };
-  }, [weltelUri]);
+  }, [webUri, t]);
 
   return (
     <View style={{ flex: 1, backgroundColor: '#fff' }}>
-      <View style={{ flex: 1, paddingTop: insets.top, paddingBottom: insets.bottom }}>
-        {weltelUri ? (
+      <View
+        style={{
+          paddingTop: insets.top,
+          paddingHorizontal: 12,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          backgroundColor: '#fff',
+          borderBottomWidth: 1,
+          borderBottomColor: '#eee',
+        }}
+      >
+        <TouchableOpacity
+          onPress={openModuleSwitcher}
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: 20,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: '#f1f5f9',
+          }}
+          accessibilityLabel={t('moduleSwitcher.open') || 'Switch application'}
+        >
+          <LayoutGrid size={22} color="#3363AD" />
+        </TouchableOpacity>
+        <Text style={{ fontSize: 16, fontWeight: '600', color: '#3363AD' }}>
+          {t('splash.egenzura.title') || t('splash.weltel.title') || 'eGenzura'}
+        </Text>
+        <View style={{ width: 40 }} />
+      </View>
+
+      <View style={{ flex: 1, paddingBottom: insets.bottom }}>
+        {webUri ? (
           <WebView
-            source={{ uri: weltelUri }}
+            source={{ uri: webUri }}
             style={{ flex: 1 }}
             onLoadStart={() => setIsLoading(true)}
             onLoad={() => stopLoading()}
@@ -95,7 +119,11 @@ export default function WelTelScreen() {
               }
             }}
             onError={(event) => {
-              setError(event.nativeEvent.description || 'Failed to load WelTel');
+              setError(
+                event.nativeEvent.description ||
+                  t('egenzura.error.loadFailed') ||
+                  'Failed to load eGenzura',
+              );
               stopLoading();
             }}
             startInLoadingState={true}
@@ -106,7 +134,7 @@ export default function WelTelScreen() {
         ) : null}
       </View>
 
-      {isLoading && weltelUri && (
+      {isLoading && webUri && (
         <View
           style={{
             position: 'absolute',
@@ -139,30 +167,6 @@ export default function WelTelScreen() {
           </TouchableOpacity>
         </View>
       )}
-
-      <View
-        {...swipeToCloseResponder.panHandlers}
-        style={{
-          position: 'absolute',
-          bottom: Math.max(insets.bottom + 8, 14),
-          alignSelf: 'center',
-          width: 170,
-          height: 44,
-          borderRadius: 22,
-          backgroundColor: 'rgba(0,0,0,0.02)',
-          justifyContent: 'center',
-          alignItems: 'center',
-        }}
-      >
-        <View
-          style={{
-            width: 34,
-            height: 4,
-            borderRadius: 3,
-            backgroundColor: 'rgba(0,0,0,0.12)',
-          }}
-        />
-      </View>
     </View>
   );
 }

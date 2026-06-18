@@ -44,6 +44,8 @@ import EventViewModal from './EventViewModal';
 import { usePersistentCountdown } from './PersistentCountdown';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
+import { useNotificationsContext } from '@/contexts/NotificationsContext';
+import { SocketService } from '@/services/socket.service';
 
 type CalendarEvent = ICalendarEvent;
 
@@ -281,6 +283,30 @@ const CalendarScreen = () => {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const isAdmin = user?.roles?.some((r: string) => r === 'ADMIN') ?? false;
+  const { notifications } = useNotificationsContext();
+
+  // Refresh when a participant notification arrives (other users' changes)
+  useEffect(() => {
+    const latest = notifications[0];
+    if (latest && (latest as any).entityType === 'calendar_event' && !latest.isRead) {
+      queryClient.invalidateQueries({ queryKey: ['CALENDAR_EVENTS'] });
+    }
+  }, [notifications, queryClient]);
+
+  // Refresh when the current user's own event changes (creator is excluded from participant notifications)
+  useEffect(() => {
+    const socket = SocketService.getInstance();
+    if (!socket) return;
+
+    const handleCalendarChange = () => {
+      queryClient.invalidateQueries({ queryKey: ['CALENDAR_EVENTS'] });
+    };
+
+    socket.on('calendar_data_changed', handleCalendarChange);
+    return () => {
+      socket.off('calendar_data_changed', handleCalendarChange);
+    };
+  }, [queryClient]);
 
   // ─── State ───────────────────────────────────────────────────────────────────
   const router = useRouter();
@@ -622,6 +648,9 @@ const CalendarScreen = () => {
           colors={isDark ? [themeColors.primary, '#1e1b4b'] : [themeColors.primary, themeColors.primary]}
           style={[styles.header, { paddingTop: insets.top + 16 }]}
         >
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()} activeOpacity={0.7}>
+            <ChevronLeft size={20} color="#ffffff" />
+          </TouchableOpacity>
 
           <View style={styles.headerContent}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>

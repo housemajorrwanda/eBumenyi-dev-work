@@ -1,5 +1,5 @@
 # Use an official Node.js Alpine runtime
-FROM node:18-alpine AS base
+FROM node:20-alpine AS base
 
 # Add necessary tools for Prisma and OpenSSL
 RUN apk add --no-cache openssl bash

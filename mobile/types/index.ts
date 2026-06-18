@@ -408,6 +408,7 @@ export interface IProgressResponse {
   statusCode: number;
   data: {
     chapterProgress: IChapterProgress[];
+    completedSlideIds?: string[];
     finalTestStatus: IFinalTestStatus;
     finalExamStatus: IFinalExamStatus;
     preTestStatus: IPreTestStatus;
@@ -607,6 +608,7 @@ export interface ICHOGroup {
   sector?: string | null;
   description?: string | null;
   choId: string;
+  groupChatId?: string | null;
   createdAt: string;
   updatedAt: string;
   cho?: {

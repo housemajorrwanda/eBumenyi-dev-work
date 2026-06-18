@@ -1,21 +1,19 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import * as React from 'react';
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import {
   BackHandler,
   AppState,
   Platform,
-  PanResponder,
-  View,
-  useWindowDimensions,
 } from 'react-native';
-import { Stack, useNavigationContainerRef, usePathname, useRouter } from 'expo-router';
+import { Stack, useNavigationContainerRef, useRouter } from 'expo-router';
 
 import { StatusBar } from 'expo-status-bar';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { LanguageProvider } from '@/contexts/LanguageContext';
 import { BackButtonProvider } from '@/contexts/BackButtonContext';
+import { ModuleSwitcherProvider } from '@/contexts/ModuleSwitcherContext';
 import {
   useFonts,
   Inter_400Regular,
@@ -84,8 +82,6 @@ export default function RootLayout() {
 
   const navigationRef = useNavigationContainerRef();
   const router = useRouter();
-  const pathname = usePathname();
-  const { height: windowHeight } = useWindowDimensions();
   const [appState, setAppState] = useState(AppState.currentState);
 
   const [fontsLoaded] = useFonts({
@@ -429,6 +425,21 @@ export default function RootLayout() {
           // ── Sync native alarm registry (remove stale entries) ──────────────
           NativeAlarmScheduler.syncRegistry().catch(() => {});
 
+          // ── Refresh real-time data (courses + calendar) ────────────────────
+          // Invalidate stale queries so they refetch if their screen is active,
+          // or on next mount if the screen is not currently rendered.
+          queryClient.invalidateQueries({ queryKey: ['ALL_COURSES'] });
+          queryClient.invalidateQueries({ queryKey: ['CALENDAR_EVENTS'] });
+
+          // If socket is already connected (wasn't disconnected during background),
+          // re-request notifications so the notification watchers can fire.
+          const socket = SocketService.getInstance();
+          if (socket?.connected) {
+            socket.emit('get_notifications');
+          }
+          // If socket was disconnected, it will reconnect automatically and
+          // the handleConnect listener in NotificationsContext will emit get_notifications.
+
           // ── Navigation state restore (splash / auth screens only) ──────────
           try {
             const token = await AsyncStorage.getItem('accessToken');
@@ -478,8 +489,16 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (fontsLoaded) {
-      SplashScreen.hideAsync();
+      SplashScreen.hideAsync().catch(() => {});
+      return;
     }
+
+    // Never leave users stuck on the native splash if fonts fail to load.
+    const safetyTimer = setTimeout(() => {
+      SplashScreen.hideAsync().catch(() => {});
+    }, 8000);
+
+    return () => clearTimeout(safetyTimer);
   }, [fontsLoaded]);
 
   // Global back handler: exit app only if no screens to go back to
@@ -505,59 +524,6 @@ export default function RootLayout() {
     return () => subscription.remove();
   }, [navigationRef]);
 
-  const goToSplashAuth = useCallback(() => {
-    router.replace('/auth/splash-auth');
-  }, [router]);
-
-  const isAuthRoute = pathname?.startsWith('/auth/');
-  const showSwipeHandle = !isAuthRoute && pathname !== '/splash';
-  // Keep swipe trigger zones at 25% top + 25% bottom of screen height.
-  const topSwipeZoneHeight = windowHeight * 0.25;
-  const bottomSwipeZoneHeight = windowHeight * 0.25;
-  const topZoneEndY = topSwipeZoneHeight;
-  const bottomZoneStartY = windowHeight - bottomSwipeZoneHeight;
-
-  // Root-level swipe responder: no overlay views, so taps are not blocked.
-  const edgeSwipeResponder = useMemo(
-    () =>
-      PanResponder.create({
-        onMoveShouldSetPanResponderCapture: (evt, gestureState) => {
-          if (!showSwipeHandle) return false;
-
-          const startY =
-            typeof gestureState.y0 === 'number' && gestureState.y0 > 0
-              ? gestureState.y0
-              : evt.nativeEvent.pageY;
-
-          const fromTop = startY <= topZoneEndY;
-          const fromBottom = startY >= bottomZoneStartY;
-          if (!fromTop && !fromBottom) return false;
-
-          const verticalDominant =
-            Math.abs(gestureState.dy) > 18 &&
-            Math.abs(gestureState.dy) > Math.abs(gestureState.dx) * 1.2;
-
-          return verticalDominant;
-        },
-        onMoveShouldSetPanResponder: () => false,
-        onPanResponderRelease: (_, gestureState) => {
-          const startY = gestureState.y0;
-          const fromTop = startY <= topZoneEndY;
-          const fromBottom = startY >= bottomZoneStartY;
-
-          const strongSwipeDown =
-            fromTop && gestureState.dy > 30 && gestureState.vy > 0.03;
-          const strongSwipeUp =
-            fromBottom && gestureState.dy < -60 && gestureState.vy < -0.12;
-
-          if (strongSwipeDown || strongSwipeUp) {
-            goToSplashAuth();
-          }
-        },
-      }),
-    [bottomZoneStartY, goToSplashAuth, showSwipeHandle, topZoneEndY],
-  );
-
   if (!fontsLoaded) {
     return null;
   }
@@ -568,7 +534,7 @@ export default function RootLayout() {
   }
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }} {...edgeSwipeResponder.panHandlers}>
+    <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <UpdateManager />
         <QueryClientProvider client={queryClient}>
@@ -578,38 +544,25 @@ export default function RootLayout() {
                 <ThemeProvider>
                   <LanguageProvider>
                     <BackButtonProvider>
-                      <AlarmProvider>
-                        <NotificationListener />
-                        <MessagingListener />
-                        <Stack screenOptions={{ headerShown: false }}>
-                          <Stack.Screen name="splash" />
-                          <Stack.Screen name="auth" />
-                          <Stack.Screen name="(tabs)" />
-                          <Stack.Screen name="chat/[id]" />
-                          <Stack.Screen name="meeting/[meetingId]" />
-                          <Stack.Screen name="weltel" />
-                          <Stack.Screen name="+not-found" />
-                        </Stack>
-                        {/* In-app alarm screen — appears over all content when event fires */}
-                        <AlarmRingScreen />
-                        {/* <Footer /> */}
-                        <StatusBar style="auto" />
-                        <Toast config={toastConfig} />
-                        {showSwipeHandle ? (
-                          <View
-                            pointerEvents="none"
-                            style={{
-                              position: 'absolute',
-                              bottom: 6,
-                              alignSelf: 'center',
-                              width: 44,
-                              height: 4,
-                              borderRadius: 3,
-                              backgroundColor: 'rgba(0,0,0,0.06)',
-                            }}
-                          />
-                        ) : null}
-                      </AlarmProvider>
+                      <ModuleSwitcherProvider>
+                        <AlarmProvider>
+                          <NotificationListener />
+                          <MessagingListener />
+                          <Stack screenOptions={{ headerShown: false }}>
+                            <Stack.Screen name="splash" />
+                            <Stack.Screen name="auth" />
+                            <Stack.Screen name="(tabs)" />
+                            <Stack.Screen name="chat/[id]" />
+                            <Stack.Screen name="meeting/[meetingId]" />
+                            <Stack.Screen name="egenzura" />
+                            <Stack.Screen name="cemr" />
+                            <Stack.Screen name="+not-found" />
+                          </Stack>
+                          <AlarmRingScreen />
+                          <StatusBar style="auto" />
+                          <Toast config={toastConfig} />
+                        </AlarmProvider>
+                      </ModuleSwitcherProvider>
                     </BackButtonProvider>
                   </LanguageProvider>
                 </ThemeProvider>

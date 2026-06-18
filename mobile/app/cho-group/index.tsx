@@ -11,7 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronLeft, Users, BarChart2, UserPlus, MapPin, Info } from 'lucide-react-native';
+import { ChevronLeft, UserPlus, MapPin, Info, Users } from 'lucide-react-native';
 import { getMyGroup } from '@/services/choGroup.api';
 import { useTheme } from '@/contexts/ThemeContext';
 
@@ -93,38 +93,14 @@ export default function CHOGroupScreen() {
             <View style={styles.actionsGrid}>
               <TouchableOpacity
                 style={[styles.actionCard, { backgroundColor: cardBg }]}
-                onPress={() => router.push('/cho-group/members')}
-                activeOpacity={0.8}
-              >
-                <View style={[styles.actionIconWrapper, { backgroundColor: '#EFF1F8' }]}>
-                  <Users size={24} color={themeColors.primary} />
-                </View>
-                <Text style={[styles.actionTitle, { color: textPrimary }]}>Abagize itsinda</Text>
-                <Text style={[styles.actionSub, { color: textMuted }]}>Reba urutonde</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.actionCard, { backgroundColor: cardBg }]}
-                onPress={() => router.push('/cho-group/monitoring')}
-                activeOpacity={0.8}
-              >
-                <View style={[styles.actionIconWrapper, { backgroundColor: '#FEF3C7' }]}>
-                  <BarChart2 size={24} color="#D97706" />
-                </View>
-                <Text style={[styles.actionTitle, { color: textPrimary }]}>Gukurikirana</Text>
-                <Text style={[styles.actionSub, { color: textMuted }]}>Intambwe z'amakuru</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.actionCard, { backgroundColor: cardBg }]}
                 onPress={() => router.push('/cho-group/invite')}
                 activeOpacity={0.8}
               >
                 <View style={[styles.actionIconWrapper, { backgroundColor: '#D1FAE5' }]}>
                   <UserPlus size={24} color="#059669" />
                 </View>
-                <Text style={[styles.actionTitle, { color: textPrimary }]}>Tuma ubutumire</Text>
-                <Text style={[styles.actionSub, { color: textMuted }]}>Ohereza CHW</Text>
+                <Text style={[styles.actionTitle, { color: textPrimary }]}>Ongeramo CHW</Text>
+                <Text style={[styles.actionSub, { color: textMuted }]}>Ongeramo umunyamuryango</Text>
               </TouchableOpacity>
             </View>
           </ScrollView>
