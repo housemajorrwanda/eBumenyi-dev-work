@@ -15,7 +15,7 @@ const buildStudentAnalyticsQuery = (roleFilter?: "TRAINEE" | "TESTER" | "CHO") =
 const getRoleLabel = (roleFilter?: "TRAINEE" | "TESTER" | "CHO") => {
   if (roleFilter === "TESTER") return "Tester";
   if (roleFilter === "CHO") return "CHO";
-  return "chw";
+  return "CHW";
 };
 
 const StudentStatsCards = ({ roleFilter }: StudentStatsCardsProps) => {

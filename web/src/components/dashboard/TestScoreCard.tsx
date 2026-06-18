@@ -26,7 +26,7 @@ export const TestScoreCard: React.FC<TestScoreCardProps> = ({
         <div className='flex items-center gap-2 mb-4'>
           <BarChart2 size={20} className='text-[#3363AD]' />
           <h3 className='text-lg font-semibold text-gray-800'>
-            Student Performance
+            CHW Performance
           </h3>
         </div>
         <div className='flex items-center justify-center h-40'>

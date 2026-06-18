@@ -478,7 +478,7 @@ export default function QuestionBuilderModal({
                     setDraft((d) => ({ ...d, feedbackStatement: e.target.value }))
                   }
                   className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
-                  placeholder="Shown after student answers..."
+                  placeholder="Shown after CHW answers..."
                 />
               </div>
 

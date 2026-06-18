@@ -362,7 +362,12 @@ export interface IGroup {
 export interface ICHOGroup {
   id: string;
   name: string;
-  sector?: string | null;
+  district?: string | null;
+  sectors?: string[];
+  cells?: string[];
+  villages?: string[];
+  cell?: string | null;
+  village?: string | null;
   description?: string | null;
   choId: string;
   createdAt: string;

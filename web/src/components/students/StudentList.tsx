@@ -272,11 +272,11 @@ const StudentsList: FC<StudentsListProps> = ({
   }
 
   return (
-    <PageContent isLoading={isLoading} hasPadding={true} title='Students'>
+    <PageContent isLoading={isLoading} hasPadding={true} title='CHWs'>
       {selectedIds.length > 0 && (
         <div className='mb-4 bg-[#3363AD]/5 border border-[#3363AD]/20 rounded-lg p-3 flex justify-between items-center text-[#3363AD]'>
           <span className='text-sm font-medium'>
-            {selectedIds.length} students selected
+            {selectedIds.length} CHWs selected
           </span>
           <div className='flex gap-2'>
             <button className='text-xs font-semibold bg-white border border-[#3363AD]/20 px-3 py-1.5 rounded shadow-sm hover:bg-gray-50'>

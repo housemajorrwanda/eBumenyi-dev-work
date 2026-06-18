@@ -40,11 +40,9 @@ import PreTest from "@/pages/dashboard/PreTest";
 import MidTest from "@/pages/dashboard/MidTest";
 import FinalTestPage from "@/pages/dashboard/FinalTestPage";
 import CHOGroupPage from "@/pages/dashboard/CHOGroup";
-import CHOGroupMembersPage from "@/pages/dashboard/CHOGroupMembers";
-import CHOGroupMonitoringPage from "@/pages/dashboard/CHOGroupMonitoring";
 import CHOGroupInvitePage from "@/pages/dashboard/CHOGroupInvite";
-import AdminCHOGroupsPage from "@/pages/dashboard/AdminCHOGroups";
 import AdminCHOGroupDetailPage from "@/pages/dashboard/AdminCHOGroupDetail";
+import VerifyCertificate from "@/pages/VerifyCertificate";
 
 const RoutesProvider = () => {
   const router = createBrowserRouter([
@@ -113,8 +111,7 @@ const RoutesProvider = () => {
           path: "messaging",
           element: (
             <ProtectedRoute
-              allowedRoles={["ADMIN", "TRAINEE", "TRAINER","DEVELOPER"]}
-              allowedIndustries={["SFH","RBC","WELTEL"]}
+              allowedRoles={["ADMIN", "TRAINEE", "TRAINER", "DEVELOPER", "CHO", "STAFF"]}
             >
               <Messaging />
             </ProtectedRoute>
@@ -150,7 +147,7 @@ const RoutesProvider = () => {
           path: "students/:id",
           element: (
             <ProtectedRoute
-              allowedRoles={["ADMIN", "TRAINER","DEVELOPER"]}
+              allowedRoles={["ADMIN", "TRAINER", "DEVELOPER", "CHO"]}
             >
               <StudentActivityPage />
             </ProtectedRoute>
@@ -191,26 +188,6 @@ const RoutesProvider = () => {
               allowedRoles={["TRAINER", "ADMIN", "DEVELOPER"]}
             >
               <Certificates />
-            </ProtectedRoute>
-          ),
-        },
-        {
-          path: "certificates/design",
-          element: (
-            <ProtectedRoute
-              allowedRoles={["TRAINER", "ADMIN", "DEVELOPER"]}
-            >
-              <CertificateDesignEditor />
-            </ProtectedRoute>
-          ),
-        },
-        {
-          path: "certificates/design/:id",
-          element: (
-            <ProtectedRoute
-              allowedRoles={["TRAINER", "ADMIN", "DEVELOPER"]}
-            >
-              <CertificateDesignEditor />
             </ProtectedRoute>
           ),
         },
@@ -270,22 +247,6 @@ const RoutesProvider = () => {
           ),
         },
         {
-          path: "cho-group/members",
-          element: (
-            <ProtectedRoute allowedRoles={["CHO"]}>
-              <CHOGroupMembersPage />
-            </ProtectedRoute>
-          ),
-        },
-        {
-          path: "cho-group/monitoring",
-          element: (
-            <ProtectedRoute allowedRoles={["CHO"]}>
-              <CHOGroupMonitoringPage />
-            </ProtectedRoute>
-          ),
-        },
-        {
           path: "cho-group/invite",
           element: (
             <ProtectedRoute allowedRoles={["CHO"]}>
@@ -295,11 +256,7 @@ const RoutesProvider = () => {
         },
         {
           path: "admin/cho-groups",
-          element: (
-            <ProtectedRoute allowedRoles={["ADMIN", "STAFF"]}>
-              <AdminCHOGroupsPage />
-            </ProtectedRoute>
-          ),
+          element: <Navigate to="/students" replace />,
         },
         {
           path: "admin/cho-groups/:id",
@@ -310,6 +267,28 @@ const RoutesProvider = () => {
           ),
         },
       ],
+    },
+
+    // ── Certificate builder (no sidebar, full-screen editor) ─────────
+    {
+      path: "/certificates/design",
+      element: (
+        <ProtectedRoute allowedRoles={["TRAINER", "ADMIN", "DEVELOPER"]}>
+          <div className="h-screen overflow-hidden">
+            <CertificateDesignEditor />
+          </div>
+        </ProtectedRoute>
+      ),
+    },
+    {
+      path: "/certificates/design/:id",
+      element: (
+        <ProtectedRoute allowedRoles={["TRAINER", "ADMIN", "DEVELOPER"]}>
+          <div className="h-screen overflow-hidden">
+            <CertificateDesignEditor />
+          </div>
+        </ProtectedRoute>
+      ),
     },
 
     // ── Course builder (no sidebar, full-screen editor) ───────────────
@@ -378,6 +357,11 @@ const RoutesProvider = () => {
     {
       path: "/terms",
       element: <Terms />,
+      errorElement: <ErrorPage />,
+    },
+    {
+      path: "/verify/:code",
+      element: <VerifyCertificate />,
       errorElement: <ErrorPage />,
     },
     {

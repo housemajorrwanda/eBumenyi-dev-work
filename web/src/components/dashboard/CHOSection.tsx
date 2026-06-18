@@ -236,10 +236,10 @@ export const CHOSection: React.FC = () => {
               )}
             </div>
             <button
-              onClick={() => navigate("/cho-group/monitoring")}
+              onClick={() => navigate("/cho-group")}
               className="text-xs text-[#3363AD] hover:underline flex items-center gap-0.5"
             >
-              Full report <ChevronRight size={12} />
+              View all <ChevronRight size={12} />
             </button>
           </div>
 
@@ -270,7 +270,7 @@ export const CHOSection: React.FC = () => {
               ))}
               {members.length > 6 && (
                 <button
-                  onClick={() => navigate("/cho-group/members")}
+                  onClick={() => navigate("/cho-group")}
                   className="w-full text-xs text-[#3363AD] hover:underline pt-2 pb-1 text-center"
                 >
                   +{members.length - 6} more members
@@ -284,23 +284,15 @@ export const CHOSection: React.FC = () => {
         <div className="lg:col-span-1 space-y-3">
           {[
             {
-              label: "Group Members",
+              label: "My Group",
               desc: "View and manage CHWs",
               Icon: Users,
-              path: "/cho-group/members",
+              path: "/cho-group",
               bg: "bg-[#EBF0F9]",
               color: "text-[#3363AD]",
             },
             {
-              label: "Monitoring",
-              desc: "Full progress report",
-              Icon: BarChart2,
-              path: "/cho-group/monitoring",
-              bg: "bg-emerald-50",
-              color: "text-emerald-600",
-            },
-            {
-              label: "Invite CHW",
+              label: "Add CHW",
               desc: "Add new members",
               Icon: UserPlus,
               path: "/cho-group/invite",
