@@ -29,8 +29,19 @@ export class CHOGroupService {
       });
 
       const name = groupName ?? `${user.fullNames}'s Group`;
+
+      const groupChat = await tx.groupChat.create({
+        data: {
+          name,
+          createdById: userId,
+          participants: {
+            create: [{ userId, role: "admin" }],
+          },
+        },
+      });
+
       const group = await tx.cHOGroup.create({
-        data: { name, choId: user.student!.id, sector: user.sector },
+        data: { name, choId: user.student!.id, sectors: user.sector ? [user.sector] : [], groupChatId: groupChat.id },
         include: {
           cho: {
             include: {
@@ -104,6 +115,27 @@ export class CHOGroupService {
         });
       }
 
+      // Sync GroupChat: promote new CHO to admin, downgrade old CHO to member
+      if (group.groupChatId) {
+        const existing = await tx.groupChatParticipant.findFirst({
+          where: { groupId: group.groupChatId, userId: newCHOStudent.userId },
+        });
+        if (!existing) {
+          await tx.groupChatParticipant.create({
+            data: { groupId: group.groupChatId, userId: newCHOStudent.userId, role: "admin" },
+          });
+        } else {
+          await tx.groupChatParticipant.update({
+            where: { id: existing.id },
+            data: { role: "admin" },
+          });
+        }
+        await tx.groupChatParticipant.updateMany({
+          where: { groupId: group.groupChatId, userId },
+          data: { role: "member" },
+        });
+      }
+
       return {
         demotedUser: { id: user.id, fullNames: user.fullNames },
         newCHO: { id: newCHOStudent.user.id, fullNames: newCHOStudent.user.fullNames },
@@ -117,7 +149,9 @@ export class CHOGroupService {
   static async createGroup(data: {
     name: string;
     choStudentId: string;
-    sector?: string;
+    sectors?: string[];
+    cells?: string[];
+    villages?: string[];
     description?: string;
   }) {
     const cho = await prisma.student.findUnique({
@@ -133,14 +167,29 @@ export class CHOGroupService {
     const existing = await prisma.cHOGroup.findUnique({ where: { choId: data.choStudentId } });
     if (existing) throw new AppError("This CHO already leads a group", 409);
 
-    return prisma.cHOGroup.create({
-      data: {
-        name: data.name,
-        choId: data.choStudentId,
-        sector: data.sector,
-        description: data.description,
-      },
-      include: { cho: { include: { user: true } } },
+    return prisma.$transaction(async (tx) => {
+      const groupChat = await tx.groupChat.create({
+        data: {
+          name: data.name,
+          createdById: cho.userId,
+          participants: {
+            create: [{ userId: cho.userId, role: "admin" }],
+          },
+        },
+      });
+
+      return tx.cHOGroup.create({
+        data: {
+          name: data.name,
+          choId: data.choStudentId,
+          sectors: data.sectors ?? [],
+          cells: data.cells ?? [],
+          villages: data.villages ?? [],
+          description: data.description,
+          groupChatId: groupChat.id,
+        },
+        include: { cho: { include: { user: true } } },
+      });
     });
   }
 
@@ -211,20 +260,51 @@ export class CHOGroupService {
     if (group.choId === studentId)
       throw new AppError("CHO cannot be added as a regular member", 400);
 
-    return prisma.cHOGroupMember.create({
-      data: { groupId, studentId },
-      include: { student: { include: { user: true } } },
+    return prisma.$transaction(async (tx) => {
+      const member = await tx.cHOGroupMember.create({
+        data: { groupId, studentId },
+        include: { student: { include: { user: true } } },
+      });
+
+      if (group.groupChatId) {
+        const alreadyInChat = await tx.groupChatParticipant.findFirst({
+          where: { groupId: group.groupChatId, userId: student.userId },
+        });
+        if (!alreadyInChat) {
+          await tx.groupChatParticipant.create({
+            data: { groupId: group.groupChatId, userId: student.userId, role: "member" },
+          });
+        }
+      }
+
+      return member;
     });
   }
 
   // ─── Admin: remove a CHW from a group ────────────────────────────────────────
 
   static async removeMember(groupId: string, studentId: string) {
-    const member = await prisma.cHOGroupMember.findFirst({
-      where: { groupId, studentId },
-    });
+    const [group, member] = await Promise.all([
+      prisma.cHOGroup.findUnique({ where: { id: groupId } }),
+      prisma.cHOGroupMember.findFirst({ where: { groupId, studentId } }),
+    ]);
     if (!member) throw new AppError("Member not found in this group", 404);
-    await prisma.cHOGroupMember.delete({ where: { id: member.id } });
+
+    const target = group
+      ? await prisma.student.findUnique({
+          where: { id: studentId },
+          select: { userId: true },
+        })
+      : null;
+
+    await prisma.$transaction(async (tx) => {
+      await tx.cHOGroupMember.delete({ where: { id: member.id } });
+      if (group?.groupChatId && target) {
+        await tx.groupChatParticipant.deleteMany({
+          where: { groupId: group.groupChatId, userId: target.userId },
+        });
+      }
+    });
   }
 
   // ─── CHO: get own group ───────────────────────────────────────────────────────
@@ -303,17 +383,32 @@ export class CHOGroupService {
     if (target.groupMembership)
       throw new AppError("This student already belongs to a group", 409);
 
-    return prisma.cHOGroupMember.create({
-      data: { groupId: group.id, studentId: targetStudentId },
-      include: {
-        student: {
-          include: {
-            user: {
-              select: { id: true, fullNames: true, photo: true, phoneNumber: true, district: true, sector: true },
+    return prisma.$transaction(async (tx) => {
+      const member = await tx.cHOGroupMember.create({
+        data: { groupId: group.id, studentId: targetStudentId },
+        include: {
+          student: {
+            include: {
+              user: {
+                select: { id: true, fullNames: true, photo: true, phoneNumber: true, district: true, sector: true },
+              },
             },
           },
         },
-      },
+      });
+
+      if (group.groupChatId) {
+        const alreadyInChat = await tx.groupChatParticipant.findFirst({
+          where: { groupId: group.groupChatId, userId: target.userId },
+        });
+        if (!alreadyInChat) {
+          await tx.groupChatParticipant.create({
+            data: { groupId: group.groupChatId, userId: target.userId, role: "member" },
+          });
+        }
+      }
+
+      return member;
     });
   }
 
@@ -331,30 +426,58 @@ export class CHOGroupService {
     });
     if (!member) throw new AppError("Member not found in your group", 404);
 
-    await prisma.cHOGroupMember.delete({ where: { id: member.id } });
+    const target = await prisma.student.findUnique({
+      where: { id: targetStudentId },
+      select: { userId: true },
+    });
+
+    await prisma.$transaction(async (tx) => {
+      await tx.cHOGroupMember.delete({ where: { id: member.id } });
+      if (group.groupChatId && target) {
+        await tx.groupChatParticipant.deleteMany({
+          where: { groupId: group.groupChatId, userId: target.userId },
+        });
+      }
+    });
   }
 
   // ─── Admin: update a group ───────────────────────────────────────────────────
 
-  static async updateGroup(groupId: string, data: { name?: string; sector?: string; description?: string }) {
+  static async updateGroup(groupId: string, data: { name?: string; district?: string; sectors?: string[]; cells?: string[]; villages?: string[]; cell?: string; village?: string; description?: string }) {
     const group = await prisma.cHOGroup.findUnique({ where: { id: groupId } });
     if (!group) throw new AppError("Group not found", 404);
 
-    return prisma.cHOGroup.update({
-      where: { id: groupId },
-      data: {
-        ...(data.name ? { name: data.name } : {}),
-        ...(data.sector !== undefined ? { sector: data.sector || null } : {}),
-        ...(data.description !== undefined ? { description: data.description || null } : {}),
-      },
-      include: {
-        cho: {
-          include: {
-            user: { select: { id: true, fullNames: true, photo: true, phoneNumber: true, district: true, sector: true } },
-          },
+    return prisma.$transaction(async (tx) => {
+      const updated = await tx.cHOGroup.update({
+        where: { id: groupId },
+        data: {
+          ...(data.name ? { name: data.name } : {}),
+          ...(data.district !== undefined ? { district: data.district || null } : {}),
+          ...(data.sectors !== undefined ? { sectors: data.sectors } : {}),
+          ...(data.cells !== undefined ? { cells: data.cells } : {}),
+          ...(data.villages !== undefined ? { villages: data.villages } : {}),
+          ...(data.cell !== undefined ? { cell: data.cell || null } : {}),
+          ...(data.village !== undefined ? { village: data.village || null } : {}),
+          ...(data.description !== undefined ? { description: data.description || null } : {}),
         },
-        _count: { select: { members: true } },
-      },
+        include: {
+          cho: {
+            include: {
+              user: { select: { id: true, fullNames: true, photo: true, phoneNumber: true, district: true, sector: true } },
+            },
+          },
+          _count: { select: { members: true } },
+        },
+      });
+
+      if (data.name && group.groupChatId) {
+        await tx.groupChat.update({
+          where: { id: group.groupChatId },
+          data: { name: data.name },
+        });
+      }
+
+      return updated;
     });
   }
 
@@ -371,6 +494,14 @@ export class CHOGroupService {
       await tx.cHOGroupMember.deleteMany({ where: { groupId } });
       await tx.userRole.deleteMany({ where: { userId: group.cho.userId, name: RoleType.CHO } });
       await tx.student.update({ where: { id: group.choId }, data: { role: RoleType.TRAINEE } });
+
+      if (group.groupChatId) {
+        await tx.groupChat.update({
+          where: { id: group.groupChatId },
+          data: { isArchived: true },
+        });
+      }
+
       await tx.cHOGroup.delete({ where: { id: groupId } });
       return { success: true };
     });
@@ -378,28 +509,44 @@ export class CHOGroupService {
 
   // ─── CHO: update own group ────────────────────────────────────────────────────
 
-  static async updateMyGroup(choUserId: string, data: { name?: string; sector?: string; description?: string }) {
+  static async updateMyGroup(choUserId: string, data: { name?: string; district?: string; sectors?: string[]; cells?: string[]; villages?: string[]; cell?: string; village?: string; description?: string }) {
     const student = await prisma.student.findUnique({ where: { userId: choUserId } });
     if (!student) throw new AppError("Student record not found", 404);
 
     const group = await prisma.cHOGroup.findUnique({ where: { choId: student.id } });
     if (!group) throw new AppError("You do not lead any group", 404);
 
-    return prisma.cHOGroup.update({
-      where: { id: group.id },
-      data: {
-        ...(data.name ? { name: data.name } : {}),
-        ...(data.sector !== undefined ? { sector: data.sector || null } : {}),
-        ...(data.description !== undefined ? { description: data.description || null } : {}),
-      },
-      include: {
-        _count: { select: { members: true } },
-        cho: {
-          include: {
-            user: { select: { id: true, fullNames: true, photo: true, phoneNumber: true } },
+    return prisma.$transaction(async (tx) => {
+      const updated = await tx.cHOGroup.update({
+        where: { id: group.id },
+        data: {
+          ...(data.name ? { name: data.name } : {}),
+          ...(data.district !== undefined ? { district: data.district || null } : {}),
+          ...(data.sectors !== undefined ? { sectors: data.sectors } : {}),
+          ...(data.cells !== undefined ? { cells: data.cells } : {}),
+          ...(data.villages !== undefined ? { villages: data.villages } : {}),
+          ...(data.cell !== undefined ? { cell: data.cell || null } : {}),
+          ...(data.village !== undefined ? { village: data.village || null } : {}),
+          ...(data.description !== undefined ? { description: data.description || null } : {}),
+        },
+        include: {
+          _count: { select: { members: true } },
+          cho: {
+            include: {
+              user: { select: { id: true, fullNames: true, photo: true, phoneNumber: true } },
+            },
           },
         },
-      },
+      });
+
+      if (data.name && group.groupChatId) {
+        await tx.groupChat.update({
+          where: { id: group.groupChatId },
+          data: { name: data.name },
+        });
+      }
+
+      return updated;
     });
   }
 

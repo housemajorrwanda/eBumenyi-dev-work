@@ -316,27 +316,20 @@ export class CalendarEventService {
               dedupKey: `calendar:${event.id}:created:${participant.userId}`,
             },
           )
-            .then(async () => {
-              // Emit real-time socket event to notify user immediately
+            .then(async (notification) => {
               if (io) {
                 console.log(
-                  "[SOCKET EMIT] Broadcasting count update for event:",
+                  "[SOCKET EMIT] Broadcasting notification for event:",
                   event.id,
                   "to user:",
                   participant.userId,
                 );
-                // OPTIMIZATION: Only emit unread count instead of full notification object
-                // Reduces bandwidth by ~90% (200-500 bytes per notification)
                 const userRoom = `user:${participant.userId}`;
                 const unreadCount = await NotificationService.getUnreadCount(
                   participant.userId,
                 );
-                console.log(
-                  "[SOCKET EMIT] Updating unread count for user:",
-                  participant.userId,
-                  "count:",
-                  unreadCount,
-                );
+                // Emit the actual DB notification (includes id, so bell interactions work)
+                io.to(userRoom).emit("notification", notification);
                 io.to(userRoom).emit("unread_count_updated", { unreadCount });
               }
             })
@@ -345,6 +338,15 @@ export class CalendarEventService {
             ),
         );
       }
+    }
+
+    // Ping the creator's socket so their CalendarScreen refetches without
+    // adding a noisy bell notification (they know they just created the event).
+    if (io && event.createdById) {
+      io.to(`user:${event.createdById}`).emit("calendar_data_changed", {
+        eventId: event.id,
+        action: "created",
+      });
     }
 
     // Send emails to external participants
@@ -1067,27 +1069,19 @@ export class CalendarEventService {
                 dedupKey: `calendar:${updated.id}:updated:${participant.userId}`,
               },
             )
-              .then(async () => {
-                // Emit real-time socket event
+              .then(async (notification) => {
                 if (io) {
                   console.log(
-                    "[SOCKET EMIT] Broadcasting count update for event:",
+                    "[SOCKET EMIT] Broadcasting notification for event update:",
                     updated.id,
                     "to user:",
                     participant.userId,
                   );
-                  // OPTIMIZATION: Only emit unread count instead of full notification object
-                  // Reduces bandwidth by ~90% (200-500 bytes per notification)
                   const userRoom = `user:${participant.userId}`;
                   const unreadCount = await NotificationService.getUnreadCount(
                     participant.userId,
                   );
-                  console.log(
-                    "[SOCKET EMIT] Updating unread count for user:",
-                    participant.userId,
-                    "count:",
-                    unreadCount,
-                  );
+                  io.to(userRoom).emit("notification", notification);
                   io.to(userRoom).emit("unread_count_updated", { unreadCount });
                 }
               })
@@ -1097,6 +1091,15 @@ export class CalendarEventService {
           );
         }
       }
+
+      // Ping the updater's socket for data sync (they're excluded from participant notifications)
+      if (io) {
+        io.to(`user:${userId}`).emit("calendar_data_changed", {
+          eventId: updated.id,
+          action: "updated",
+        });
+      }
+
       console.log(
         "[CALENDAR EVENT] Waiting for all notifications to complete...",
       );
@@ -1174,8 +1177,7 @@ export class CalendarEventService {
               dedupKey: `calendar:${existing.id}:deleted:${participant.userId}`,
             },
           )
-            .then(async () => {
-              // Emit real-time socket event
+            .then(async (notification) => {
               if (io) {
                 console.log(
                   "[SOCKET EMIT] Broadcasting deletion notification for event:",
@@ -1183,18 +1185,11 @@ export class CalendarEventService {
                   "to user:",
                   participant.userId,
                 );
-                // OPTIMIZATION: Only emit unread count instead of full notification object
-                // Reduces bandwidth by ~90% (200-500 bytes per notification)
                 const userRoom = `user:${participant.userId}`;
                 const unreadCount = await NotificationService.getUnreadCount(
                   participant.userId,
                 );
-                console.log(
-                  "[SOCKET EMIT] Updating unread count for user:",
-                  participant.userId,
-                  "count:",
-                  unreadCount,
-                );
+                io.to(userRoom).emit("notification", notification);
                 io.to(userRoom).emit("unread_count_updated", { unreadCount });
               }
             })
@@ -1204,6 +1199,15 @@ export class CalendarEventService {
         );
       }
     }
+
+    // Ping the deleter's socket for data sync
+    if (io && userId) {
+      io.to(`user:${userId}`).emit("calendar_data_changed", {
+        eventId: existing.id,
+        action: "deleted",
+      });
+    }
+
     console.log(
       "[CALENDAR EVENT] Waiting for all deletion notifications to complete...",
     );

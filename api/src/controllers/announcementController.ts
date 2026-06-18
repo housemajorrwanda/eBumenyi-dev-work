@@ -17,6 +17,7 @@ import { Request as ExpressRequest } from "express";
 import { AnnouncementService } from "../services/announcementService";
 import {
   CreateAnnouncementDto,
+  UpdateAnnouncementDto,
   AnnouncementResponse,
 } from "../utils/interfaces/common";
 import { loggerMiddleware } from "../utils/loggers/loggingMiddleware";
@@ -119,7 +120,7 @@ export class AnnouncementController {
   @Middlewares(loggerMiddleware, checkRole(roles.ADMIN, roles.STAFF))
   public async updateAnnouncement(
     @Path() announcementId: string,
-    @Body() body: Partial<CreateAnnouncementDto>,
+    @Body() body: UpdateAnnouncementDto,
   ): Promise<any> {
     try {
       const data = await AnnouncementService.update(announcementId, body);

@@ -2,6 +2,7 @@
 import { prisma } from "../utils/client";
 import {
   CreateAnnouncementDto,
+  UpdateAnnouncementDto,
   AnnouncementResponse,
 } from "../utils/interfaces/common";
 import { NotificationHelper } from "../utils/notificationHelper";
@@ -170,6 +171,7 @@ export class AnnouncementService {
           title: payload.title.trim(),
           body: payload.body.trim(),
           segment: payload.segment,
+          category: payload.category || "",
           priority: payload.priority || "medium",
           status: payload.status || "draft",
           publishAt,
@@ -178,49 +180,53 @@ export class AnnouncementService {
         },
       });
 
-      const targetUserIds = await this.resolveTargetUsers(payload.segment);
+      // Only send notifications when the announcement is published, not for drafts
+      if (announcement.status === "published") {
+        const targetUserIds = await this.resolveTargetUsers(payload.segment);
 
-      const actionUrl = `/announcements/${announcement.id}`;
-      const metadata = {
-        announcementId: announcement.id,
-        segment: payload.segment,
-      };
+        const actionUrl = `/announcements/${announcement.id}`;
+        const metadata = {
+          announcementId: announcement.id,
+          segment: payload.segment,
+        };
 
-      // Send notifications asynchronously (non-blocking)
-      // Don't await - let them process in background
-      Promise.all(
-        targetUserIds.map((userId) =>
-          NotificationHelper.sendToUser(
-            io,
-            userId,
-            announcement.title,
-            announcement.body,
-            "info",
-            actionUrl,
-            "announcement",
-            announcement.id,
-            metadata,
-            300_000, // 5 minutes cooldown
-            `announcement:${announcement.id}:${userId}`,
-          ).catch((err) =>
-            console.error(
-              `[AnnouncementService] failed to notify ${userId} for announcement ${announcement.id}:`,
-              err,
+        // Send notifications asynchronously (non-blocking)
+        // Don't await - let them process in background
+        Promise.all(
+          targetUserIds.map((userId) =>
+            NotificationHelper.sendToUser(
+              io,
+              userId,
+              announcement.title,
+              announcement.body,
+              "info",
+              actionUrl,
+              "announcement",
+              announcement.id,
+              metadata,
+              300_000, // 5 minutes cooldown
+              `announcement:${announcement.id}:${userId}`,
+            ).catch((err) =>
+              console.error(
+                `[AnnouncementService] failed to notify ${userId} for announcement ${announcement.id}:`,
+                err,
+              ),
             ),
           ),
-        ),
-      ).catch((err) =>
-        console.error(
-          "[AnnouncementService] Error sending bulk notifications:",
-          err,
-        ),
-      );
+        ).catch((err) =>
+          console.error(
+            "[AnnouncementService] Error sending bulk notifications:",
+            err,
+          ),
+        );
+      }
 
       return {
         id: announcement.id,
         title: announcement.title,
         body: announcement.body,
         segment: announcement.segment,
+        category: announcement.category,
         priority: announcement.priority,
         status: announcement.status,
         publishAt: announcement.publishAt.toISOString(),
@@ -274,7 +280,7 @@ export class AnnouncementService {
 
   static async update(
     announcementId: string,
-    payload: Partial<CreateAnnouncementDto>,
+    payload: UpdateAnnouncementDto,
   ): Promise<AnnouncementResponse> {
     try {
       if (!announcementId || announcementId.trim() === "") {
@@ -307,6 +313,7 @@ export class AnnouncementService {
       }
 
       if (payload.segment) updateData.segment = payload.segment;
+      if (payload.category !== undefined) updateData.category = payload.category;
       if (payload.priority) updateData.priority = payload.priority;
       if (payload.status) updateData.status = payload.status;
 
@@ -332,7 +339,8 @@ export class AnnouncementService {
 
       // Validate date logic if both dates are provided
       const publishDate = updateData.publishAt || existing.publishAt;
-      const validDate = updateData.validUntil ?? existing.validUntil;
+      // Use 'in' check so explicit null (clearing the field) is respected over existing value
+      const validDate = "validUntil" in updateData ? updateData.validUntil : existing.validUntil;
       if (validDate && validDate < publishDate) {
         throw new AppError("Expiration date must be after publish date", 400);
       }
@@ -355,6 +363,7 @@ export class AnnouncementService {
         title: announcement.title,
         body: announcement.body,
         segment: announcement.segment,
+        category: announcement.category,
         priority: announcement.priority,
         status: announcement.status,
         publishAt: announcement.publishAt.toISOString(),

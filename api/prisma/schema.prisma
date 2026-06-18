@@ -79,7 +79,7 @@ model UserSettings {
   userId       String   @unique
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   theme        String   @default("light")
-  language     String   @default("en")
+  language     String   @default("rw")
   timezone     String   @default("Africa/Kigali")
   dateFormat   String   @default("DD/MM/YYYY")
   emailNotif   Boolean  @default(true)
@@ -200,6 +200,7 @@ model Announcement {
   title       String
   body        String
   segment     String   // role name or 'all'
+  category    String   @default("")
   priority    String   @default("medium")
   status      String   @default("draft")
   publishAt   DateTime @default(now())
@@ -338,7 +339,9 @@ model Course {
   isPublished      Boolean      @default(true)
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
+  certificateTemplateId String?
   staff            Staff        @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  certificateTemplate CertificateTemplate? @relation(fields: [certificateTemplateId], references: [id], onDelete: SetNull)
   sections         Section[]
   intro            CourseIntro?
   progresses       CourseProgress[]
@@ -639,14 +642,21 @@ model Student {
 }
 
 model CHOGroup {
-  id          String   @id @default(uuid())
+  id          String     @id @default(uuid())
   name        String
-  choId       String   @unique
-  sector      String?
+  choId       String     @unique
+  district    String?
+  sectors     String[]   @default([])
+  cells       String[]   @default([])
+  villages    String[]   @default([])
+  cell        String?
+  village     String?
   description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  cho         Student  @relation("CHOLeader", fields: [choId], references: [id], onDelete: Cascade)
+  groupChatId String?    @unique
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  cho         Student    @relation("CHOLeader", fields: [choId], references: [id], onDelete: Cascade)
+  groupChat   GroupChat? @relation("CHOGroupChat", fields: [groupChatId], references: [id], onDelete: SetNull)
   members     CHOGroupMember[]
   invitations CHOGroupInvitation[]
 }
@@ -886,10 +896,11 @@ model GroupChat {
   updatedAt       DateTime @updatedAt
   
   // Relations
-  creator         User     @relation("GroupChatCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  creator         User      @relation("GroupChatCreator", fields: [createdById], references: [id], onDelete: Cascade)
   lastMessage     GroupMessage? @relation("GroupChatLastMessage", fields: [lastMessageId], references: [id], onDelete: SetNull)
   participants    GroupChatParticipant[]
   messages        GroupMessage[] @relation("GroupChatMessages")
+  choGroup        CHOGroup? @relation("CHOGroupChat")
   
   @@index([createdById])
   @@index([updatedAt(sort: Desc)])
@@ -1151,5 +1162,17 @@ model MeetingRecordingInvite {
   @@index([recordingId])
   @@index([userId])
   @@map("meeting_recording_invites")
+}
+
+model CertificateTemplate {
+  id         String   @id @default(uuid())
+  name       String
+  canvasJson Json
+  thumbnail  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  courses    Course[]
+
+  @@map("certificate_templates")
 }
 
