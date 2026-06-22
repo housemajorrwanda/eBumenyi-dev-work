@@ -38,6 +38,8 @@ import CourseReviewCard from '@/components/CourseReviewCard';
 import calculateTimeSpent from '@/utils/format';
 import { extractMeetingId, isValidMeetingUrl } from '@/utils/deepLinking';
 import { useMeetingRouter } from '@/hooks/useMeetingRouter';
+import { useCourseRecommendations } from '@/hooks/useCourseRecommendations';
+import { SEVERITY_BADGE } from '@/constants/recommendations';
 // import AsyncStorage from '@react-native-async-storage/async-storage';
 
 
@@ -170,34 +172,12 @@ const PulsingVideoCircle = ({ active }: { active: boolean }) => {
   );
 };
 
-type RecommendedSeverity = 'high' | 'moderate' | 'low';
-
-const RECOMMENDATION_SEVERITY_STYLE: Record<RecommendedSeverity, { bg: string; border: string; text: string; label: string }> = {
-  high: { bg: '#FEE2E2', border: '#DC2626', text: '#991B1B', label: 'Bikomeye' },
-  moderate: { bg: '#FEF3C7', border: '#D97706', text: '#92400E', label: 'Biringaniye' },
-  low: { bg: '#D1FAE5', border: '#059669', text: '#065F46', label: 'Byoroheje' },
-};
-
-const parseRecommendedParam = (raw: string | string[] | undefined): Map<string, RecommendedSeverity> => {
-  const map = new Map<string, RecommendedSeverity>();
-  const value = Array.isArray(raw) ? raw[0] : raw;
-  if (!value) return map;
-  for (const entry of value.split(',')) {
-    const [id, sev] = entry.split(':');
-    if (!id) continue;
-    const severity: RecommendedSeverity =
-      sev === 'high' || sev === 'moderate' || sev === 'low' ? sev : 'moderate';
-    map.set(id, severity);
-  }
-  return map;
-};
-
 export default function OneCourseScreen() {
   const router = useMeetingRouter();
   const { courseId, sectionId, recommended } = useLocalSearchParams();
-  const recommendedChaptersMap = React.useMemo(
-    () => parseRecommendedParam(recommended as string | string[] | undefined),
-    [recommended],
+  const { recommendedChaptersMap } = useCourseRecommendations(
+    courseId as string | undefined,
+    recommended as string | string[] | undefined,
   );
   const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(true);
@@ -1184,7 +1164,7 @@ export default function OneCourseScreen() {
             // Get chapter number and duration
             const chapterNumber = idxInSection + 1;
             const recommendedSeverity = recommendedChaptersMap.get(module.id);
-            const recStyle = recommendedSeverity ? RECOMMENDATION_SEVERITY_STYLE[recommendedSeverity] : null;
+            const recStyle = recommendedSeverity ? SEVERITY_BADGE[recommendedSeverity] : null;
             return (
               <TouchableOpacity
                 key={module.id}
@@ -1226,9 +1206,12 @@ export default function OneCourseScreen() {
                           { backgroundColor: recStyle.bg, borderColor: recStyle.border },
                         ]}
                       >
+                        <View
+                          style={[styles.recommendedSeverityDot, { backgroundColor: recStyle.border }]}
+                        />
                         <RotateCcw size={10} color={recStyle.text} />
                         <Text style={[styles.recommendedBadgeText, { color: recStyle.text }]}>
-                          Subiramo · {recStyle.label}
+                          Subiramo
                         </Text>
                       </View>
                     )}
@@ -1677,6 +1660,11 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: 999,
     borderWidth: 1,
+  },
+  recommendedSeverityDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
   },
   recommendedBadgeText: {
     fontSize: 10,
