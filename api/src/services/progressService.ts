@@ -1,6 +1,11 @@
 import { prisma } from "../utils/client";
 import AppError from "../utils/error";
 import { NotificationHelper } from "../utils/notificationHelper";
+import {
+  extractStudentFirstName,
+  generateConversationalRecommendations,
+  type ConversationalMessage,
+} from "./recommendationNlpService";
 
 export class ProgressService {
   // Slide progress: mark slideProgress.isCompleted true when student views slide
@@ -1240,6 +1245,8 @@ export class ProgressService {
       expectedLessonMinutes: number;
       elapsedHours: number | null;
       summaryMessageRw: string;
+      conversationalMessages: ConversationalMessage[];
+      generatedByNlp: boolean;
       chapters: Array<{
         chapterId: string;
         sectionId: string;
@@ -1262,6 +1269,7 @@ export class ProgressService {
   }> {
     const student = await prisma.student.findUnique({
       where: { id: studentId },
+      include: { user: { select: { fullNames: true } } },
     });
     if (!student) throw new AppError("Student not found", 404);
 
@@ -1270,6 +1278,8 @@ export class ProgressService {
       select: { id: true, title: true },
     });
     if (!course) throw new AppError("Course not found", 404);
+
+    const studentFirstName = extractStudentFirstName(student.user?.fullNames);
 
     const certificate = await prisma.certificate.findUnique({
       where: {
@@ -1533,6 +1543,14 @@ export class ProgressService {
       chapters,
     );
 
+    const { messages: conversationalMessages, generatedByNlp } =
+      await generateConversationalRecommendations({
+        studentFirstName,
+        courseTitle: course.title,
+        completedQuickly,
+        chapters,
+      });
+
     return {
       message: "Recommendations fetched",
       statusCode: 200,
@@ -1543,6 +1561,8 @@ export class ProgressService {
         expectedLessonMinutes,
         elapsedHours,
         summaryMessageRw,
+        conversationalMessages,
+        generatedByNlp,
         chapters,
       },
     };

@@ -927,6 +927,16 @@ export interface IPostCourseRecommendationChapter {
   severity: PostCourseRecommendationSeverity;
 }
 
+export interface IConversationalRecommendationMessage {
+  id: string;
+  role: 'assistant';
+  content: string;
+  chapterId?: string;
+  sectionId?: string;
+  actionLabel?: string;
+  severity?: PostCourseRecommendationSeverity;
+}
+
 export interface IPostCourseRecommendationsData {
   courseId: string;
   courseTitle: string;
@@ -934,6 +944,8 @@ export interface IPostCourseRecommendationsData {
   expectedLessonMinutes: number;
   elapsedHours: number | null;
   summaryMessageRw: string;
+  conversationalMessages?: IConversationalRecommendationMessage[];
+  generatedByNlp?: boolean;
   chapters: IPostCourseRecommendationChapter[];
 }
 
