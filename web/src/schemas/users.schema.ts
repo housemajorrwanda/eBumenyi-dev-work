@@ -27,4 +27,5 @@ export const signupSchema = z.object({
       message: "Invalid birthdate",
     }),
   gender: z.string().min(1, "Gender is required"),
+  hospitalId: z.string().optional(),
 });

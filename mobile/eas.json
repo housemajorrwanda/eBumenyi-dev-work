@@ -5,33 +5,41 @@
   },
   "build": {
     "base": {
-      "node": "20.11.0"
+      "node": "20.11.0",
+      "env": {
+        "GOOGLE_SERVICES_JSON": "@env GOOGLE_SERVICES_JSON",
+        "EXPO_PUBLIC_BACKEND_BASE_URL": "@env EXPO_PUBLIC_BACKEND_BASE_URL",
+        "EXPO_PUBLIC_API_BASE_URL": "@env EXPO_PUBLIC_API_BASE_URL",
+        "EXPO_PUBLIC_ASSETS_BASE_URL": "@env EXPO_PUBLIC_ASSETS_BASE_URL",
+        "EXPO_PUBLIC_WELTEL_WEB_URL": "@env EXPO_PUBLIC_WELTEL_WEB_URL",
+        "EXPO_PUBLIC_UPLOADS_VIDEOS_PATH": "@env EXPO_PUBLIC_UPLOADS_VIDEOS_PATH",
+        "EXPO_PUBLIC_UPLOADS_DOCUMENTS_PATH": "@env EXPO_PUBLIC_UPLOADS_DOCUMENTS_PATH",
+        "EXPO_PUBLIC_UPLOADS_IMAGES_PATH": "@env EXPO_PUBLIC_UPLOADS_IMAGES_PATH"
+      }
     },
     "development": {
+      "extends": "base",
       "developmentClient": true,
       "distribution": "internal",
       "channel": "development",
       "android": {
         "buildType": "apk"
-      },
-      "env": {
-        "GOOGLE_SERVICES_JSON": "@env GOOGLE_SERVICES_JSON"
       }
     },
     "preview": {
+      "extends": "base",
       "distribution": "internal",
       "channel": "preview",
-      "env": {
-        "GOOGLE_SERVICES_JSON": "@env GOOGLE_SERVICES_JSON"
-      },
       "android": {
         "buildType": "apk"
       }
     },
     "production": {
+      "extends": "base",
       "autoIncrement": true,
-      "env": {
-        "GOOGLE_SERVICES_JSON": "@env GOOGLE_SERVICES_JSON"
+      "channel": "production",
+      "android": {
+        "buildType": "apk"
       }
     }
   },

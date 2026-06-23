@@ -63,7 +63,7 @@ export class WeltelController {
 
   /**
    * JWT login link for WelTel (name + phone signed with WELTEL_SECRET, encrypted with WELTEL_ENCRYPTION_KEY).
-   * Returns https://rw-chw1.weltelhealth.net/login?jwtKey=...
+   * Returns https://rw-chw1.weltelhealth.net/login?jwtKey=...&locale=...
    */
   @Get("/login-url")
   @Security("jwt")

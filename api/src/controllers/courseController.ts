@@ -126,9 +126,7 @@ export class CourseController {
 
   @Delete("/{id}")
   @Security("jwt")
-  @Middlewares(
-    checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN),
-  )
+  @Middlewares(checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN))
   public deleteCourse(@Path() id: string, @Request() req: ExpressRequest) {
     const io = getIOInstance(req);
     return CourseService.deleteCourse(id, io);
@@ -153,9 +151,7 @@ export class CourseController {
 
   @Post("/super")
   @Security("jwt")
-  @Middlewares(
-    checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN),
-  )
+  @Middlewares(checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN))
   public async createSuperCourse(
     @Body() body: CreateSuperCourseDto,
     @Request() req: ExpressRequest,
@@ -168,14 +164,13 @@ export class CourseController {
           "Staff ID (creatorId) is required. Make sure you are authenticated as staff.",
       };
     }
-    return CourseService.createSuperCourse(body, creatorId);
+    const io = req.app.get("io");
+    return CourseService.createSuperCourse(body, creatorId, io);
   }
 
   @Put("/super/{courseId}")
   @Security("jwt")
-  @Middlewares(
-    checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN),
-  )
+  @Middlewares(checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN))
   public async updateSuperCourse(
     @Path() courseId: string,
     @Body() body: CreateSuperCourseDto,
@@ -183,7 +178,8 @@ export class CourseController {
   ) {
     const creatorId = req.user?.staff?.id as string;
     const updateData: UpdateSuperCourseDto = { ...body, courseId };
-    return CourseService.updateSuperCourse(updateData, creatorId);
+    const io = req.app.get("io");
+    return CourseService.updateSuperCourse(updateData, creatorId, io);
   }
 
   @Get("/dashboard/statistics")
@@ -241,9 +237,7 @@ export class CourseController {
    */
   @Post("/large/create")
   @Security("jwt")
-  @Middlewares(
-    checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN),
-  )
+  @Middlewares(checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN))
   public async createLargeCourse(
     @Body() body: CreateSuperCourseDto,
     @Request() req: ExpressRequest,
@@ -404,9 +398,7 @@ export class CourseController {
    */
   @Put("/large/{courseId}")
   @Security("jwt")
-  @Middlewares(
-    checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN),
-  )
+  @Middlewares(checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN))
   public async updateLargeCourse(
     @Path() courseId: string,
     @Body() body: UpdateSuperCourseDto,
@@ -423,7 +415,8 @@ export class CourseController {
 
     try {
       const data: UpdateSuperCourseDto = { ...body, courseId };
-      const result = await CourseService.updateSuperCourse(data, creatorId);
+      const io = req.app.get("io");
+      const result = await CourseService.updateSuperCourse(data, creatorId, io);
 
       return {
         ...result,
@@ -446,9 +439,7 @@ export class CourseController {
    */
   @Put("/{courseId}/sections")
   @Security("jwt")
-  @Middlewares(
-    checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN),
-  )
+  @Middlewares(checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN))
   public async updateSection(
     @Path() courseId: string,
     @Body() sectionData: any,

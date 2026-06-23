@@ -131,19 +131,22 @@
     ],
     "runtimeVersion": "1.0.0",
     "updates": {
-      "url": "https://u.expo.dev/695ed06b-8e35-4885-8284-179930c88ef4",
+      "url": "https://u.expo.dev/0f17f4a3-d9fb-4380-8bb9-2c6ae108949d",
       "fallbackToCacheTimeout": 0,
       "checkAutomatically": "ON_LOAD",
       "enabled": true
     },
     "extra": {
-      "apiUrl": "https://api.yourbackend.com",
+      "backendBaseUrl": "https://apitest.ebumenyi.online",
+      "apiBaseUrl": "https://apitest.ebumenyi.online/api",
+      "assetsBaseUrl": "https://apitest.ebumenyi.online",
+      "weltelWebUrl": "https://rw-chw1.weltelhealth.net",
       "environment": "production",
       "router": {},
       "eas": {
-        "projectId": "695ed06b-8e35-4885-8284-179930c88ef4"
+        "projectId": "0f17f4a3-d9fb-4380-8bb9-2c6ae108949d"
       }
     },
-    "owner": "isangepro"
+    "owner": "happigilbert"
   }
 }

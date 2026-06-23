@@ -6,6 +6,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import { AppState } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { ICalendarEvent } from '@/types';
 import { GlobalReminderService } from '@/services/calender';
@@ -25,20 +26,34 @@ export function AlarmProvider({ children }: { children: React.ReactNode }) {
   const activeAlarmRef = useRef<ICalendarEvent | null>(null);
   activeAlarmRef.current = activeAlarm;
 
-  // Tracks pending snooze re-trigger so it can be cancelled on unmount
   const snoozeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const triggerAlarm = useCallback((event: ICalendarEvent) => {
     setActiveAlarm(event);
   }, []);
 
+  // Check whether the native AlarmService is currently ringing and, if so,
+  // immediately show the alarm screen. Called on mount and on every foreground
+  // resume so the screen appears regardless of whether the user was in-app or
+  // coming back from the background.
+  const checkAndRestoreActiveAlarm = useCallback(async () => {
+    if (activeAlarmRef.current) return; // already showing
+
+    const uid = await NativeAlarmScheduler.getActiveAlarmUid().catch(() => null);
+    if (!uid) return;
+
+    // uid format: "alarm_<eventId>"
+    const eventId = String(uid).replace(/^alarm_/, '');
+    const event = GlobalReminderService.getEventById(eventId);
+    if (event) {
+      triggerAlarm(event);
+    }
+  }, [triggerAlarm]);
+
   const dismissAlarm = useCallback(async (eventId: string) => {
     setActiveAlarm(null);
-    // stopRinging stops the AlarmService → clears sound + removes the notification
     await NativeAlarmScheduler.stopRinging();
-    // Also clean up our JS registry and any scheduled (not yet fired) alarm entry
     await NativeAlarmScheduler.cancelAlarm(eventId).catch(() => {});
-    // Belt-and-suspenders: dismiss any remaining delivered notifications
     await Notifications.dismissAllNotificationsAsync().catch(() => {});
   }, []);
 
@@ -46,11 +61,9 @@ export function AlarmProvider({ children }: { children: React.ReactNode }) {
     const event = activeAlarmRef.current;
     setActiveAlarm(null);
 
-    // Stop the currently ringing alarm (clears notification)
     await NativeAlarmScheduler.stopRinging();
     await Notifications.dismissAllNotificationsAsync().catch(() => {});
 
-    // Schedule the native alarm again for +5 minutes
     const snoozeMs = 5 * 60 * 1000;
     const snoozeTime = new Date(Date.now() + snoozeMs);
     await NativeAlarmScheduler.scheduleAlarm(
@@ -59,10 +72,8 @@ export function AlarmProvider({ children }: { children: React.ReactNode }) {
       event?.title ?? '',
     ).catch(() => {});
 
-    // Allow GlobalReminderService to re-fire the in-app screen at snooze time
     GlobalReminderService.unmarkAlarm(`alarm-${eventId}`);
 
-    // Schedule the in-app alarm screen to re-appear at snooze time
     if (snoozeTimerRef.current) clearTimeout(snoozeTimerRef.current);
     snoozeTimerRef.current = setTimeout(() => {
       if (event) triggerAlarm(event);
@@ -77,10 +88,23 @@ export function AlarmProvider({ children }: { children: React.ReactNode }) {
     };
   }, [triggerAlarm]);
 
-  // Bidirectional sync: poll getActiveAlarmUid() while alarm screen is visible.
-  // When the user taps "Hagarika" or "Rindira 5 min" on the notification panel,
-  // the native AlarmService stops and getActiveAlarmUid() returns null — we
-  // detect this here and close the alarm screen to match.
+  // Check on mount — handles cold-start while alarm is already ringing
+  useEffect(() => {
+    checkAndRestoreActiveAlarm();
+  }, [checkAndRestoreActiveAlarm]);
+
+  // Check every time app comes to foreground — if native alarm is ringing,
+  // block the UI immediately regardless of what screen the user was on.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') checkAndRestoreActiveAlarm();
+    });
+    return () => sub.remove();
+  }, [checkAndRestoreActiveAlarm]);
+
+  // Bidirectional sync: while alarm screen is visible, poll getActiveAlarmUid().
+  // When it returns null the user dismissed/snoozed via the notification panel —
+  // close the screen to match.
   useEffect(() => {
     if (!activeAlarm) return;
 
@@ -93,15 +117,13 @@ export function AlarmProvider({ children }: { children: React.ReactNode }) {
       if (cancelled) return;
 
       if (!uid) {
-        // Native alarm stopped (dismissed or snoozed via notification panel)
         setActiveAlarm(null);
         return;
       }
-      // Keep polling
       timer = setTimeout(poll, 1500);
     };
 
-    // Give the AlarmService a moment to fully initialise before first poll
+    // Give AlarmService a moment to fully initialise before first poll
     timer = setTimeout(poll, 800);
 
     return () => {

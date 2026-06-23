@@ -3,8 +3,12 @@ import AppError from "../utils/error";
 import { TCertificateResponse } from "../utils/interfaces/common";
 import { Prisma } from "@prisma/client";
 import { v2 as cloudinary } from "cloudinary";
-import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
+import { PDFDocument, PDFFont, rgb, StandardFonts } from "pdf-lib";
 import * as fs from "fs";
+import { v4 as uuidv4 } from "uuid";
+import axios from "axios";
+import QRCode from "qrcode";
+import sharp from "sharp";
 import { NotificationHelper } from "../utils/notificationHelper";
 
 export class CertificateService {
@@ -296,80 +300,435 @@ export class CertificateService {
   }
 
 
+  // ── Template-based certificate generation ─────────────────────────────────
+
+  // PDF page size (points at 72 dpi — standard US Letter landscape)
+  private static readonly CANVAS_W = 792;
+  private static readonly CANVAS_H = 612;
+  // Editor canvas size (pixels at 96 dpi — must match CANVAS_WIDTH/CANVAS_HEIGHT in CertificateDesignEditor.tsx)
+  private static readonly EDITOR_W = 1056;
+  private static readonly EDITOR_H = 816;
+
+  private static readonly TOKEN_KEY_MAP: Record<string, string> = {
+    "cert-code":       "{{certificateCode}}",
+    "date":            "{{currentDate}}",
+    "course-name":     "{{courseName}}",
+    "details":         "{{courseDetails}}",
+    "progress":        "{{progress}}",
+    "duration":        "{{courseDuration}}",
+    "start-date":      "{{startDate}}",
+    "end-date":        "{{endDate}}",
+    "student-name":    "{{studentName}}",
+    "student-code":    "{{studentCode}}",
+    "instructor-name": "{{instructorName}}",
+  };
+
+  // Fallback: match by display-label text for templates saved before tokenKey was persisted
+  private static readonly TEXT_LABEL_MAP: Record<string, string> = {
+    "Certificate Code":  "{{certificateCode}}",
+    "Current Date":      "{{currentDate}}",
+    "-Course name-":     "{{courseName}}",
+    "-Details-":         "{{courseDetails}}",
+    "-Progress-":        "{{progress}}",
+    "-Duration-":        "{{courseDuration}}",
+    "-Start Date-":      "{{startDate}}",
+    "-End Date-":        "{{endDate}}",
+    "-Student name-":    "{{studentName}}",
+    "-Student code-":    "{{studentCode}}",
+    "-Instructor name-": "{{instructorName}}",
+  };
+
+  private static hexToRgb(hex: string): { r: number; g: number; b: number } {
+    const clean  = hex.replace("#", "");
+    const full   = clean.length === 3
+      ? clean.split("").map((c) => c + c).join("")
+      : clean;
+    return {
+      r: parseInt(full.slice(0, 2), 16) / 255,
+      g: parseInt(full.slice(2, 4), 16) / 255,
+      b: parseInt(full.slice(4, 6), 16) / 255,
+    };
+  }
+
+  private static async getPdfFont(
+    pdfDoc: PDFDocument,
+    fontFamily = "",
+    fontWeight = "normal",
+    fontStyle  = "normal",
+  ): Promise<PDFFont> {
+    const serif  = /times|georgia|serif/i.test(fontFamily);
+    const mono   = /courier|mono|consolas/i.test(fontFamily);
+    const bold   = fontWeight === "bold" || Number(fontWeight) >= 700;
+    const italic = fontStyle === "italic" || fontStyle === "oblique";
+    if (mono) {
+      if (bold && italic) return pdfDoc.embedFont(StandardFonts.CourierBoldOblique);
+      if (bold)           return pdfDoc.embedFont(StandardFonts.CourierBold);
+      if (italic)         return pdfDoc.embedFont(StandardFonts.CourierOblique);
+      return pdfDoc.embedFont(StandardFonts.Courier);
+    }
+    if (serif) {
+      if (bold && italic) return pdfDoc.embedFont(StandardFonts.TimesRomanBoldItalic);
+      if (bold)           return pdfDoc.embedFont(StandardFonts.TimesRomanBold);
+      if (italic)         return pdfDoc.embedFont(StandardFonts.TimesRomanItalic);
+      return pdfDoc.embedFont(StandardFonts.TimesRoman);
+    }
+    if (bold && italic) return pdfDoc.embedFont(StandardFonts.HelveticaBoldOblique);
+    if (bold)           return pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    if (italic)         return pdfDoc.embedFont(StandardFonts.HelveticaOblique);
+    return pdfDoc.embedFont(StandardFonts.Helvetica);
+  }
+
+  private static parseColor(fill: unknown): { r: number; g: number; b: number } {
+    if (typeof fill === "string" && fill.startsWith("#")) return this.hexToRgb(fill);
+    return { r: 0, g: 0, b: 0 };
+  }
+
+  private static async generateCertificateFromTemplate(
+    canvasJson: Record<string, unknown>,
+    tokenValues: Record<string, string>,
+    certId: string,
+  ): Promise<Buffer> {
+    const W = this.CANVAS_W;
+    const H = this.CANVAS_H;
+    // Scale factor: convert editor canvas pixels (1056×816) → PDF points (792×612)
+    const xRatio = W / this.EDITOR_W;
+    const yRatio = H / this.EDITOR_H;
+
+    // Clone and replace tokens in text objects
+    const json = JSON.parse(JSON.stringify(canvasJson)) as {
+      objects: Record<string, unknown>[];
+      background?: string;
+      backgroundImage?: Record<string, unknown>;
+    };
+
+    for (const obj of json.objects ?? []) {
+      const token    = obj.token    as string | undefined;
+      const tokenKey = obj.tokenKey as string | undefined;
+      const objText  = obj.text     as string | undefined;
+      const value =
+        (token    ? tokenValues[token]                                         : undefined) ??
+        (tokenKey ? tokenValues[this.TOKEN_KEY_MAP[tokenKey] ?? ""]            : undefined) ??
+        (objText  ? tokenValues[this.TEXT_LABEL_MAP[objText] ?? ""]            : undefined);
+      if (value !== undefined) {
+        obj.text      = value;
+        obj.fontStyle = "normal";
+      }
+    }
+
+    const pdfDoc = await PDFDocument.create();
+    const page   = pdfDoc.addPage([W, H]);
+
+    // Background colour
+    const bgColor = (json.background ?? "#ffffff").toString();
+    if (bgColor && bgColor !== "#ffffff" && bgColor.startsWith("#")) {
+      const { r, g, b } = this.hexToRgb(bgColor);
+      page.drawRectangle({ x: 0, y: 0, width: W, height: H, color: rgb(r, g, b) });
+    }
+
+    // Background image (set via the background image picker in the editor)
+    if (json.backgroundImage) {
+      const bgImg = json.backgroundImage;
+      const src = (bgImg.src as string) ?? "";
+      if (src) {
+        try {
+          let imgBytes: Buffer;
+          if (src.startsWith("data:")) {
+            imgBytes = Buffer.from(src.split(",")[1], "base64");
+          } else {
+            const resp = await axios.get<ArrayBuffer>(src, { responseType: "arraybuffer", timeout: 8000 });
+            imgBytes = Buffer.from(resp.data);
+          }
+
+          // Detect MIME from data URL prefix
+          let mimeType = "";
+          if (src.startsWith("data:")) {
+            const m = src.match(/^data:([^;]+);/);
+            mimeType = m?.[1] ?? "";
+          } else {
+            if (/\.png(\?|$)/i.test(src))   mimeType = "image/png";
+            if (/\.jpe?g(\?|$)/i.test(src)) mimeType = "image/jpeg";
+          }
+
+          // Convert unsupported formats (WebP, AVIF, GIF…) via sharp, same as object images
+          let finalBytes = imgBytes;
+          let finalMime  = mimeType;
+          if (mimeType !== "image/png" && mimeType !== "image/jpeg" && mimeType !== "image/jpg") {
+            finalBytes = await sharp(imgBytes).png().toBuffer();
+            finalMime  = "image/png";
+          }
+
+          const embedded = finalMime === "image/png"
+            ? await pdfDoc.embedPng(finalBytes)
+            : await pdfDoc.embedJpg(finalBytes);
+          page.drawImage(embedded, { x: 0, y: 0, width: W, height: H });
+        } catch (bgErr) {
+          console.error("[CertificateService] Background image failed to embed:", bgErr);
+        }
+      }
+    }
+
+    for (const obj of json.objects ?? []) {
+      const type    = ((obj.type    as string) ?? "").toLowerCase();
+      // Scale canvas pixel coordinates → PDF points
+      const left    = ((obj.left    as number) ?? 0) * xRatio;
+      const top     = ((obj.top     as number) ?? 0) * yRatio;
+      const scaleX  = (obj.scaleX  as number) ?? 1;
+      const scaleY  = (obj.scaleY  as number) ?? 1;
+      const opacity = (obj.opacity as number) ?? 1;
+      const angle   = (obj.angle   as number) ?? 0;
+
+      // Skip rotated objects — coordinate maths become complex
+      if (Math.abs(angle) > 1) continue;
+
+      // QR code placeholder: any object with tokenKey "qr" → render real QR image
+      const objTokenKey = obj.tokenKey as string | undefined;
+      if (objTokenKey === "qr") {
+        const verifyUrl = `${process.env.WEB_APP_URL ?? "http://localhost:4173"}/verify/${certId}`;
+        const w = ((obj.width  as number) ?? 120) * scaleX * xRatio;
+        const h = ((obj.height as number) ?? 120) * scaleY * yRatio;
+        try {
+          const qrPng = await QRCode.toBuffer(verifyUrl, {
+            type: "png",
+            width: Math.round(Math.max(w, h) * 2),
+            margin: 1,
+            color: { dark: "#000000", light: "#ffffff" },
+          });
+          const qrImage = await pdfDoc.embedPng(qrPng);
+          page.drawImage(qrImage, { x: left, y: H - top - h, width: w, height: h, opacity });
+        } catch {
+          // fallback: plain grey square
+          page.drawRectangle({ x: left, y: H - top - h, width: w, height: h, color: rgb(0.9, 0.9, 0.9), opacity });
+        }
+        continue;
+      }
+
+      if (type === "rect") {
+        const w   = ((obj.width  as number) ?? 100) * scaleX * xRatio;
+        const h   = ((obj.height as number) ?? 100) * scaleY * yRatio;
+        const { r, g, b } = this.parseColor(obj.fill);
+        page.drawRectangle({
+          x: left, y: H - top - h,
+          width: w, height: h,
+          color: rgb(r, g, b),
+          opacity,
+        });
+        // stroke
+        if (obj.stroke && typeof obj.stroke === "string" && obj.stroke !== "") {
+          const sw = ((obj.strokeWidth as number) ?? 1) * yRatio;
+          const sc = this.parseColor(obj.stroke);
+          page.drawRectangle({
+            x: left, y: H - top - h,
+            width: w, height: h,
+            borderColor: rgb(sc.r, sc.g, sc.b),
+            borderWidth: sw,
+            opacity,
+          });
+        }
+      } else if (type === "i-text" || type === "itext" || type === "textbox" || type === "text") {
+        const text       = (obj.text       as string)  ?? "";
+        const fontSize   = ((obj.fontSize  as number)  ?? 16) * scaleY * yRatio;
+        const fontFamily =  (obj.fontFamily as string) ?? "";
+        const fontWeight =  (obj.fontWeight as string) ?? "normal";
+        const fontStyle  =  (obj.fontStyle  as string) ?? "normal";
+        const textAlign  =  (obj.textAlign  as string) ?? "left";
+        const { r, g, b } = this.parseColor(obj.fill);
+
+        if (!text) continue;
+
+        const font = await this.getPdfFont(pdfDoc, fontFamily, fontWeight, fontStyle);
+        const objW = ((obj.width as number) ?? 0) * scaleX * xRatio;
+
+        // Center point of the stored bounding box
+        const boxCenterX = left + objW / 2;
+
+        let tw = font.widthOfTextAtSize(text, fontSize);
+        let finalFontSize = fontSize;
+
+        // Scale font down if text overflows page bounds
+        const pageMargin = 8;
+        if (textAlign === "center") {
+          const half = tw / 2;
+          const maxHalf = Math.min(boxCenterX - pageMargin, W - boxCenterX - pageMargin);
+          if (half > maxHalf && maxHalf > 0) {
+            finalFontSize = fontSize * (maxHalf / half) * 0.95;
+            tw = font.widthOfTextAtSize(text, finalFontSize);
+          }
+        } else {
+          const maxW = W - left - pageMargin;
+          if (tw > maxW && maxW > 0) {
+            finalFontSize = fontSize * (maxW / tw) * 0.95;
+            tw = font.widthOfTextAtSize(text, finalFontSize);
+          }
+        }
+
+        // Compute draw-x based on alignment
+        let drawX: number;
+        if (textAlign === "center") {
+          drawX = boxCenterX - tw / 2;
+        } else if (textAlign === "right" && objW > 0) {
+          drawX = left + objW - tw;
+        } else {
+          drawX = left;
+        }
+        drawX = Math.max(pageMargin, drawX);
+
+        const drawY = H - top - finalFontSize * 0.85;
+
+        page.drawText(text, {
+          x: drawX, y: drawY,
+          size: finalFontSize, font,
+          color: rgb(r, g, b),
+          opacity,
+        });
+      } else if (type === "image") {
+        const src = (obj.src as string) ?? "";
+        if (!src) continue;
+        try {
+          const w = ((obj.width  as number) ?? 100) * scaleX * xRatio;
+          const h = ((obj.height as number) ?? 100) * scaleY * yRatio;
+          let imgBytes: Buffer;
+          if (src.startsWith("data:")) {
+            const base64 = src.split(",")[1];
+            imgBytes = Buffer.from(base64, "base64");
+          } else {
+            const resp = await axios.get<ArrayBuffer>(src, { responseType: "arraybuffer", timeout: 8000 });
+            imgBytes   = Buffer.from(resp.data);
+          }
+
+          // Detect MIME type from data URL prefix; fall back to extension hints
+          let mimeType = "";
+          if (src.startsWith("data:")) {
+            const m = src.match(/^data:([^;]+);/);
+            mimeType = m?.[1] ?? "";
+          } else {
+            if (/\.png(\?|$)/i.test(src))  mimeType = "image/png";
+            if (/\.jpe?g(\?|$)/i.test(src)) mimeType = "image/jpeg";
+          }
+
+          // Convert unsupported formats (WebP, AVIF, GIF…) to PNG via sharp
+          let finalBytes = imgBytes;
+          let finalMime  = mimeType;
+          if (mimeType !== "image/png" && mimeType !== "image/jpeg" && mimeType !== "image/jpg") {
+            try {
+              finalBytes = await sharp(imgBytes).png().toBuffer();
+              finalMime  = "image/png";
+            } catch (convErr) {
+              console.error(`[CertificateService] sharp could not convert MIME "${mimeType}":`, convErr);
+              page.drawRectangle({ x: left, y: H - top - h, width: w, height: h, color: rgb(0.85, 0.85, 0.85), opacity });
+              continue;
+            }
+          }
+
+          let embedded;
+          try {
+            embedded = finalMime === "image/png"
+              ? await pdfDoc.embedPng(finalBytes)
+              : await pdfDoc.embedJpg(finalBytes);
+          } catch (embedErr) {
+            console.error(`[CertificateService] Cannot embed image (MIME "${finalMime}"):`, embedErr);
+            page.drawRectangle({ x: left, y: H - top - h, width: w, height: h, color: rgb(0.85, 0.85, 0.85), opacity });
+            continue;
+          }
+          page.drawImage(embedded, { x: left, y: H - top - h, width: w, height: h, opacity });
+        } catch (fetchErr) {
+          console.error(`[CertificateService] Failed to fetch/decode image:`, fetchErr);
+        }
+      }
+    }
+
+    return Buffer.from(await pdfDoc.save());
+  }
+
   public static async generateCertificate(studentId: string, courseId: string, io?: any) {
     // Validate student
     const student = await prisma.student.findUnique({
       where: { id: studentId },
       include: {
         user: {
-          select: {
-            id: true,
-            fullNames: true,
-          },
+          select: { id: true, fullNames: true },
         },
       },
     });
+    if (!student) throw new AppError("Student not found", 404);
 
-    if (!student) {
-      throw new AppError("Student not found", 404);
-    }
-
-    // Validate course
+    // Validate course (include linked template + instructor)
     const course = await prisma.course.findUnique({
       where: { id: courseId },
       select: {
         title: true,
+        description: true,
+        certificateTemplate: { select: { canvasJson: true } },
+        staff: { select: { user: { select: { fullNames: true } } } },
       },
     });
-
-    if (!course) {
-      throw new AppError("Course not found", 404);
-    }
+    if (!course) throw new AppError("Course not found", 404);
 
     // Check if certificate already exists
     const existingCertificate = await prisma.certificate.findUnique({
-      where: {
-        studentId_courseId: {
-          studentId,
-          courseId,
-        },
-      },
+      where: { studentId_courseId: { studentId, courseId } },
+    });
+    if (existingCertificate) {
+      throw new AppError("Certificate already exists for this student and course", 400);
+    }
+
+    // Completion date = first time student passed the final exam
+    const completionDate = await this.getFirstFinalExamPassDate(studentId, courseId);
+
+    // Enrollment date
+    const courseProgress = await prisma.courseProgress.findFirst({
+      where: { studentId, courseId },
+      select: { createdAt: true, progress: true },
     });
 
-    if (existingCertificate) {
-      throw new AppError(
-        "Certificate already exists for this student and course",
-        400,
+    // Pre-generate certificate ID so it can be embedded in the template as {{certificateCode}}
+    const certId = uuidv4();
+
+    let pdfBuffer: Buffer;
+
+    if (course.certificateTemplate?.canvasJson) {
+      // Template-based generation
+      // Human-readable display code (e.g. CHW-2026-A3F9C1) — shorter than the raw UUID
+      const certYear        = new Date().getFullYear();
+      const certShort       = certId.replace(/-/g, "").substring(0, 6).toUpperCase();
+      const certDisplayCode = `CHW-${certYear}-${certShort}`;
+
+      const tokenValues: Record<string, string> = {
+        "{{studentName}}":     student.user.fullNames,
+        "{{certificateCode}}": certDisplayCode,
+        "{{currentDate}}":     this.formatDateToKinyarwanda(new Date()),
+        "{{courseName}}":      course.title,
+        "{{courseDetails}}":   course.description ?? "",
+        "{{progress}}":        `${Math.round(courseProgress?.progress ?? 100)}%`,
+        "{{startDate}}":       courseProgress ? this.formatDateToKinyarwanda(courseProgress.createdAt) : "",
+        "{{endDate}}":         this.formatDateToKinyarwanda(completionDate),
+        "{{studentCode}}":     studentId.slice(0, 8).toUpperCase(),
+        "{{instructorName}}":  course.staff?.user?.fullNames ?? "",
+        "{{courseDuration}}":  "",
+      };
+      pdfBuffer = await this.generateCertificateFromTemplate(
+        course.certificateTemplate.canvasJson as Record<string, unknown>,
+        tokenValues,
+        certId,
+      );
+    } else {
+      // Fall back to static PDF template
+      pdfBuffer = await this.generateCertificatePDF(
+        student.user.fullNames,
+        course.title,
+        this.formatDateToKinyarwanda(completionDate),
       );
     }
 
-    // Get first time final exam pass date
-    const completionDate = await this.getFirstFinalExamPassDate(
-      studentId,
-      courseId,
-    );
-
-    // Generate PDF certificate
-    const pdfBuffer = await this.generateCertificatePDF(
-      student.user.fullNames,
-      course.title,
-      this.formatDateToKinyarwanda(completionDate),
-    );
-
     // Upload PDF to Cloudinary
     const fileName = `certificate_${studentId}_${courseId}_${Date.now()}`;
-    const pdfUrl = await this.uploadPdfToCloudinary(pdfBuffer, fileName);
+    const pdfUrl   = await this.uploadPdfToCloudinary(pdfBuffer, fileName);
 
-    // Save certificate to database
+    // Save certificate to database using the pre-generated ID
     const certificate = await prisma.certificate.create({
-      data: {
-        studentId,
-        courseId,
-        pdf: pdfUrl,
-      },
+      data: { id: certId, studentId, courseId, pdf: pdfUrl },
     });
 
-    // ── Notify student that their certificate is ready ─────────────────────
+    // Notify student
     if (io && student.user.id) {
       try {
         await NotificationHelper.sendToUser(
@@ -382,7 +741,7 @@ export class CertificateService {
           "certificate",
           certificate.id,
           { courseTitle: course.title, courseId },
-          0, // no cooldown — certificate is issued once
+          0,
         );
       } catch (notifErr) {
         console.warn("[CertificateService] Certificate notification failed:", notifErr);
@@ -746,6 +1105,33 @@ export class CertificateService {
       message: string;
       statusCode: number;
       data: TCertificateResponse;
+    };
+  }
+
+  public static async verifyCertificate(code: string) {
+    const certificate = await prisma.certificate.findUnique({
+      where: { id: code },
+      select: {
+        id: true,
+        createdAt: true,
+        student: {
+          select: { user: { select: { fullNames: true } } },
+        },
+        course: {
+          select: { title: true },
+        },
+      },
+    });
+    if (!certificate) throw new AppError("Certificate not found", 404);
+    return {
+      statusCode: 200,
+      message: "Certificate verified successfully",
+      data: {
+        id: certificate.id,
+        recipientName: certificate.student.user.fullNames,
+        courseName: certificate.course.title,
+        issuedAt: certificate.createdAt,
+      },
     };
   }
 

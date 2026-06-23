@@ -154,7 +154,7 @@ const Table: FC<TableProps> = ({
                 value={searchText}
                 onChange={(e) => handleTableSearch(e.target.value)}
                 className='block w-full rounded-lg border-0 py-2 pl-9 text-gray-900 ring-1 ring-inset ring-gray-200 placeholder:text-gray-400 focus:ring-1 focus:ring-inset focus:ring-[#3363AD] sm:text-sm sm:leading-6'
-                placeholder='Search students...'
+                placeholder='Search CHWs...'
               />
             </div>
           )}

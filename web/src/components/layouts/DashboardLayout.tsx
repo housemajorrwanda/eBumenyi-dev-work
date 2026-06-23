@@ -16,9 +16,7 @@ import {
   BarChart3,
   Calendar,
   GraduationCap,
-  HelpCircle,
   Building2,
-  Mail,
   Megaphone,
   MessageCircle,
   MessageSquare,
@@ -412,7 +410,7 @@ const DashboardLayout = ({
           icon: <BarChart2 className='w-4 h-4' />,
         },
         {
-          label: "Student",
+          label: "CHW",
           path: "/analytics/student",
           icon: <Users className='w-4 h-4' />,
         },
@@ -447,28 +445,16 @@ const DashboardLayout = ({
       roles: ["TRAINEE", "CHO"],
     },
     {
-      label: "Invitations",
-      icon: <Mail className='w-4 h-4' />,
-      path: "/my-invitations",
-      roles: ["TRAINEE"],
-    },
-    {
       label: "My Group",
       icon: <UsersRound className='w-4 h-4' />,
       path: "/cho-group",
       roles: ["CHO"],
     },
     {
-      label: "CHW",
+      label: "CHW & CHO",
       icon: <Users className='w-4 h-4' />,
       path: "/students",
-      roles: ["ADMIN","DEVELOPER" ,"TRAINER", "STAFF"],
-    },
-    {
-      label: "CHO",
-      icon: <UsersRound className='w-4 h-4' />,
-      path: "/admin/cho-groups",
-      roles: ["ADMIN", "STAFF"],
+      roles: ["ADMIN", "DEVELOPER", "TRAINER", "STAFF"],
     },
     {
       label: "My Certificates",
@@ -499,8 +485,7 @@ const DashboardLayout = ({
       label: "Messaging",
       icon: <MessageSquare className='w-4 h-4' />,
       path: "/messaging",
-      roles: ["ADMIN", "TRAINER", "TRAINEE", "DEVELOPER", "CHO"],
-      industries: ["SFH", "WELTEL", "RBC"],
+      roles: ["ADMIN", "TRAINER", "TRAINEE", "DEVELOPER", "CHO", "STAFF"],
     },
     {
       label: "Announcement",
@@ -510,13 +495,7 @@ const DashboardLayout = ({
     },
 
     {
-      label: "Help",
-      path: "/help",
-      roles: ["ADMIN", "TRAINER", "TRAINEE", "DEVELOPER", "CHO"],
-      icon: <HelpCircle className='w-5 h-5' />,
-    },
-    {
-      label: "Settings",
+      label: "My Settings",
       path: "/settings",
       roles: ["ADMIN", "TRAINER", "TRAINEE", "DEVELOPER", "CHO"],
       icon: <Cog8ToothIcon className='w-5 h-5' />,

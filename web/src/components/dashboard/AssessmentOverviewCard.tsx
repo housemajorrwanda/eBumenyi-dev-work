@@ -122,7 +122,7 @@ export const AssessmentOverviewCard: React.FC<AssessmentOverviewCardProps> = ({
         : 0,
       barColor: "rgba(51, 99, 173, 0.7)",
       subLabel: totalStudents > 0
-        ? `${Math.round((preTest / totalStudents) * 100)}% of students`
+        ? `${Math.round((preTest / totalStudents) * 100)}% of CHWs`
         : undefined,
     },
     {

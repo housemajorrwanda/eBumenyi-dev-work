@@ -69,7 +69,7 @@ function StudentTable({
   if (rows.length === 0) {
     return (
       <p className="text-xs text-gray-500 py-3 text-center">
-        No students flagged yet.
+        No CHWs flagged yet.
       </p>
     );
   }
@@ -79,7 +79,7 @@ function StudentTable({
       <table className="w-full text-left text-xs">
         <thead>
           <tr className="text-gray-500 border-b border-gray-100">
-            <th className="pb-2 font-medium">Student</th>
+            <th className="pb-2 font-medium">CHW</th>
             <th className="pb-2 font-medium text-right">Chapters</th>
             <th className="pb-2 font-medium text-right hidden sm:table-cell">Courses</th>
             <th className="pb-2 font-medium text-right"> </th>

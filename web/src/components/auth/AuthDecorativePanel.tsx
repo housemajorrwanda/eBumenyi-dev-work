@@ -30,7 +30,7 @@ export const AuthDecorativePanel: React.FC = () => {
   }, []);
 
   return (
-    <div className="w-[46%] flex-shrink-0 p-3 self-stretch">
+    <div className="hidden lg:block w-[46%] flex-shrink-0 p-3 self-stretch">
       <div className="relative w-full h-full rounded-2xl overflow-hidden flex flex-col">
 
         {/* Photos — pure CSS crossfade via opacity transition */}

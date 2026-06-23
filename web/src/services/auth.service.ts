@@ -47,14 +47,14 @@ export const signup = async (data: ISignup): Promise<IResponse<User>> => {
 };
 
 export const forgotPassword = async (email: string): Promise<IResponse<null>> => {
-  return (await api.post("/auth/forgot-password", { email })).data;
+  return (await api.post("/auth/request-password-reset", { email })).data;
 };
 
 export const resetPassword = async (
   token: string,
   password: string
 ): Promise<IResponse<null>> => {
-  return (await api.post("/auth/reset-password", { token, password })).data;
+  return (await api.post("/auth/reset-password", { token, newPassword: password })).data;
 };
 
 export const logout = async (): Promise<void> => {

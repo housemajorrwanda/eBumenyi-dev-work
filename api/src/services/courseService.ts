@@ -1006,6 +1006,7 @@ export class CourseService {
   public static async createSuperCourse(
     data: CreateSuperCourseDto,
     creatorId: string,
+    io?: any,
   ) {
     // ensure creator (staff) exists
     const staff = await prisma.staff.findUnique({
@@ -1055,6 +1056,15 @@ export class CourseService {
         timeout: CourseService.TRANSACTION_TIMEOUT, // 2 minutes
       },
     );
+    if (io) {
+      CourseService.notifyTraineesAboutCourse(
+        result.course.id,
+        result.course.title,
+        "created",
+        io,
+      ).catch(console.warn);
+    }
+
     return {
       message: "Super course created successfully",
       statusCode: 201,
@@ -1637,6 +1647,7 @@ export class CourseService {
   public static async updateSuperCourse(
     data: UpdateSuperCourseDto,
     creatorId: string,
+    io?: any,
   ) {
     // Ensure creator (staff) exists
     const staff = await prisma.staff.findUnique({
@@ -1691,6 +1702,15 @@ export class CourseService {
         timeout: CourseService.TRANSACTION_TIMEOUT, // 2 minutes
       },
     );
+    if (io) {
+      CourseService.notifyTraineesAboutCourse(
+        data.courseId,
+        result.course.title,
+        "updated",
+        io,
+      ).catch(console.warn);
+    }
+
     return {
       message: "Super course updated successfully",
       statusCode: 200,

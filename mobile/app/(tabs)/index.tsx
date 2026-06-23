@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Modal, Alert, RefreshControl } from 'react-native';
 import Header from '@/components/Header';
 import StatsCard from '@/components/StatsCard';
-import { useRouter } from 'expo-router';
-import { Trophy, BookOpen, Book, Clock, MessageCircle, Users, BarChart2, Bell } from 'lucide-react-native';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { Trophy, BookOpen, Book, Clock, MessageCircle, Bell } from 'lucide-react-native';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { getStudentCourseStats } from '@/services/course.api';
-import { getMyGroup, getMyInvitations } from '@/services/choGroup.api';
+import { getMyInvitations } from '@/services/choGroup.api';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { IStudentCourse, CreateSystemReviewDto } from '@/types';
 import { formatDate } from '@/utils/format';
@@ -48,16 +48,7 @@ export default function HomeScreen() {
     });
   }, []);
 
-  const isCHO = userRoles.includes('CHO');
   const isCHW = userRoles.some((r) => ['TRAINEE', 'TESTER'].includes(r));
-
-  // CHO: fetch own group summary (only when CHO role confirmed)
-  const { data: choGroup } = useQuery({
-    queryKey: ['cho-group-mine'],
-    queryFn: getMyGroup,
-    enabled: isCHO && !isValidatingToken,
-    retry: false,
-  });
 
   // CHW: fetch pending invitations count
   const { data: pendingInvitations = [] } = useQuery({
@@ -156,6 +147,15 @@ export default function HomeScreen() {
     gcTime: 0,
     enabled: !isValidatingToken,
   });
+
+  // Refresh course stats whenever the tab comes into focus (e.g. returning from a course)
+  useFocusEffect(
+    useCallback(() => {
+      if (!isValidatingToken) {
+        queryClient.invalidateQueries({ queryKey: ['COURSE'] });
+      }
+    }, [isValidatingToken, queryClient])
+  );
 
   // Handle pull-to-refresh
   const handleRefresh = async () => {
@@ -329,58 +329,6 @@ export default function HomeScreen() {
             </View>
             <Text style={styles.invitationBannerArrow}>›</Text>
           </TouchableOpacity>
-        )}
-
-        {/* CHO: Group Dashboard Section */}
-        {isCHO && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Itsinda ryanjye</Text>
-            {choGroup ? (
-              <View style={styles.choGroupCard}>
-                <View style={styles.choGroupHeader}>
-                  <View style={[styles.choGroupIconWrapper]}>
-                    <Users size={22} color="#4D81D2" />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.choGroupName}>{choGroup.name}</Text>
-                    {choGroup.sector && (
-                      <Text style={styles.choGroupSector}>{choGroup.sector}</Text>
-                    )}
-                    <Text style={styles.choGroupMembers}>
-                      {choGroup._count?.members ?? 0} abagize itsinda
-                    </Text>
-                  </View>
-                </View>
-                <View style={styles.choGroupActions}>
-                  <TouchableOpacity
-                    style={[styles.choGroupBtn, { backgroundColor: '#4D81D2' }]}
-                    onPress={() => router.push('/cho-group')}
-                    activeOpacity={0.8}
-                  >
-                    <Users size={14} color="#ffffff" />
-                    <Text style={styles.choGroupBtnText}>Itsinda</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.choGroupBtn, { backgroundColor: '#D97706' }]}
-                    onPress={() => router.push('/cho-group/monitoring')}
-                    activeOpacity={0.8}
-                  >
-                    <BarChart2 size={14} color="#ffffff" />
-                    <Text style={styles.choGroupBtnText}>Gukurikirana</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ) : (
-              <TouchableOpacity
-                style={styles.choGroupEmpty}
-                onPress={() => router.push('/cho-group')}
-                activeOpacity={0.8}
-              >
-                <Users size={24} color="#9ca3af" />
-                <Text style={styles.choGroupEmptyText}>Nta tsinda ubuze. Vugana na Administrateur.</Text>
-              </TouchableOpacity>
-            )}
-          </View>
         )}
 
         {/* Quick Actions */}
@@ -1407,81 +1355,5 @@ const styles = StyleSheet.create({
     fontSize: 22,
     color: '#D97706',
     fontWeight: '600',
-  },
-  // CHO group card
-  choGroupCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 14,
-    padding: 14,
-    borderWidth: 0.5,
-    borderColor: '#4D81D2',
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 3,
-  },
-  choGroupHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 12,
-  },
-  choGroupIconWrapper: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#EFF1F8',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  choGroupName: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#1f2937',
-    marginBottom: 1,
-  },
-  choGroupSector: {
-    fontSize: 11,
-    color: '#6b7280',
-    marginBottom: 1,
-  },
-  choGroupMembers: {
-    fontSize: 12,
-    color: '#4D81D2',
-    fontWeight: '500',
-  },
-  choGroupActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  choGroupBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 8,
-    borderRadius: 10,
-  },
-  choGroupBtnText: {
-    color: '#ffffff',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  choGroupEmpty: {
-    backgroundColor: '#f9fafb',
-    borderRadius: 12,
-    padding: 20,
-    alignItems: 'center',
-    gap: 8,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderStyle: 'dashed',
-  },
-  choGroupEmptyText: {
-    fontSize: 12,
-    color: '#9ca3af',
-    textAlign: 'center',
   },
 });

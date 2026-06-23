@@ -941,6 +941,8 @@ export interface IStudent {
   phoneNumber: string;
   district: string;
   sector: string;
+  cell: string;
+  village: string;
   courses: string[];
   progress: string;
   createdAt: string;
@@ -1303,7 +1305,20 @@ export interface CreateAnnouncementDto {
   title: string;
   body: string;
   segment: string; // role name or 'all'
+  category?: string;
   publishAt?: string;
+  validUntil?: string | null;
+  priority?: "high" | "medium" | "low";
+  status?: "draft" | "published";
+}
+
+export interface UpdateAnnouncementDto {
+  title?: string;
+  body?: string;
+  segment?: string;
+  category?: string;
+  publishAt?: string;
+  /** @isString */
   validUntil?: string | null;
   priority?: "high" | "medium" | "low";
   status?: "draft" | "published";
@@ -1314,6 +1329,7 @@ export interface AnnouncementResponse {
   title: string;
   body: string;
   segment: string;
+  category: string;
   priority?: string;
   status?: string;
   publishAt: string;
