@@ -74,7 +74,7 @@ export const StudentAnalytics: React.FC = () => {
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#3363AD] mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading student analytics...</p>
+          <p className="mt-4 text-gray-600">Loading CHW analytics...</p>
         </div>
       </div>
     );
@@ -83,15 +83,15 @@ export const StudentAnalytics: React.FC = () => {
   return (
     <div className="space-y-6">
       <div className="mb-6">
-        <h1 className="text-xl font-bold text-gray-900 mb-1">Student Analytics</h1>
-        <p className="text-xs text-gray-600">Track student progress, performance, and engagement metrics</p>
+        <h1 className="text-xl font-bold text-gray-900 mb-1">CHW Analytics</h1>
+        <p className="text-xs text-gray-600">Track CHW progress, performance, and engagement metrics</p>
       </div>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div className="bg-white rounded-lg shadow p-4">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-medium text-gray-600">Total chw</span>
+            <span className="text-xs font-medium text-gray-600">Total CHWs</span>
             <div className="w-9 h-9 rounded-lg bg-[#3363AD]/10 flex items-center justify-center">
               <Users className="w-4 h-4 text-[#3363AD]" />
             </div>
@@ -102,7 +102,7 @@ export const StudentAnalytics: React.FC = () => {
 
         <div className="bg-white rounded-lg shadow p-4">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-medium text-gray-600">Active Students</span>
+            <span className="text-xs font-medium text-gray-600">Active CHWs</span>
             <div className="w-9 h-9 rounded-lg bg-[#3363AD]/10 flex items-center justify-center">
               <TrendingUp className="w-4 h-4 text-[#3363AD]" />
             </div>
@@ -145,7 +145,7 @@ export const StudentAnalytics: React.FC = () => {
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
         <div className="bg-white rounded-lg shadow p-4">
-          <h3 className="text-sm font-semibold text-gray-900 mb-3">Student Engagement Trends</h3>
+          <h3 className="text-sm font-semibold text-gray-900 mb-3">CHW Engagement Trends</h3>
           {analytics?.engagementTrends && analytics.engagementTrends.length > 0 ? (
             <div className="h-56">
               {(() => {
@@ -300,12 +300,12 @@ export const StudentAnalytics: React.FC = () => {
 
       {/* Recent Activity */}
       <div className="bg-white rounded-lg shadow p-4">
-        <h3 className="text-sm font-semibold text-gray-900 mb-3">Recent Student Activity</h3>
+        <h3 className="text-sm font-semibold text-gray-900 mb-3">Recent CHW Activity</h3>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-200">
-                <th className="text-left py-2 px-3 text-[10px] font-semibold text-gray-700 uppercase tracking-wide">Student Name</th>
+                <th className="text-left py-2 px-3 text-[10px] font-semibold text-gray-700 uppercase tracking-wide">CHW Name</th>
                 <th className="text-left py-2 px-3 text-[10px] font-semibold text-gray-700 uppercase tracking-wide">Course</th>
                 <th className="text-left py-2 px-3 text-[10px] font-semibold text-gray-700 uppercase tracking-wide">Progress</th>
                 <th className="text-left py-2 px-3 text-[10px] font-semibold text-gray-700 uppercase tracking-wide">Last Activity</th>
@@ -366,11 +366,11 @@ export const StudentAnalytics: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="text-center">
                 <div className="text-xl font-bold text-gray-900">{analytics.averageCoursesPerStudent}</div>
-                <div className="text-xs text-gray-600">Average Courses per Student</div>
+                <div className="text-xs text-gray-600">Average Courses per CHW</div>
               </div>
               <div className="text-center">
                 <div className="text-xl font-bold text-gray-900">{analytics.activeStudentPercentage}%</div>
-                <div className="text-xs text-gray-600">Student Activity Rate</div>
+                <div className="text-xs text-gray-600">CHW Activity Rate</div>
               </div>
             </div>
           </div>

@@ -141,7 +141,7 @@ export class ExcelExporter {
     // ── Banner ─────────────────────────────────────────────────────────────
     ws.mergeCells(`A${r}:${lastCol}${r}`);
     const bannerCell = ws.getCell(`A${r}`);
-    bannerCell.value = "AKILI CHW Platform  |  Community Health Workers";
+    bannerCell.value = "eBumenyi Platform  |  Community Health Workers";
     bannerCell.fill = { type: "pattern", pattern: "solid", fgColor: C.bannerBg };
     bannerCell.font = { bold: true, size: 15, color: C.white, name: "Calibri" };
     bannerCell.alignment = { horizontal: "center", vertical: "middle" };
@@ -310,7 +310,7 @@ export class ExcelExporter {
 
   public static createMultiSheetWorkbook(): ExcelJS.Workbook {
     const wb = new ExcelJS.Workbook();
-    wb.creator = "Akili CHW Platform";
+    wb.creator = "eBumenyi Platform";
     wb.created = new Date();
     return wb;
   }

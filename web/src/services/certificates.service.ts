@@ -1,10 +1,27 @@
+import axios from "axios";
 import api from "./api";
+import { getApiBaseURL } from "@/config/api.config";
 import {
   ITraineeCertificate,
   IWorkshopCertificate,
   CertificateFilters,
   CertificateResponse,
 } from "@/types/certificates.d";
+
+// Plain axios instance for public (no-auth) endpoints
+const publicApi = axios.create({ baseURL: getApiBaseURL() });
+
+export interface ICertificateVerification {
+  id: string;
+  recipientName: string;
+  courseName: string;
+  issuedAt: string;
+}
+
+export const verifyCertificate = async (code: string): Promise<ICertificateVerification> => {
+  const res = await publicApi.get(`/certificates/verify/${code}`);
+  return res.data?.data as ICertificateVerification;
+};
 
 // ============================================
 // REAL BACKEND ENDPOINTS

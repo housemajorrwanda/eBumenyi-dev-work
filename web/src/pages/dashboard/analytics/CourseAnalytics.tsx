@@ -180,7 +180,7 @@ export const CourseAnalytics: React.FC = () => {
                         style={{ width: `${course.completion}%` }}
                       ></div>
                     </div>
-                    <span className="text-[10px] text-gray-500 mt-1">{course.students} chw</span>
+                    <span className="text-[10px] text-gray-500 mt-1">{course.students} CHWs</span>
                   </div>
                 </div>
               ))}

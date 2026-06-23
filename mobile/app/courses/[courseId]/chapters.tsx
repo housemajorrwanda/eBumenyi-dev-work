@@ -1,5 +1,5 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -15,7 +15,7 @@ import {
 import { CircleCheck as CheckCircle, Video, ClipboardCheck, RotateCcw } from 'lucide-react-native';
 import { assets } from '@/theme';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useFocusEffect } from 'expo-router';
 import type { ICourse, IChapter, ISection, IMySectionReviewItem, ICertificate } from '@/types';
 import { getCourseById, getStudentCourseStats, getStudentCourseProgressByCourseId, addCoursereview, 
   // addSectionreview,
@@ -25,7 +25,7 @@ import { getCalendarEvents } from '@/services/calender';
 import { getMe } from '@/services/auth';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import Footer from '@/components/Footer';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import DocumentViewer from '@/components/DocumentViewer';
 // Use legacy FileSystem API to keep downloadAsync working until migration to new File/Directory API
 import * as FileSystem from 'expo-file-system/legacy';
@@ -40,6 +40,8 @@ import { extractMeetingId, isValidMeetingUrl } from '@/utils/deepLinking';
 import { useMeetingRouter } from '@/hooks/useMeetingRouter';
 import { useCourseRecommendations } from '@/hooks/useCourseRecommendations';
 import { SEVERITY_BADGE } from '@/constants/recommendations';
+import SocketService from '@/services/socket.service';
+import { useNotificationsContext } from '@/contexts/NotificationsContext';
 // import AsyncStorage from '@react-native-async-storage/async-storage';
 
 
@@ -187,6 +189,7 @@ export default function OneCourseScreen() {
   const [finalTestStatus, setFinalTestStatus] = React.useState<{ attempted: boolean; passed: boolean; bestMarks: number; marksToPass: number; associatedCourseId?: string; } | null>(null);
   const [finalExamStatus, setFinalExamStatus] = React.useState<{ attempted: boolean; passed: boolean; bestMarks: number; marksToPass: number; associatedCourseId?: string; } | null>(null);
   const [showReviewModal, setShowReviewModal] = useState(false);
+  const [now, setNow] = useState(() => new Date());
 
   // Keep track of sections we've already shown the review modal for during THIS app session
   const shownSectionReviewsRef = useRef<Set<string>>(new Set());
@@ -324,7 +327,31 @@ export default function OneCourseScreen() {
     queryFn: getStudentCourseStats,
     gcTime: 0,
   });
+  const queryClient = useQueryClient();
+  const { notifications } = useNotificationsContext();
 
+  // Tick every 30 s so time-based conditions (pulsing, join button) re-evaluate automatically
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 30_000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Refresh calendar data when a new event is broadcast to this user (as a participant)
+  useEffect(() => {
+    const latest = notifications[0];
+    if (latest && (latest as any).entityType === 'calendar_event' && !latest.isRead) {
+      queryClient.invalidateQueries({ queryKey: ['CALENDAR_EVENTS'] });
+    }
+  }, [notifications, queryClient]);
+
+  // Refresh calendar data when the creator changes an event on the web
+  useEffect(() => {
+    const socket = SocketService.getInstance();
+    if (!socket) return;
+    const handle = () => queryClient.invalidateQueries({ queryKey: ['CALENDAR_EVENTS'] });
+    socket.on('calendar_data_changed', handle);
+    return () => { socket.off('calendar_data_changed', handle); };
+  }, [queryClient]);
 
   // Get current course data from courseStatsData
   const getCurrentCourseStats = () => {
@@ -351,16 +378,27 @@ export default function OneCourseScreen() {
 
   const upcomingEvent = React.useMemo(() => {
     if (!calendarEvents) return null;
-    
-    const now = new Date();
     return calendarEvents
-      .filter(event => 
-        event.endAt && new Date(event.endAt) > now && 
-        event.meetingType !== 'OTHER' && 
+      .filter(event =>
+        event.endAt && new Date(event.endAt) > now &&
+        event.meetingType !== 'OTHER' &&
         event.location
       )
       .sort((a, b) => a.startAt.getTime() - b.startAt.getTime())[0] || null;
-  }, [calendarEvents]);
+  }, [calendarEvents, now]);
+
+  // Precise timeout: fire setNow exactly at meeting start and end so the pulsing
+  // animation activates/deactivates right on time without waiting for the 30 s tick
+  const eventStartMs = upcomingEvent ? new Date(upcomingEvent.startAt).getTime() : 0;
+  const eventEndMs = upcomingEvent?.endAt ? new Date(upcomingEvent.endAt).getTime() : 0;
+  useEffect(() => {
+    if (!eventStartMs || !eventEndMs) return;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const nowMs = Date.now();
+    if (eventStartMs > nowMs) timers.push(setTimeout(() => setNow(new Date()), eventStartMs - nowMs));
+    if (eventEndMs > nowMs) timers.push(setTimeout(() => setNow(new Date()), eventEndMs - nowMs));
+    return () => timers.forEach(clearTimeout);
+  }, [eventStartMs, eventEndMs]);
 
   const loadCourse = async () => {
     try {
@@ -582,6 +620,58 @@ export default function OneCourseScreen() {
     loadCompletedChapters();
   }, [courseId]);
 
+  // Re-sync all progress state when the screen regains focus (returning from lesson/test screens).
+  // useFocusEffect fires on every focus event; skip the very first mount because the existing
+  // useEffects already handle initial load.
+  const hasMountedRef = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      if (!hasMountedRef.current) {
+        hasMountedRef.current = true;
+        return;
+      }
+      if (!courseId) return;
+      const courseIdStr = Array.isArray(courseId) ? courseId[0] : courseId;
+
+      const refreshProgress = async () => {
+        try {
+          const response = await getStudentCourseProgressByCourseId(courseIdStr);
+          if (!response?.data) return;
+
+          // Refresh completed chapters
+          const serverCompleted = (response.data.chapterProgress ?? [])
+            .filter((ch: any) => ch.isCompleted)
+            .map((ch: any) => ch.chapterId);
+          for (const id of serverCompleted) {
+            await StorageService.markChapterCompleted(id);
+          }
+          const local = await StorageService.getCompletedChapters();
+          setCompletedChapters([...new Set([...serverCompleted, ...local])]);
+
+          // Refresh pre-test status
+          if (response.data.preTestStatus) {
+            setPreTestDone(Boolean(response.data.preTestStatus.attempted));
+          } else if (!course || !Array.isArray(course.preTests) || course.preTests.length === 0) {
+            setPreTestDone(true);
+          }
+
+          // Refresh final test / exam status
+          if (response.data.finalTestStatus) {
+            setFinalTestStatus({ ...response.data.finalTestStatus, associatedCourseId: courseIdStr });
+          }
+          if (response.data.finalExamStatus) {
+            setFinalExamStatus({ ...response.data.finalExamStatus, associatedCourseId: courseIdStr });
+          }
+        } catch (error) {
+          console.log('Error refreshing progress on focus:', error);
+        }
+        queryClient.invalidateQueries({ queryKey: ['COURSE'] });
+      };
+
+      refreshProgress();
+    }, [courseId, course, queryClient])
+  );
+
   // Handle review submission
   const handleReviewSubmit = async (reviewData: any) => {
     
@@ -754,7 +844,7 @@ export default function OneCourseScreen() {
                 }
               </Text>
             </View>
-            {upcomingEvent && upcomingEvent.location && upcomingEvent.endAt && new Date() < new Date(upcomingEvent.endAt) && (
+            {upcomingEvent && upcomingEvent.location && upcomingEvent.endAt && now < new Date(upcomingEvent.endAt) && (
               <TouchableOpacity style={styles.joinButton} activeOpacity={0.8} onPress={() => {
                 // Open meeting link - keep available until endAt to allow late joiners
                 if (upcomingEvent.location) {
@@ -783,7 +873,7 @@ export default function OneCourseScreen() {
                 <View style={styles.joinButtonContent}>
                   <View style={styles.joinIconCircle}>
                     {/* Show pulsing circle only if meeting is currently ongoing (between startAt and endAt) */}
-                    <PulsingVideoCircle active={new Date(upcomingEvent.startAt) <= new Date() && new Date() < new Date(upcomingEvent.endAt)} />
+                    <PulsingVideoCircle active={new Date(upcomingEvent.startAt) <= now && now < new Date(upcomingEvent.endAt)} />
                     <Video size={18} color="#FFFFFF" />
                   </View>
                   <Text style={styles.timeText}>
@@ -792,7 +882,7 @@ export default function OneCourseScreen() {
                 </View>
               </TouchableOpacity>
             )}
-            {upcomingEvent && !upcomingEvent.location && upcomingEvent.endAt && new Date() < new Date(upcomingEvent.endAt) && (
+            {upcomingEvent && !upcomingEvent.location && upcomingEvent.endAt && now < new Date(upcomingEvent.endAt) && (
               <TouchableOpacity style={[styles.joinButton, { opacity: 0.5 }]} disabled>
                 <View style={styles.joinButtonContent}>
                   <View style={styles.joinIconCircle}>

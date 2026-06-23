@@ -10,12 +10,13 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/contexts/ThemeContext';
-import { SquarePen } from 'lucide-react-native';
+import { SquarePen, LayoutGrid } from 'lucide-react-native';
 import { useMeetingRouter } from '@/hooks/useMeetingRouter';
 import { BellIcon, CalendarDaysIcon } from 'react-native-heroicons/outline';
 import { useQuery } from '@tanstack/react-query';
 import { getMe } from '@/services/auth';
 import { useNotificationsSocket } from '@/hooks/useNotificationsSocket';
+import { useModuleSwitcher } from '@/contexts/ModuleSwitcherContext';
 
 type Props = {
   title?: string;
@@ -24,6 +25,7 @@ type Props = {
 export default function Header({ title }: Props) {
   const router = useMeetingRouter();
   const { isDark, themeColors } = useTheme();
+  const { open: openModuleSwitcher } = useModuleSwitcher();
   const previousUserIdRef = useRef<string | null>(null);
 
   // fetch current user info for display
@@ -137,6 +139,13 @@ export default function Header({ title }: Props) {
           </View>
 
           <View style={styles.rightActions}>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={openModuleSwitcher}
+              accessibilityLabel="Switch application"
+            >
+              <LayoutGrid size={28} color="white" />
+            </TouchableOpacity>
             <TouchableOpacity
               style={styles.actionButton}
               onPress={() => {

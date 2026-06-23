@@ -40,6 +40,7 @@ import {
 } from "@/services/calender.service";
 import { useAuth } from "@/hooks/useAuth";
 import { uploadFileByType } from "@/services/uploader.api";
+import { getPublicHospitals } from "@/services/hospitals.service";
 
 const EBUMENYI_SCHEDULE_URL =
   import.meta.env.VITE_EBUMENYI_MEET_API_URL ||
@@ -263,6 +264,7 @@ const Calendar: React.FC = () => {
   const [attendeeFilterRole, setAttendeeFilterRole] = useState("all");
   const [attendeeFilterHospital, setAttendeeFilterHospital] = useState("all");
   const [attendeeFilterDistrict, setAttendeeFilterDistrict] = useState("all");
+  const [hospitalFilterOptions, setHospitalFilterOptions] = useState<{ value: string; label: string }[]>([]);
   const [attendeeFilterSector, setAttendeeFilterSector] = useState("all");
   const [attendeeFilterCell, setAttendeeFilterCell] = useState("all");
   const [attendeeFilterVillage, setAttendeeFilterVillage] = useState("all");
@@ -348,6 +350,32 @@ const Calendar: React.FC = () => {
       setDaysOfWeek([]);
     }
   }, [frequency, formDate, daysOfWeek.length]);
+
+  const fetchHospitalOptions = React.useCallback(async (district?: string) => {
+    try {
+      const params = district && district !== "all" ? { district } : undefined;
+      const hospitals = await getPublicHospitals(params);
+      setHospitalFilterOptions(hospitals.map((h) => ({ value: h.id, label: h.name })));
+    } catch (err) {
+      console.error("[Calendar] failed to load hospitals:", err);
+    }
+  }, []);
+
+  // Load all hospitals on mount
+  React.useEffect(() => {
+    fetchHospitalOptions();
+  }, [fetchHospitalOptions]);
+
+  // Re-fetch hospitals filtered by district, reset hospital selection
+  const isFirstDistrictRender = React.useRef(true);
+  React.useEffect(() => {
+    if (isFirstDistrictRender.current) {
+      isFirstDistrictRender.current = false;
+      return;
+    }
+    fetchHospitalOptions(attendeeFilterDistrict);
+    setAttendeeFilterHospital("all");
+  }, [attendeeFilterDistrict, fetchHospitalOptions]);
 
   // Event management functions
   const sendEventToBackend = (eventData: any, _editingEvent?: any) => {
@@ -3255,14 +3283,7 @@ const Calendar: React.FC = () => {
                   <ComboboxField
                     options={[
                       { value: "all", label: "All Hospitals" },
-                      ...[
-                        ...new Set(
-                          users.filter((u) => u.hospital).map((u) => u.hospital),
-                        ),
-                      ].map((hospital) => ({
-                        value: hospital!.id,
-                        label: hospital!.name,
-                      })),
+                      ...hospitalFilterOptions,
                     ]}
                     defaultValue={attendeeFilterHospital}
                     onChange={(value) => setAttendeeFilterHospital(value)}

@@ -1,6 +1,6 @@
-import React, { useEffect, useState, useMemo, useRef } from 'react';
+import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { View, Text, ScrollView, StyleSheet, TextInput, Animated, Easing, RefreshControl } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useNotificationsContext } from '@/contexts/NotificationsContext';
 import Header from '@/components/Header';
@@ -186,6 +186,15 @@ export default function TrainingScreen() {
     queryFn: getStudentCourseStats,
     enabled: !isValidatingToken,
   });
+
+  // Refresh student stats whenever the tab comes into focus (e.g. returning from a course)
+  useFocusEffect(
+    useCallback(() => {
+      if (!isValidatingToken) {
+        queryClient.invalidateQueries({ queryKey: ['STUDENT_STATS'] });
+      }
+    }, [isValidatingToken, queryClient])
+  );
 
   const handleCoursePress = (course: ICourse, courseIndex: number) => {
     const lastViewedPath = getLastViewedSlidePath(courseStatsData, course.id);

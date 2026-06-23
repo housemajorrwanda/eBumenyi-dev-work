@@ -87,7 +87,7 @@ const StudentTableActions: FC<StudentTableActionsProps> = ({ item, showPromote =
   const handleSubmit = async (data: EditUserFormData) => {
     await updateStudent(item.id, { ...data });
     queryClient.invalidateQueries({ queryKey: studentKeys.all });
-    toast.success("Student info updated successfully");
+    toast.success("CHW info updated successfully");
   };
 
   const { mutate: promote, isPending: isPromoting } = useMutation({
@@ -164,7 +164,7 @@ const StudentTableActions: FC<StudentTableActionsProps> = ({ item, showPromote =
       <EditUserModal
         isOpen={editOpen}
         onClose={() => setEditOpen(false)}
-        title='Edit Student Info'
+        title='Edit CHW Info'
         initialData={initialData}
         roleOptions={STUDENT_ROLE_OPTIONS}
         onSubmit={handleSubmit}

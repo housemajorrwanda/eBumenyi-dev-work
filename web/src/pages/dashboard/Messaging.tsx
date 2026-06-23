@@ -718,7 +718,7 @@ console.log("here messages:",messagesData)
                   <h2 className="text-3xl font-bold text-[#333333]">
                     Messaging
                   </h2>
-                  <p className="text-gray-600">Chat with trainers, students, and staff in groups and communities</p>
+                  <p className="text-gray-600">Chat with trainers, CHWs, and staff in groups and communities</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
                   <Button

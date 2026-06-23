@@ -97,7 +97,7 @@ const CHOGroupInvitePage = () => {
           <div className="space-y-1">
             <h2 className="text-3xl font-bold text-[#333333]">Add CHW</h2>
             <p className="text-sm text-gray-500">
-              CHWs in your area — add them directly to your group.
+              Suggestions from your area — or search by name/phone to find anyone.
             </p>
           </div>
         </div>
@@ -130,7 +130,9 @@ const CHOGroupInvitePage = () => {
           <Users className="w-12 h-12 text-gray-300" />
           <p className="text-gray-500 font-medium">No available CHWs found</p>
           <p className="text-gray-400 text-sm">
-            {debouncedSearch ? "Try a different name or phone number" : "No unassigned CHWs in your area"}
+            {debouncedSearch
+              ? "No match — try a different name or phone number"
+              : "No unassigned CHWs in your area yet"}
           </p>
         </div>
       ) : (

@@ -1199,7 +1199,7 @@ export default function CourseBuilder({ courseData, onAutoSave, onPublish, onBac
                   <h3 className="text-lg font-semibold text-dark">Tests</h3>
                   <p className="text-sm text-secondary mt-1">
                     Configure how many questions each test draws from the Question Bank.
-                    Questions are selected randomly each time a student takes the test.
+                    Questions are selected randomly each time a CHW takes the test.
                   </p>
                 </div>
 

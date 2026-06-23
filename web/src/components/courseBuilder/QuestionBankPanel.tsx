@@ -405,7 +405,7 @@ export default function QuestionBankPanel({
                   value={draft.feedbackStatement}
                   onChange={(e) => setDraft((d) => ({ ...d, feedbackStatement: e.target.value }))}
                   className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary/40 bg-white"
-                  placeholder="Shown after student answers..."
+                  placeholder="Shown after CHW answers..."
                 />
               </div>
             </div>

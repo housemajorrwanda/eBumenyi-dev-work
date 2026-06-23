@@ -24,13 +24,38 @@ export const getGroupMonitoring = async (): Promise<ICHOGroupMonitoring> => {
   return (response as any).data.data;
 };
 
-export const inviteMember = async (
+// ─── CHO: direct add / remove members ────────────────────────────────────────
+
+export const choDirectlyAddMember = async (
   targetStudentId: string,
-): Promise<ICHOGroupInvitation> => {
-  const response = await httpClient.post('/cho-groups/mine/invitations', {
-    targetStudentId,
-  });
+): Promise<ICHOGroupMember> => {
+  const response = await httpClient.post('/cho-groups/mine/members', { targetStudentId });
   return (response as any).data.data;
+};
+
+export const choRemoveMyMember = async (studentId: string): Promise<void> => {
+  await httpClient.delete(`/cho-groups/mine/members/${studentId}`);
+};
+
+// ─── CHO: update own group ────────────────────────────────────────────────────
+
+export const choUpdateMyGroup = async (data: {
+  name?: string;
+  sector?: string;
+  description?: string;
+}): Promise<ICHOGroup> => {
+  const response = await httpClient.patch('/cho-groups/mine', data);
+  return (response as any).data.data;
+};
+
+// ─── CHO: search CHW candidates (area-filtered, unlimited with search) ────────
+
+export const searchCHWCandidates = async (
+  search?: string,
+): Promise<IStudentSearchResult[]> => {
+  const params = search ? `?search=${encodeURIComponent(search)}` : '';
+  const response = await httpClient.get(`/cho-groups/mine/chw-candidates${params}`);
+  return (response as any).data.data ?? [];
 };
 
 // ─── CHW: invitations ─────────────────────────────────────────────────────────
@@ -51,14 +76,7 @@ export const respondToInvitation = async (
   return (response as any).data;
 };
 
-// ─── Student search for invite screen ────────────────────────────────────────
+// ─── legacy alias kept for backward compat ───────────────────────────────────
 
-export const searchStudentsForInvite = async (
-  query?: string,
-): Promise<IStudentSearchResult[]> => {
-  const params = query ? `?search=${encodeURIComponent(query)}` : '';
-  const response = await httpClient.get(
-    `/cho-groups/mine/invite-candidates${params}`,
-  );
-  return (response as any).data.data ?? [];
-};
+export const inviteMember = choDirectlyAddMember;
+export const searchStudentsForInvite = searchCHWCandidates;

@@ -72,13 +72,13 @@ export const ForgotPassword: React.FC = () => {
   };
 
   return (
-    <div className="h-screen flex items-center justify-center p-3"
+    <div className="min-h-screen flex items-center justify-center p-0 lg:p-3"
       style={{ background: "#0e0a1f" }}
     >
       <div
-        className="w-full h-full flex overflow-hidden"
+        className="w-full min-h-screen lg:min-h-0 lg:h-[calc(100vh-24px)] flex overflow-hidden"
         style={{
-          borderRadius: 18,
+          borderRadius: "clamp(0px, (100vw - 768px) * 9999, 18px)",
           background: "#111827",
           boxShadow: "0 40px 80px rgba(0,0,0,0.8), 0 0 0 1px rgba(51,99,173,0.12)",
         }}

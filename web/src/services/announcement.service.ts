@@ -6,6 +6,7 @@ export interface IAnnouncement {
   title: string;
   body: string;
   segment: string;
+  category?: string;
   publishAt: string;
   validUntil?: string | null;
   createdById: string;

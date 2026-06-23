@@ -66,7 +66,9 @@ export class CHOGroupController {
     body: {
       name: string;
       choStudentId: string;
-      sector?: string;
+      sectors?: string[];
+      cells?: string[];
+      villages?: string[];
       description?: string;
     },
   ): Promise<any> {
@@ -102,7 +104,7 @@ export class CHOGroupController {
   @Middlewares(loggerMiddleware, checkRole(roles.CHO))
   public async updateMyGroup(
     @Request() req: ExpressRequest,
-    @Body() body: { name?: string; sector?: string; description?: string },
+    @Body() body: { name?: string; district?: string; sectors?: string[]; cells?: string[]; villages?: string[]; cell?: string; village?: string; description?: string },
   ): Promise<any> {
     try {
       const userId = req.user?.id as string;
@@ -219,7 +221,7 @@ export class CHOGroupController {
   @Middlewares(loggerMiddleware, checkRole(roles.ADMIN))
   public async updateGroup(
     @Path() groupId: string,
-    @Body() body: { name?: string; sector?: string; description?: string },
+    @Body() body: { name?: string; district?: string; sectors?: string[]; cells?: string[]; villages?: string[]; cell?: string; village?: string; description?: string },
   ): Promise<any> {
     try {
       const group = await CHOGroupService.updateGroup(groupId, body);

@@ -8,13 +8,13 @@ import {
   Image,
   TextInput,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, Search, Send, MapPin } from 'lucide-react-native';
-import { searchStudentsForInvite, inviteMember } from '@/services/choGroup.api';
+import Toast from 'react-native-toast-message';
+import { ChevronLeft, Search, UserPlus, MapPin } from 'lucide-react-native';
+import { searchCHWCandidates, choDirectlyAddMember } from '@/services/choGroup.api';
 import { IStudentSearchResult } from '@/types';
 import { useTheme } from '@/contexts/ThemeContext';
 
@@ -29,35 +29,28 @@ export default function InviteScreen() {
   const [invitedIds, setInvitedIds] = useState<Set<string>>(new Set());
 
   const { data: students = [], isLoading } = useQuery({
-    queryKey: ['students-for-invite', search],
-    queryFn: () => searchStudentsForInvite(search),
+    queryKey: ['chw-candidates', search],
+    queryFn: () => searchCHWCandidates(search),
     enabled: true,
   });
 
-  const { mutate: sendInvite, isPending } = useMutation({
-    mutationFn: (studentId: string) => inviteMember(studentId),
+  const { mutate: addMember, isPending } = useMutation({
+    mutationFn: (studentId: string) => choDirectlyAddMember(studentId),
     onSuccess: (_, studentId) => {
       setInvitedIds((prev) => new Set([...prev, studentId]));
       queryClient.invalidateQueries({ queryKey: ['cho-group-members'] });
-      Alert.alert('Byagenze neza!', 'Ubutumire bwoherejwe neza.');
+      queryClient.invalidateQueries({ queryKey: ['cho-chw-candidates'] });
+      Toast.show({ type: 'success', text1: 'Byongewe mu itsinda' });
     },
     onError: (error: any) => {
-      const msg =
-        error?.response?.data?.message ?? 'Habaye ikosa mu kohereza ubutumire.';
-      Alert.alert('Ikosa', msg);
+      const msg = error?.response?.data?.message ?? 'Habaye ikosa mu kongera umunyamuryango.';
+      Toast.show({ type: 'error', text1: msg });
     },
   });
 
-  const handleInvite = (student: IStudentSearchResult) => {
+  const handleAdd = (student: IStudentSearchResult) => {
     if (invitedIds.has(student.id) || student.groupMembership) return;
-    Alert.alert(
-      'Ohereza ubutumire',
-      `Urashaka kohereza ubutumire kuri ${student.user.fullNames}?`,
-      [
-        { text: 'Oya', style: 'cancel' },
-        { text: 'Yego', onPress: () => sendInvite(student.id) },
-      ],
-    );
+    addMember(student.id);
   };
 
   const cardBg = isDark ? '#1f2937' : '#ffffff';
@@ -68,8 +61,8 @@ export default function InviteScreen() {
 
   const renderStudent = ({ item }: { item: IStudentSearchResult }) => {
     const alreadyInGroup = !!item.groupMembership;
-    const alreadyInvited = invitedIds.has(item.id) || !!item.pendingInvitation;
-    const disabled = alreadyInGroup || alreadyInvited || isPending;
+    const alreadyAdded = invitedIds.has(item.id);
+    const disabled = alreadyInGroup || alreadyAdded || isPending;
 
     return (
       <View style={[styles.studentCard, { backgroundColor: cardBg }]}>
@@ -100,27 +93,27 @@ export default function InviteScreen() {
           style={[
             styles.inviteBtn,
             {
-              backgroundColor: alreadyInvited
+              backgroundColor: alreadyAdded
                 ? '#D1FAE5'
                 : disabled
                 ? '#e5e7eb'
                 : themeColors.primary,
             },
           ]}
-          onPress={() => handleInvite(item)}
+          onPress={() => handleAdd(item)}
           disabled={disabled}
           activeOpacity={0.8}
         >
           {isPending ? (
             <ActivityIndicator size="small" color="#ffffff" />
-          ) : alreadyInvited ? (
-            <Text style={[styles.inviteBtnText, { color: '#059669' }]}>Yoherejwe</Text>
+          ) : alreadyAdded ? (
+            <Text style={[styles.inviteBtnText, { color: '#059669' }]}>Wongewe</Text>
           ) : alreadyInGroup ? (
-            <Text style={[styles.inviteBtnText, { color: '#9ca3af' }]}>Ntabwo</Text>
+            <Text style={[styles.inviteBtnText, { color: '#9ca3af' }]}>Afite itsinda</Text>
           ) : (
             <>
-              <Send size={14} color="#ffffff" />
-              <Text style={[styles.inviteBtnText, { color: '#ffffff' }]}>Tuma</Text>
+              <UserPlus size={14} color="#ffffff" />
+              <Text style={[styles.inviteBtnText, { color: '#ffffff' }]}>Ongeramo</Text>
             </>
           )}
         </TouchableOpacity>
@@ -136,7 +129,7 @@ export default function InviteScreen() {
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <ChevronLeft size={24} color="#ffffff" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Tuma ubutumire bwa CHW</Text>
+          <Text style={styles.headerTitle}>Ongeramo CHW mu itsinda</Text>
           <View style={{ width: 40 }} />
         </View>
 
@@ -154,7 +147,7 @@ export default function InviteScreen() {
             />
           </View>
           <Text style={[styles.hintText, { color: textMuted }]}>
-            Shakisha CHW ufite itsinda cyangwa utarimo, hanyuma umubuze.
+            Shakisha CHW utarimo itsinda mu karere kawe, hanyuma umwongere.
           </Text>
         </View>
 

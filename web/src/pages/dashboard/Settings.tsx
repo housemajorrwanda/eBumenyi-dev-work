@@ -32,9 +32,10 @@ import {
   CheckCircle,
   XCircle,
   AlertCircle,
-  Inbox,
+  HelpCircle,
 } from "lucide-react";
 import NotificationsPage from "./NotificationsPage";
+import Help from "./Help";
 import { getProfile, updateAvatar } from "@/services/profile.api";
 import api from "@/services/api";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -322,12 +323,12 @@ export const Settings: React.FC = () => {
 
   const tabs = [
     { id: "profile", label: t("tabs.profile"), icon: User },
-    { id: "inbox", label: "Inbox", icon: Inbox },
-    { id: "notification-prefs", label: "Notification Preferences", icon: Bell },
+    { id: "notifications", label: "Notifications", icon: Bell },
     { id: "security", label: t("tabs.security"), icon: Shield },
     { id: "appearance", label: t("tabs.appearance"), icon: Palette },
     { id: "language", label: t("tabs.language"), icon: Globe },
     { id: "data", label: t("tabs.data"), icon: Download },
+    { id: "help", label: "Help & Support", icon: HelpCircle },
   ];
 
   // ── Render ──────────────────────────────────────────────────────────────────
@@ -539,143 +540,10 @@ export const Settings: React.FC = () => {
               </div>
             )}
 
-            {/* ── INBOX ──────────────────────────────────────────────────── */}
-            {activeTab === "inbox" && (
+            {/* ── NOTIFICATIONS ──────────────────────────────────────────── */}
+            {activeTab === "notifications" && (
               <div className="p-6">
                 <NotificationsPage embedded />
-              </div>
-            )}
-
-            {/* ── NOTIFICATION PREFERENCES ───────────────────────────────── */}
-            {activeTab === "notification-prefs" && (
-              <div className="p-6">
-                <div className="flex items-center gap-3 mb-6 pb-4 border-b dark:border-slate-700">
-                  <Bell className="w-5 h-5 text-gray-400 dark:text-slate-500" />
-                  <h2 className="text-xl font-semibold text-gray-900 dark:text-slate-100">
-                    Notification Preferences
-                  </h2>
-                </div>
-
-                {/* ── Delivery channels ── */}
-                <div className="space-y-3">
-                  {/* Email */}
-                  <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-slate-700/40 rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <Mail className="w-5 h-5 text-gray-500 dark:text-slate-400" />
-                      <div>
-                        <p className="text-sm font-medium text-gray-900 dark:text-slate-100">{t("notifications.email")}</p>
-                        <p className="text-xs text-gray-500 dark:text-slate-400">{t("notifications.emailDesc")}</p>
-                      </div>
-                    </div>
-                    <Toggle
-                      checked={emailNotif}
-                      onChange={(v) => {
-                        setEmailNotif(v);
-                        localStorage.setItem("st_email", JSON.stringify(v));
-                        saveSetting({ emailNotif: v });
-                        toast.success(`${t("notifications.email")} ${v ? t("notifications.enabled") : t("notifications.disabled")}`);
-                      }}
-                    />
-                  </div>
-
-                  {/* Push — with live browser permission badge */}
-                  <div className="p-4 bg-gray-50 dark:bg-slate-700/40 rounded-lg">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <Smartphone className="w-5 h-5 text-gray-500 dark:text-slate-400" />
-                        <div>
-                          <p className="text-sm font-medium text-gray-900 dark:text-slate-100">{t("notifications.push")}</p>
-                          <p className="text-xs text-gray-500 dark:text-slate-400">{t("notifications.pushDesc")}</p>
-                        </div>
-                      </div>
-                      {pushLoading ? (
-                        <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
-                      ) : (
-                        <Toggle checked={pushNotif} onChange={handlePushToggle} />
-                      )}
-                    </div>
-
-                    {/* Permission status banner */}
-                    <div className="mt-3 flex items-center gap-2">
-                      {pushPermission === "granted" && (
-                        <>
-                          <CheckCircle className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
-                          <span className="text-xs text-green-600 dark:text-green-400">{t("notifications.permGranted")}</span>
-                        </>
-                      )}
-                      {pushPermission === "denied" && (
-                        <>
-                          <XCircle className="w-3.5 h-3.5 text-red-500 flex-shrink-0" />
-                          <span className="text-xs text-red-600 dark:text-red-400">
-                            {t("notifications.permDenied")}
-                          </span>
-                        </>
-                      )}
-                      {pushPermission === "default" && (
-                        <>
-                          <AlertCircle className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
-                          <span className="text-xs text-amber-600 dark:text-amber-400">
-                            {t("notifications.permDefault")}
-                          </span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* SMS */}
-                  <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-slate-700/40 rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <Phone className="w-5 h-5 text-gray-500 dark:text-slate-400" />
-                      <div>
-                        <p className="text-sm font-medium text-gray-900 dark:text-slate-100">{t("notifications.sms")}</p>
-                        <p className="text-xs text-gray-500 dark:text-slate-400">{t("notifications.smsDesc")}</p>
-                      </div>
-                    </div>
-                    <Toggle
-                      checked={smsNotif}
-                      onChange={(v) => {
-                        setSmsNotif(v);
-                        localStorage.setItem("st_sms", JSON.stringify(v));
-                        saveSetting({ smsNotif: v });
-                        toast.success(`${t("notifications.sms")} ${v ? t("notifications.enabled") : t("notifications.disabled")}`);
-
-                      }}
-                    />
-                  </div>
-                </div>
-
-                {/* ── Notification categories ── */}
-                <div className="mt-6">
-                  <h3 className="text-sm font-medium text-gray-900 dark:text-slate-100 mb-3">
-                    {t("notifications.categories")}
-                  </h3>
-                  <div className="space-y-1 border border-gray-200 dark:border-slate-700 rounded-lg overflow-hidden">
-                    {(
-                      [
-                        { key: "courseUpdates",       labelKey: "notifications.courseUpdates",       descKey: "notifications.courseUpdatesDesc" },
-                        { key: "assignmentReminders", labelKey: "notifications.assignmentReminders", descKey: "notifications.assignmentRemindersDesc" },
-                        { key: "certificates",        labelKey: "notifications.certificates",        descKey: "notifications.certificatesDesc" },
-                        { key: "systemUpdates",       labelKey: "notifications.systemUpdates",       descKey: "notifications.systemUpdatesDesc" },
-                      ] as const
-                    ).map(({ key, labelKey, descKey }) => (
-                      <label
-                        key={key}
-                        className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-700/40 border-b border-gray-100 dark:border-slate-700 last:border-0 transition-colors"
-                      >
-                        <div>
-                          <p className="text-sm font-medium text-gray-900 dark:text-slate-100">{t(labelKey)}</p>
-                          <p className="text-xs text-gray-500 dark:text-slate-400">{t(descKey)}</p>
-                        </div>
-                        <input
-                          type="checkbox"
-                          checked={categories[key]}
-                          onChange={() => toggleCategory(key)}
-                          className="w-4 h-4 text-blue-600 rounded accent-blue-600"
-                        />
-                      </label>
-                    ))}
-                  </div>
-                </div>
               </div>
             )}
 
@@ -823,14 +691,15 @@ export const Settings: React.FC = () => {
 
             {/* ── APPEARANCE ─────────────────────────────────────────────── */}
             {activeTab === "appearance" && (
-              <div className="p-6">
-                <div className="flex items-center gap-3 mb-6 pb-4 border-b dark:border-slate-700">
-                  <Palette className="w-5 h-5 text-gray-400 dark:text-slate-500" />
-                  <h2 className="text-xl font-semibold text-gray-900 dark:text-slate-100">
-                    {t("appearance.title")}
-                  </h2>
-                </div>
+              <div className="p-6 space-y-8">
+                {/* Theme */}
                 <div>
+                  <div className="flex items-center gap-3 mb-6 pb-4 border-b dark:border-slate-700">
+                    <Palette className="w-5 h-5 text-gray-400 dark:text-slate-500" />
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-slate-100">
+                      {t("appearance.title")}
+                    </h2>
+                  </div>
                   <h3 className="text-sm font-medium text-gray-900 dark:text-slate-100 mb-3">
                     {t("appearance.theme")}
                   </h3>
@@ -859,7 +728,6 @@ export const Settings: React.FC = () => {
                       </button>
                     ))}
                   </div>
-
                   <p className="mt-4 text-xs text-gray-500 dark:text-slate-400">
                     {theme === "auto"
                       ? t("appearance.autoDesc")
@@ -867,6 +735,129 @@ export const Settings: React.FC = () => {
                       ? t("appearance.darkDesc")
                       : t("appearance.lightDesc")}
                   </p>
+                </div>
+
+                {/* Notification Preferences */}
+                <div>
+                  <div className="flex items-center gap-3 mb-6 pb-4 border-b dark:border-slate-700">
+                    <Bell className="w-5 h-5 text-gray-400 dark:text-slate-500" />
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-slate-100">
+                      Notification Preferences
+                    </h2>
+                  </div>
+
+                  <div className="space-y-3">
+                    {/* Email */}
+                    <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-slate-700/40 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <Mail className="w-5 h-5 text-gray-500 dark:text-slate-400" />
+                        <div>
+                          <p className="text-sm font-medium text-gray-900 dark:text-slate-100">{t("notifications.email")}</p>
+                          <p className="text-xs text-gray-500 dark:text-slate-400">{t("notifications.emailDesc")}</p>
+                        </div>
+                      </div>
+                      <Toggle
+                        checked={emailNotif}
+                        onChange={(v) => {
+                          setEmailNotif(v);
+                          localStorage.setItem("st_email", JSON.stringify(v));
+                          saveSetting({ emailNotif: v });
+                          toast.success(`${t("notifications.email")} ${v ? t("notifications.enabled") : t("notifications.disabled")}`);
+                        }}
+                      />
+                    </div>
+
+                    {/* Push */}
+                    <div className="p-4 bg-gray-50 dark:bg-slate-700/40 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <Smartphone className="w-5 h-5 text-gray-500 dark:text-slate-400" />
+                          <div>
+                            <p className="text-sm font-medium text-gray-900 dark:text-slate-100">{t("notifications.push")}</p>
+                            <p className="text-xs text-gray-500 dark:text-slate-400">{t("notifications.pushDesc")}</p>
+                          </div>
+                        </div>
+                        {pushLoading ? (
+                          <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+                        ) : (
+                          <Toggle checked={pushNotif} onChange={handlePushToggle} />
+                        )}
+                      </div>
+                      <div className="mt-3 flex items-center gap-2">
+                        {pushPermission === "granted" && (
+                          <>
+                            <CheckCircle className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
+                            <span className="text-xs text-green-600 dark:text-green-400">{t("notifications.permGranted")}</span>
+                          </>
+                        )}
+                        {pushPermission === "denied" && (
+                          <>
+                            <XCircle className="w-3.5 h-3.5 text-red-500 flex-shrink-0" />
+                            <span className="text-xs text-red-600 dark:text-red-400">{t("notifications.permDenied")}</span>
+                          </>
+                        )}
+                        {pushPermission === "default" && (
+                          <>
+                            <AlertCircle className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+                            <span className="text-xs text-amber-600 dark:text-amber-400">{t("notifications.permDefault")}</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* SMS */}
+                    <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-slate-700/40 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <Phone className="w-5 h-5 text-gray-500 dark:text-slate-400" />
+                        <div>
+                          <p className="text-sm font-medium text-gray-900 dark:text-slate-100">{t("notifications.sms")}</p>
+                          <p className="text-xs text-gray-500 dark:text-slate-400">{t("notifications.smsDesc")}</p>
+                        </div>
+                      </div>
+                      <Toggle
+                        checked={smsNotif}
+                        onChange={(v) => {
+                          setSmsNotif(v);
+                          localStorage.setItem("st_sms", JSON.stringify(v));
+                          saveSetting({ smsNotif: v });
+                          toast.success(`${t("notifications.sms")} ${v ? t("notifications.enabled") : t("notifications.disabled")}`);
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Notification categories */}
+                  <div className="mt-6">
+                    <h3 className="text-sm font-medium text-gray-900 dark:text-slate-100 mb-3">
+                      {t("notifications.categories")}
+                    </h3>
+                    <div className="space-y-1 border border-gray-200 dark:border-slate-700 rounded-lg overflow-hidden">
+                      {(
+                        [
+                          { key: "courseUpdates",       labelKey: "notifications.courseUpdates",       descKey: "notifications.courseUpdatesDesc" },
+                          { key: "assignmentReminders", labelKey: "notifications.assignmentReminders", descKey: "notifications.assignmentRemindersDesc" },
+                          { key: "certificates",        labelKey: "notifications.certificates",        descKey: "notifications.certificatesDesc" },
+                          { key: "systemUpdates",       labelKey: "notifications.systemUpdates",       descKey: "notifications.systemUpdatesDesc" },
+                        ] as const
+                      ).map(({ key, labelKey, descKey }) => (
+                        <label
+                          key={key}
+                          className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-700/40 border-b border-gray-100 dark:border-slate-700 last:border-0 transition-colors"
+                        >
+                          <div>
+                            <p className="text-sm font-medium text-gray-900 dark:text-slate-100">{t(labelKey)}</p>
+                            <p className="text-xs text-gray-500 dark:text-slate-400">{t(descKey)}</p>
+                          </div>
+                          <input
+                            type="checkbox"
+                            checked={categories[key]}
+                            onChange={() => toggleCategory(key)}
+                            className="w-4 h-4 text-blue-600 rounded accent-blue-600"
+                          />
+                        </label>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -941,6 +932,13 @@ export const Settings: React.FC = () => {
                     </select>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* ── HELP & SUPPORT ─────────────────────────────────────────── */}
+            {activeTab === "help" && (
+              <div className="p-6">
+                <Help />
               </div>
             )}
 

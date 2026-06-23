@@ -6,6 +6,17 @@ export const getAllHospitals = async (params?: string): Promise<IPaged<IHospital
   return (await api.get(`/hospitals${queryParams}`)).data;
 };
 
+export const getPublicHospitals = async (params?: {
+  district?: string;
+  sector?: string;
+  cell?: string;
+  village?: string;
+}): Promise<IHospital[]> => {
+  const res = await api.get("/hospitals/public", { params });
+  const body = res.data;
+  return Array.isArray(body?.data) ? body.data : Array.isArray(body) ? body : [];
+};
+
 export const getHospitalById = async (id: string): Promise<IResponse<IHospital>> => {
   return (await api.get(`/hospitals/${id}`)).data;
 };

@@ -4,8 +4,6 @@ export default function CHOGroupLayout() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="index" />
-      <Stack.Screen name="members" />
-      <Stack.Screen name="monitoring" />
       <Stack.Screen name="invite" />
       <Stack.Screen name="invitations" />
     </Stack>

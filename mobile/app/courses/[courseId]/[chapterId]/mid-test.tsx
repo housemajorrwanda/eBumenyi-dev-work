@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import Questionnaire from '@/components/Questionnaire';
-import { getCourseById, getMidTestById } from '@/services/course.api';
+import { getCourseById, getMidTestById, getStudentCourseProgressByCourseId } from '@/services/course.api';
 import { ICourse, IChapter, ITest } from '@/types';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
+import StorageService from '@/services/storage.service';
 
 export default function MidTestScreen() {
   const { courseId, chapterId, nextPage } = useLocalSearchParams<{ courseId: string; chapterId: string; nextPage?: string }>();
@@ -43,7 +44,22 @@ export default function MidTestScreen() {
 
   const handleTestComplete = async (testAnswers: Record<string, string[]>) => {
     try {
-      // Progress tracking removed - navigate back to course content or chapters overview
+      // Sync latest chapter progress from server to local cache so chapters.tsx reflects
+      // mid-test completion immediately when the screen regains focus
+      if (courseId) {
+        try {
+          const response = await getStudentCourseProgressByCourseId(courseId);
+          const completed = (response.data?.chapterProgress ?? [])
+            .filter((ch: any) => ch.isCompleted)
+            .map((ch: any) => ch.chapterId);
+          for (const id of completed) {
+            await StorageService.markChapterCompleted(id);
+          }
+        } catch (syncErr) {
+          console.log('Mid-test progress sync error:', syncErr);
+        }
+      }
+
       const np = nextPage ? Number(nextPage) : undefined;
       if (np && !Number.isNaN(np) && chapterId) {
         router.push(`/courses/${courseId}/${chapterId}/course-content?page=${np}`);

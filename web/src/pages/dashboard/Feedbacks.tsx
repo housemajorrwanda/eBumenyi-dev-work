@@ -521,40 +521,43 @@ export const Feedbacks: React.FC = () => {
     return queryString ? `?${queryString}` : '';
   };
 
-  // Export data function
-  const exportData = async (keyword?: string) => {
-    if (isExporting) return; // Prevent double clicks
-    
+  // Export data function — exports all selected chip types as separate sheets in one workbook
+  const exportData = async () => {
+    if (isExporting) return;
     setIsExporting(true);
-    
+
     try {
       const params = new URLSearchParams();
-      
-      // Add search query if provided
-      if (keyword) params.append('searchq', keyword);
-      
-      // Add filter parameters
+
+      // Send each chip's current selected state directly
+      params.append('includeFeedbacks', filters.includeFeedbacks.toString());
+      params.append('includeChapterReviews', filters.includeChapterReviews.toString());
+      params.append('includeSectionReviews', filters.includeSectionReviews.toString());
+      params.append('includeCourseReviews', filters.includeCourseReviews.toString());
+      params.append('includeSystemReviews', filters.includeSystemReviews.toString());
+
+      // Pass active location/date filter parameters
       if (filters.district) params.append('district', filters.district);
       if (filters.sector) params.append('sector', filters.sector);
       if (filters.startDate) params.append('startDate', filters.startDate);
       if (filters.endDate) params.append('endDate', filters.endDate);
-      
-      // Add include parameters only for enabled review types
-      if (filters.includeFeedbacks) params.append('includeFeedbacks', 'true');
-      if (filters.includeSystemReviews) params.append('includeSystemReviews', 'true');
-      if (filters.includeCourseReviews) params.append('includeCourseReviews', 'true');
-      if (filters.includeSectionReviews) params.append('includeSectionReviews', 'true');
-      if (filters.includeChapterReviews) params.append('includeChapterReviews', 'true');
-      
-      const queryString = params.toString();
-      const queryParams = queryString ? `?${queryString}` : '';
-      
-      const blob = await exportReviews(queryParams);
+
+      // Build filename from which chips are selected
+      const selected: string[] = [];
+      if (filters.includeFeedbacks) selected.push('slides');
+      if (filters.includeChapterReviews) selected.push('chapters');
+      if (filters.includeSectionReviews) selected.push('sections');
+      if (filters.includeCourseReviews) selected.push('courses');
+      if (filters.includeSystemReviews) selected.push('system');
+      const typePart = selected.length === 5 ? 'all-reviews' : selected.join('-');
+      const filename = `${typePart}-${new Date().toISOString().split('T')[0]}.xlsx`;
+
+      const blob = await exportReviews(`?${params.toString()}`);
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.style.display = 'none';
       a.href = url;
-      a.download = 'reviews-export.xlsx';
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -990,7 +993,7 @@ export const Feedbacks: React.FC = () => {
         actionBtn={exportBtn}
         columns={[
         {
-          title: "Student",
+          title: "CHW",
           key: "student",
           render: (row: IChapterReview) => (
             <div className="flex items-center gap-2">
@@ -1063,7 +1066,7 @@ export const Feedbacks: React.FC = () => {
         actionBtn={exportBtn}
         columns={[
         {
-          title: "Student",
+          title: "CHW",
           key: "student",
           render: (row: ISectionReview) => (
             <div className="flex items-center gap-2">
@@ -1136,7 +1139,7 @@ export const Feedbacks: React.FC = () => {
         actionBtn={exportBtn}
         columns={[
         {
-          title: "Student",
+          title: "CHW",
           key: "student",
           render: (row: ICourseReview) => (
             <div className="flex items-center gap-2">

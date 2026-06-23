@@ -46,7 +46,7 @@ const CourseLoader = ({
           tips: [
             "💾 Pro tip: Regular saves prevent data loss",
             "📝 Organizing content in chapters improves learning flow",
-            "🎯 Clear learning objectives increase student engagement",
+            "🎯 Clear learning objectives increase CHW engagement",
             "📊 Interactive elements boost retention by 85%",
             "🔄 Version control helps track course improvements",
             "🎨 Visual content increases comprehension by 400%",
@@ -79,7 +79,7 @@ const CourseLoader = ({
             "📈 Processing analytics help optimize performance",
             "🎯 Smart compression maintains quality while reducing size",
             "🌟 AI processing can generate subtitles automatically",
-            "📊 Quality metrics ensure best student experience",
+            "📊 Quality metrics ensure best CHW experience",
             "⚡ Background processing doesn't interrupt your workflow",
             "🔄 Multi-format output supports all learning platforms"
           ]

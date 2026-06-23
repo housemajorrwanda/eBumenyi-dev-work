@@ -40,4 +40,5 @@ export interface ISignUp {
   NID?: string;
   birthdate?: string;
   gender?: string;
+  hospitalId?: string;
 }

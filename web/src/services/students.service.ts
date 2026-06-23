@@ -9,6 +9,8 @@ export interface IStudent {
   phoneNumber: string;
   district: string;
   sector: string;
+  cell: string;
+  village: string;
   courses: string[];
   progress: string;
   createdAt: string;
