@@ -6,9 +6,9 @@ import {
   TextInput,
   TouchableOpacity,
   FlatList,
-  ActivityIndicator,
   Modal,
 } from 'react-native';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQuery } from '@tanstack/react-query';
 import { searchMessages } from '@/services/messaging.api';
@@ -201,10 +201,7 @@ export function MessageSearch({
             )}
           </View>
         ) : isLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#4D81D2" />
-            <Text style={styles.loadingText}>Searching...</Text>
-          </View>
+          <LoadingSpinner message="Searching..." />
         ) : error ? (
           <View style={styles.errorContainer}>
             <Text style={styles.errorText}>Failed to search messages</Text>

@@ -11,6 +11,7 @@ import {
   Tags,
 } from "tsoa";
 import { CertificateTemplateService } from "../services/certificateTemplateService";
+import { CertificateService } from "../services/certificateService";
 import { loggerMiddleware } from "../utils/loggers/loggingMiddleware";
 import { checkRole } from "../middlewares";
 import { roles } from "../utils/roles";
@@ -76,6 +77,38 @@ interface LinkedCoursesResponse {
   data: LinkedCourseItem[];
 }
 
+interface PreviewResponse {
+  statusCode: number;
+  message: string;
+  data: { pdf: string };
+}
+
+interface PreviewDto {
+  canvasJson: Record<string, unknown>;
+}
+
+interface BgImageItem {
+  id: string;
+  url: string;
+  createdAt: Date;
+}
+
+interface BgImageListResponse {
+  statusCode: number;
+  message: string;
+  data: BgImageItem[];
+}
+
+interface BgImageResponse {
+  statusCode: number;
+  message: string;
+  data: BgImageItem;
+}
+
+interface UploadBgDto {
+  dataUrl: string;
+}
+
 @Route("/api/certificate-templates")
 @Tags("CertificateTemplates")
 export class CertificateTemplateController {
@@ -91,6 +124,34 @@ export class CertificateTemplateController {
   @Middlewares(loggerMiddleware, checkRole(roles.TRAINER, roles.ADMIN, roles.DEVELOPER))
   public async create(@Body() body: CreateTemplateDto): Promise<TemplateResponse> {
     return CertificateTemplateService.create(body.name, body.canvasJson) as Promise<TemplateResponse>;
+  }
+
+  @Get("/mock-tokens")
+  @Security("jwt")
+  @Middlewares(loggerMiddleware, checkRole(roles.TRAINER, roles.ADMIN, roles.DEVELOPER))
+  public async getMockTokenValues() {
+    return CertificateTemplateService.getMockTokenValues();
+  }
+
+  @Get("/backgrounds")
+  @Security("jwt")
+  @Middlewares(loggerMiddleware, checkRole(roles.TRAINER, roles.ADMIN, roles.DEVELOPER))
+  public async listBgImages(): Promise<BgImageListResponse> {
+    return CertificateTemplateService.listBgImages() as Promise<BgImageListResponse>;
+  }
+
+  @Post("/backgrounds")
+  @Security("jwt")
+  @Middlewares(loggerMiddleware, checkRole(roles.TRAINER, roles.ADMIN, roles.DEVELOPER))
+  public async uploadBgImage(@Body() body: UploadBgDto): Promise<BgImageResponse> {
+    return CertificateTemplateService.uploadBgImage(body.dataUrl) as Promise<BgImageResponse>;
+  }
+
+  @Delete("/backgrounds/{id}")
+  @Security("jwt")
+  @Middlewares(loggerMiddleware, checkRole(roles.TRAINER, roles.ADMIN, roles.DEVELOPER))
+  public async deleteBgImage(@Path() id: string): Promise<DeleteResponse> {
+    return CertificateTemplateService.deleteBgImage(id);
   }
 
   @Get("/{id}")
@@ -138,4 +199,17 @@ export class CertificateTemplateController {
   public async listLinkedCourses(@Path() id: string): Promise<LinkedCoursesResponse> {
     return CertificateTemplateService.listLinkedCourses(id) as Promise<LinkedCoursesResponse>;
   }
+
+  @Post("/{id}/preview")
+  @Security("jwt")
+  @Middlewares(loggerMiddleware, checkRole(roles.TRAINER, roles.ADMIN, roles.DEVELOPER))
+  public async previewTemplate(@Path() id: string, @Body() body: PreviewDto): Promise<PreviewResponse> {
+    const pdfBuffer = await CertificateService.previewTemplate(body.canvasJson);
+    return {
+      statusCode: 200,
+      message: "Preview generated successfully",
+      data: { pdf: pdfBuffer.toString("base64") },
+    };
+  }
+
 }

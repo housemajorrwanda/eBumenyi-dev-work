@@ -2,7 +2,15 @@ import React, { useEffect, useRef, useState, forwardRef, useImperativeHandle } f
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Animated, Easing } from 'react-native';
 import { Bot, Menu, CheckCircle, Circle, CheckSquare, Square } from 'lucide-react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { getCourseById, attemptTest, getStudentCourseProgressByCourseId } from '@/services/course.api';
+import { attemptTest } from '@/services/course.api';
+import {
+  fetchCourseWorkspace,
+  normalizeCourseId,
+  syncWorkspaceAfterPreTest,
+  COURSE_WORKSPACE_QUERY_KEY,
+} from '@/hooks/useCourseWorkspace';
+import { findNextIncompleteSectionId } from '@/utils/courseWorkspace';
+import { useQueryClient } from '@tanstack/react-query';
 import Header from '@/components/Header';
 import BackButtonContext from '@/contexts/BackButtonContext';
 import { ICourse, ITest, IQuestionnaire as ServerQuestionnaire, IOption as ServerOption, CreateAttempTestDto, IQuestionnaire } from '@/types';
@@ -58,7 +66,9 @@ const Questionnaire = forwardRef(function Questionnaire({
   const [showResults, setShowResults] = useState(false);
   const [drawerVisible, setDrawerVisible] = useState(false);
   const { courseId } = useLocalSearchParams();
+  const courseIdStr = normalizeCourseId(courseId as string | string[] | undefined);
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<number, number | number[]>>({});
   const [fetchedQuestions, setFetchedQuestions] = useState<LocalQuestion[]>([]);
@@ -428,8 +438,15 @@ const Questionnaire = forwardRef(function Questionnaire({
         return;
       }
 
-      // For pre-test, don't show results, just navigate to chapters
+      // For pre-test, refresh workspace then notify parent (unlocks chapters immediately)
       if (currentPage && currentPage.includes('pre-test')) {
+        if (courseIdStr) {
+          try {
+            await syncWorkspaceAfterPreTest(queryClient, courseIdStr);
+          } catch (syncErr) {
+            console.log('Pre-test workspace sync failed:', syncErr);
+          }
+        }
         if (onComplete) {
           onComplete(answers as unknown as Record<string, string[]>);
         }
@@ -475,24 +492,28 @@ const Questionnaire = forwardRef(function Questionnaire({
 
   const handleContinue = async () => {
     // Pre-test: unlock + progress use "attempted" (chapters screen); go back to course outline
-    if (currentPage?.includes('pre-test') && courseId) {
+    if (currentPage?.includes('pre-test') && courseIdStr) {
       try {
-        const courseResp = await getCourseById(String(courseId));
-        const firstSectionId = courseResp.data?.sections?.[0]?.id;
-        router.push({
-          pathname: `/courses/${courseId}/chapters`,
+        await syncWorkspaceAfterPreTest(queryClient, courseIdStr);
+        const workspace = queryClient.getQueryData<Awaited<ReturnType<typeof fetchCourseWorkspace>>>([
+          COURSE_WORKSPACE_QUERY_KEY,
+          courseIdStr,
+        ]);
+        const firstSectionId = workspace?.course?.sections?.[0]?.id;
+        router.replace({
+          pathname: `/courses/${courseIdStr}/chapters`,
           params: firstSectionId ? { sectionId: firstSectionId } : {},
         });
       } catch {
-        router.push(`/courses/${courseId}/chapters` as never);
+        router.replace(`/courses/${courseIdStr}/chapters` as never);
       }
       return;
     }
 
     // --- Final Test Completion Sync ---
-    if (currentPage === 'final-test' && courseId) {
+    if (currentPage === 'final-test' && courseIdStr) {
       // Check if course has been reviewed
-      const isReviewed = await getCourseReviewStatus(courseId as string);
+      const isReviewed = await getCourseReviewStatus(courseIdStr as string);
       console.log('Course review status:', isReviewed);
       
       if (!isReviewed) {
@@ -519,29 +540,17 @@ const Questionnaire = forwardRef(function Questionnaire({
       
       // Course already reviewed or no onComplete handler - direct navigation
       try {
-        const progressResp = await getStudentCourseProgressByCourseId(courseId as string);
-        let nextSectionId = null;
-        if (progressResp.data && progressResp.data.chapterProgress) {
-          const courseResp = await getCourseById(courseId as string);
-          const course = courseResp.data;
-          nextSectionId = course.sections[0]?.id;
-          outer: for (const section of course.sections) {
-            for (const ch of section.chapters) {
-              const completed = progressResp.data.chapterProgress.find(cp => cp.chapterId === ch.id && cp.isCompleted);
-              if (!completed) {
-                nextSectionId = section.id;
-                break outer;
-              }
-            }
-          }
-        }
-        router.push({ pathname: `/courses/${courseId}/chapters`, params: { sectionId: nextSectionId } });
+        const workspace = await fetchCourseWorkspace(queryClient, courseIdStr, { force: true });
+        const nextSectionId = workspace.progress?.chapterProgress
+          ? findNextIncompleteSectionId(workspace.course, workspace.progress.chapterProgress)
+          : workspace.course.sections[0]?.id;
+        router.push({ pathname: `/courses/${courseIdStr}/chapters`, params: { sectionId: nextSectionId } });
         return;
       } catch (e) {
         console.log('Failed to sync final test completion', e);
       }
     } else {
-       router.push({ pathname: `/courses/${courseId}/chapters` });
+       router.push({ pathname: `/courses/${courseIdStr}/chapters` });
     }
   };
 
@@ -555,14 +564,14 @@ const Questionnaire = forwardRef(function Questionnaire({
       let lastErr: unknown;
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         try {
-          if (!courseId) return;
-          const courseResp = await getCourseById(String(courseId));
+          if (!courseIdStr) return;
+          const workspace = await fetchCourseWorkspace(queryClient, courseIdStr);
           if (!mounted) return;
-          setCourseDetails(courseResp.data);
+          setCourseDetails(workspace.course);
 
           if (!Array.isArray(test) || test.length === 0) {
             const serverTests: ITest[] = [];
-            courseResp.data.sections?.forEach((s: any) => {
+            workspace.course.sections?.forEach((s: any) => {
               if (s.preTests && s.preTests.length > 0) serverTests.push(...s.preTests);
               s.chapters?.forEach((ch: any) => {
                 if (ch.finalTest) serverTests.push(ch.finalTest);
@@ -593,7 +602,7 @@ const Questionnaire = forwardRef(function Questionnaire({
     return () => {
       mounted = false;
     };
-  }, [courseId, mapTestsToLocal, test]);
+  }, [courseIdStr, mapTestsToLocal, queryClient, test]);
 
   useImperativeHandle(ref, () => ({
     showResults: () => setShowResults(true),
@@ -771,9 +780,11 @@ const Questionnaire = forwardRef(function Questionnaire({
                 const options = fullQuestionnaire?.options || [];
                 const allowMultiple = fullQuestionnaire?.allowMultiple;
                 return (
-                  <View key={ans.id} style={{ backgroundColor: '#F9FAFB', borderRadius: 12, marginBottom: 16, padding: 16 }}>
-                    <Text style={{ fontWeight: 'bold', color: '#3363AD', marginBottom: 4 }}>{idx + 1}. {ans.questionnaire?.question || fullQuestionnaire?.question || ''}</Text>
-                    {options.length > 0 ? options.map((opt: any, oi: number) => {
+                  <View key={ans.id} style={styles.resultAnswerCard}>
+                    <Text style={styles.resultQuestionText}>
+                      {idx + 1}. {ans.questionnaire?.question || fullQuestionnaire?.question || ''}
+                    </Text>
+                    {options.length > 0 ? options.map((opt: any) => {
                       const backendOptionId = opt.id;
                       const isSelected = ans.selectedAnswerIds?.includes(backendOptionId);
                       const isCorrect = ans.correctAnswerIds
@@ -792,10 +803,11 @@ const Questionnaire = forwardRef(function Questionnaire({
                         else if (!isSelected && isCorrect) { color = '#059669'; bg = '#F0FDF4'; icon = '🟢'; }
                       }
                       return (
-                        <View key={backendOptionId} style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 2, backgroundColor: bg, borderRadius: 6, paddingVertical: 4, paddingHorizontal: 8 }}>
-                                      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: isSelected ? color : '#D1D5DB', marginRight: 8 }} />
-                        
-                          <Text style={{ color, fontSize: 14 }}>{opt.label} {icon} </Text>
+                        <View key={backendOptionId} style={[styles.resultOptionRow, { backgroundColor: bg }]}>
+                          <View style={[styles.resultOptionDot, { backgroundColor: isSelected ? color : '#D1D5DB' }]} />
+                          <Text style={[styles.resultOptionText, { color }]}>
+                            {opt.label} {icon}
+                          </Text>
                         </View>
                       );
                     }) : (
@@ -871,105 +883,139 @@ const Questionnaire = forwardRef(function Questionnaire({
     <View style={styles.container}>
       <Header />
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={() => setDrawerVisible(true)} activeOpacity={0.7}>
-            <Menu size={24} color="#3363AD" />
-          </TouchableOpacity>
-          <View style={styles.headerContent}>
-            <Text style={styles.headerSubtitle}>{firstHeaderSubtitle}</Text>
-          </View>
-          <View style={styles.profileContainer}>
-            <Bot color="#3363AD" size={36} />
-          </View>
-        </View>
-
-        <View style={styles.progressHeader}>
-          <Text style={styles.questionCounter}>
-            Ikibazo {currentQuestionIndex + 1} of {totalQuestions}
+      <View style={styles.testTopBar}>
+        <TouchableOpacity style={styles.backButton} onPress={() => setDrawerVisible(true)} activeOpacity={0.7}>
+          <Menu size={24} color="#3363AD" />
+        </TouchableOpacity>
+        <View style={styles.headerContent}>
+          <Text style={styles.headerSubtitle} numberOfLines={2}>
+            {firstHeaderSubtitle}
           </Text>
-          <View style={styles.progressBar}>
-            <View 
-              style={[
-                styles.progressFill, 
-                { width: `${((currentQuestionIndex + 1) / totalQuestions) * 100}%` }
-              ]} 
-            />
-          </View>
         </View>
+        <View style={styles.profileContainer}>
+          <Bot color="#3363AD" size={36} />
+        </View>
+      </View>
 
-        {/* Question */}
-        {currentQuestion?.questionImage ? (
-          <View style={styles.questionImageWrap}>
-            <Text style={styles.questionTextImage}>{currentQuestion.question}</Text>
-            <Image source={{ uri: currentQuestion.questionImage }} style={styles.questionImage} resizeMode="cover" />
+      <View style={styles.progressHeader}>
+        <Text style={styles.questionCounter}>
+          Ikibazo {currentQuestionIndex + 1} / {totalQuestions}
+        </Text>
+        <View style={styles.progressBar}>
+          <View
+            style={[
+              styles.progressFill,
+              { width: `${((currentQuestionIndex + 1) / totalQuestions) * 100}%` },
+            ]}
+          />
+        </View>
+      </View>
+
+      <ScrollView
+        style={styles.content}
+        contentContainerStyle={styles.questionScrollContent}
+        showsVerticalScrollIndicator
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.questionCard}>
+          <View style={styles.questionRow}>
+            <View style={styles.questionNumberBadge}>
+              <Text style={styles.questionNumberText}>{currentQuestionIndex + 1}</Text>
+            </View>
+            <View style={styles.questionBody}>
+              <Text style={styles.questionTextReadable}>{currentQuestion?.question}</Text>
+              {currentQuestion?.allowMultiple ? (
+                <Text style={styles.multiSelectHint}>Hitamo kimwe cg byinshi</Text>
+              ) : null}
+            </View>
           </View>
-        ) : (
-          <View style={styles.questionContainer}>
-            <Text style={styles.questionText}>{currentQuestion.question}</Text>
-          </View>
-        )}
+
+          {currentQuestion?.questionImage ? (
+            <Image
+              source={{ uri: currentQuestion.questionImage }}
+              style={styles.questionImageReadable}
+              resizeMode="contain"
+            />
+          ) : null}
+        </View>
 
         <View style={styles.optionsContainer}>
-          {currentQuestion.options.map((option, index) => {
+          {currentQuestion?.options.map((option, index) => {
             const selected = isSelected(currentQuestion.id, option.id);
+            const optionLetter = String.fromCharCode(65 + index);
             return (
               <TouchableOpacity
                 key={index}
-                style={[styles.optionButton, selected && styles.selectedOption]}
+                style={[styles.optionButtonReadable, selected && styles.selectedOptionReadable]}
                 onPress={() => handleAnswerSelect(index)}
                 activeOpacity={0.85}
               >
-                <View style={[styles.check, selected && styles.checkSelected]}>
+                <View style={[styles.optionLetterBadge, selected && styles.optionLetterBadgeSelected]}>
+                  <Text style={[styles.optionLetterText, selected && styles.optionLetterTextSelected]}>
+                    {optionLetter}
+                  </Text>
+                </View>
+
+                <View style={styles.optionContent}>
+                  <Text style={[styles.optionTextReadable, selected && styles.selectedOptionText]}>
+                    {option.label}
+                  </Text>
+                  {option.image ? (
+                    <Image
+                      source={{ uri: option.image }}
+                      style={styles.optionImage}
+                      resizeMode="cover"
+                    />
+                  ) : null}
+                </View>
+
+                <View style={[styles.optionCheckIcon, selected && styles.optionCheckIconSelected]}>
                   {currentQuestion.allowMultiple ? (
-                    selected ? <CheckSquare size={20} color="#3B82F6" /> : <Square size={20} color="#64748B" />
+                    selected ? <CheckSquare size={18} color="#3363AD" /> : <Square size={18} color="#94A3B8" />
                   ) : (
-                    selected ? <CheckCircle size={20} color="#3B82F6" /> : <Circle size={20} color="#64748B" />
+                    selected ? <CheckCircle size={18} color="#3363AD" /> : <Circle size={18} color="#94A3B8" />
                   )}
                 </View>
-                <Text style={[styles.optionText, selected && styles.selectedOptionText]}>{option.label}</Text>
               </TouchableOpacity>
             );
           })}
         </View>
-
-        <View style={styles.navigationContainer}>
-          {currentQuestionIndex > 0 && (
-            <TouchableOpacity style={styles.previousButton} onPress={() => setCurrentQuestionIndex((p) => p - 1)}>
-              <Text style={styles.previousButtonText}>Subira inyuma</Text>
-            </TouchableOpacity>
-          )}
-
-          <TouchableOpacity
-            style={[styles.nextButton, !hasAnsweredCurrent() && styles.disabledButton]}
-            onPress={async () => {
-              if (currentQuestionIndex < questions.length - 1) {
-                setCurrentQuestionIndex((p) => p + 1);
-              } else {
-                // For pre-test we now submit answers to backend (attemptTest) first
-                // then pass a mapping of questionnaireId -> selectedAnswerIds to onComplete
-                if (currentPage && currentPage.includes('pre-test')) {
-                  try {
-                    await handleFinish();
-                  } catch (err) {
-                    console.log('handleFinish error:', err);
-                  }
-                  // Results screen: show marks + Komeza (navigation in handleContinue). Do not Alert here.
-                } else {
-                  await handleFinish();
-                }
-              }
-            }}
-            disabled={!hasAnsweredCurrent() || isSubmitting}
-          >
-            <Text style={styles.nextButtonText}>
-              {isSubmitting ? 'Gusoza...' : (currentQuestionIndex === questions.length - 1 ? 'Soza' : 'Komeza')}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={{ height: 120 }} />
       </ScrollView>
+
+      <View style={[styles.navigationContainerFixed, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+        {currentQuestionIndex > 0 ? (
+          <TouchableOpacity
+            style={styles.previousButton}
+            onPress={() => setCurrentQuestionIndex((p) => p - 1)}
+          >
+            <Text style={styles.previousButtonText}>Subira inyuma</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.navButtonSpacer} />
+        )}
+
+        <TouchableOpacity
+          style={[styles.nextButton, !hasAnsweredCurrent() && styles.disabledButton]}
+          onPress={async () => {
+            if (currentQuestionIndex < questions.length - 1) {
+              setCurrentQuestionIndex((p) => p + 1);
+            } else if (currentPage && currentPage.includes('pre-test')) {
+              try {
+                await handleFinish();
+              } catch (err) {
+                console.log('handleFinish error:', err);
+              }
+            } else {
+              await handleFinish();
+            }
+          }}
+          disabled={!hasAnsweredCurrent() || isSubmitting}
+        >
+          <Text style={styles.nextButtonText}>
+            {isSubmitting ? 'Gusoza...' : (currentQuestionIndex === questions.length - 1 ? 'Soza' : 'Komeza')}
+          </Text>
+        </TouchableOpacity>
+      </View>
 
       {courseDetails && (
         <CourseDrawer
@@ -1021,8 +1067,86 @@ const styles = StyleSheet.create({
     overflow: 'hidden' 
   },
   content: { flex: 1 },
+  testTopBar: {
+    backgroundColor: '#FFFFFF',
+    paddingTop: 10,
+    paddingBottom: 2,
+    paddingHorizontal: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  questionScrollContent: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 24,
+    flexGrow: 1,
+  },
+  questionCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  questionRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  questionNumberBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: 'rgba(51, 99, 173, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  questionNumberText: {
+    color: '#3363AD',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  questionBody: {
+    flex: 1,
+    minWidth: 0,
+    gap: 8,
+  },
+  questionTextReadable: {
+    color: '#0F172A',
+    fontSize: 14,
+    fontWeight: '500',
+    lineHeight: 20,
+  },
+  multiSelectHint: {
+    alignSelf: 'flex-start',
+    fontSize: 10,
+    fontWeight: '500',
+    color: '#3363AD',
+    backgroundColor: 'rgba(51, 99, 173, 0.1)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  questionImageReadable: {
+    width: '100%',
+    minHeight: 160,
+    maxHeight: 260,
+    marginTop: 14,
+    borderRadius: 12,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
   progressHeader: { 
-    padding: 20, 
+    padding: 8, 
     paddingTop: 0, 
     borderBottomWidth: 1, 
     borderBottomColor: '#E2E8F0' 
@@ -1038,12 +1162,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#E2E8F0', 
     borderRadius: 2 
   },
-  progressFill: { 
-    height: '100%', 
-    backgroundColor: '#3363AD', 
-    borderRadius: 10, 
-    borderWidth: 4, 
-    borderColor: '#3363AD' 
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#3363AD',
+    borderRadius: 2,
   },
   questionContainer: {
     backgroundColor: '#3363AD',
@@ -1090,9 +1212,74 @@ const styles = StyleSheet.create({
     textAlign: 'left',
   },
   optionsContainer: {
-    padding: 20,
-    gap: 8,
+    gap: 10,
   },
+  optionButtonReadable: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: '#E2E8F0',
+    gap: 12,
+  },
+  selectedOptionReadable: {
+    backgroundColor: 'rgba(51, 99, 173, 0.06)',
+    borderColor: '#3363AD',
+  },
+  optionLetterBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: '#CBD5E1',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    marginTop: 1,
+  },
+  optionLetterBadgeSelected: {
+    borderColor: '#3363AD',
+    backgroundColor: '#3363AD',
+  },
+  optionLetterText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  optionLetterTextSelected: {
+    color: '#FFFFFF',
+  },
+  optionContent: {
+    flex: 1,
+    minWidth: 0,
+    gap: 10,
+  },
+  optionTextReadable: {
+    flexShrink: 1,
+    fontSize: 14,
+    color: '#1E293B',
+    lineHeight: 20,
+  },
+  optionImage: {
+    width: '100%',
+    maxWidth: 220,
+    height: 120,
+    borderRadius: 10,
+    backgroundColor: '#E2E8F0',
+    alignSelf: 'flex-start',
+  },
+  optionCheckIcon: {
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    marginTop: 1,
+  },
+  optionCheckIconSelected: {},
   optionButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1137,6 +1324,23 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',
+  },
+  navigationContainerFixed: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    gap: 12,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 8,
+  },
+  navButtonSpacer: {
+    flex: 1,
   },
   previousButton: {
     flex: 1,
@@ -1205,6 +1409,41 @@ const styles = StyleSheet.create({
   resultsScrollContent: {
     alignItems: 'center',
     paddingVertical: 20,
+  },
+  resultAnswerCard: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    marginBottom: 16,
+    padding: 16,
+    width: '100%',
+  },
+  resultQuestionText: {
+    fontWeight: '700',
+    color: '#3363AD',
+    marginBottom: 8,
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  resultOptionRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginVertical: 4,
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    gap: 10,
+  },
+  resultOptionDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginTop: 7,
+    flexShrink: 0,
+  },
+  resultOptionText: {
+    flex: 1,
+    fontSize: 14,
+    lineHeight: 20,
   },
   resultsTitle: {
     fontSize: 28,

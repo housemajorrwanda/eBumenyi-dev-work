@@ -3,6 +3,7 @@ import { usePathname, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { checkValiditOfToken } from '@/services/auth';
 import { getWeltelLoginUrl } from '@/services/weltel.api';
+import { clearAuthSession, getAccessToken } from '@/utils/authSession';
 import {
   ACTIVE_MODULE_KEY,
   type AppModule,
@@ -19,10 +20,6 @@ type SelectModuleResult = {
 
 async function persistActiveModule(module: AppModule) {
   await AsyncStorage.setItem(ACTIVE_MODULE_KEY, module);
-}
-
-async function clearInvalidSession() {
-  await AsyncStorage.multiRemove(['accessToken', 'userData', 'role']);
 }
 
 export function useModuleSwitch() {
@@ -49,7 +46,7 @@ export function useModuleSwitch() {
       try {
         if (key === 'ebumenyi') {
           setLoadingModule('ebumenyi');
-          const token = await AsyncStorage.getItem('accessToken');
+          const token = await getAccessToken();
 
           if (token) {
             try {
@@ -59,9 +56,9 @@ export function useModuleSwitch() {
                 router.replace('/(tabs)');
                 return { switched: true };
               }
-              await clearInvalidSession();
+              await clearAuthSession();
             } catch {
-              await clearInvalidSession();
+              await clearAuthSession();
             }
           }
 
@@ -71,7 +68,7 @@ export function useModuleSwitch() {
 
         if (key === 'egenzura') {
           setLoadingModule('egenzura');
-          const token = await AsyncStorage.getItem('accessToken');
+          const token = await getAccessToken();
 
           if (!token) {
             router.replace('/auth/login');
@@ -81,7 +78,7 @@ export function useModuleSwitch() {
           try {
             const validationResult = await checkValiditOfToken();
             if (validationResult?.valid !== true) {
-              await clearInvalidSession();
+              await clearAuthSession();
               router.replace('/auth/login');
               return { switched: true };
             }

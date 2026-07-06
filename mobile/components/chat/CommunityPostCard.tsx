@@ -25,6 +25,7 @@ import { IMessage } from '@/types';
 import { WhatsAppVideoMessage } from './WhatsAppVideoMessage';
 import { AudioMessagePlayer } from './AudioMessagePlayer';
 import { SocketService } from '@/services/socket.service';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
 
 interface CommunityPostCardProps {
   post: IMessage & Record<string, any>;
@@ -837,7 +838,7 @@ export function CommunityPostCard({
 
           {/* Comments List */}
           {loadingComments ? (
-            <ActivityIndicator size="small" color="#4D81D2" style={{ marginVertical: 16 }} />
+            <LoadingSpinner variant="inline" message="" />
           ) : comments.length === 0 ? (
             <Text style={styles.noComments}>Nta gitekerezo. Uba uwa mbere!</Text>
           ) : (

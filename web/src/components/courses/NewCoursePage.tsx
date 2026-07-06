@@ -1,13 +1,13 @@
 import { useState, useRef, useEffect, useCallback, FC } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Plus, Trash2, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Upload, X, Eye } from "lucide-react";
+import { Plus, Trash2, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Upload, X, Eye, Bell } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import { ICourse } from "@/types";
 import DraftRestoreModal from "@/components/Dialogs/DraftRestoreModal";
 import { CourseLoader } from "@/components/Loader";
 import { uploadFileByType, uploadVideoFile } from "@/services/uploader.api";
-import { createCourse, updateCourse } from "@/services/course.service";
+import { createCourse, updateCourse, notifyCourseUsers } from "@/services/course.service";
 import { CourseSlideForm, transformCourseToFormData } from "@/utils/constants/courseTransformers";
 
 interface ICourseForm {
@@ -518,6 +518,14 @@ const NewCoursePage:FC<ICourseForm> = ({ item, onClose, isModal = false }) => {
     description: existingCourse?.description || "",
     isPublished: existingCourse?.isPublished || false,
   });
+
+  const [savedCourseId, setSavedCourseId] = useState<string | null>(
+    courseToEdit?.id ?? null,
+  );
+  const [pendingNotificationType, setPendingNotificationType] = useState<
+    "created" | "updated" | null | undefined
+  >(courseToEdit?.pendingNotificationType ?? null);
+  const [isNotifying, setIsNotifying] = useState(false);
 
   const [courseIntro, setCourseIntro] = useState({
     title: existingCourse?.intro?.title || initialCourseName || "",
@@ -1737,6 +1745,46 @@ const NewCoursePage:FC<ICourseForm> = ({ item, onClose, isModal = false }) => {
     await handlePublish(true);
   };
 
+  const syncCourseNotificationState = (response: unknown) => {
+    const courseData = (response as { data?: { course?: ICourse } })?.data?.course;
+    if (courseData?.id) setSavedCourseId(courseData.id);
+    if (courseData) {
+      setPendingNotificationType(courseData.pendingNotificationType ?? null);
+      setCourse((prev) => ({
+        ...prev,
+        isPublished: courseData.isPublished ?? prev.isPublished,
+      }));
+    }
+  };
+
+  const handleNotifyUsers = async () => {
+    const courseId = savedCourseId || courseToEdit?.id;
+    if (!courseId) {
+      toast.error("Save the course before notifying users");
+      return;
+    }
+    setIsNotifying(true);
+    try {
+      const response = await notifyCourseUsers(courseId);
+      syncCourseNotificationState(response);
+      toast.success(response.message || "Users notified successfully");
+    } catch (error: unknown) {
+      const errorMessage =
+        (error as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message ?? "Failed to notify users";
+      toast.error(errorMessage);
+    } finally {
+      setIsNotifying(false);
+    }
+  };
+
+  const showNotifyButton =
+    course.isPublished && !!pendingNotificationType && !!(savedCourseId || courseToEdit?.id);
+  const notifyButtonLabel =
+    pendingNotificationType === "created"
+      ? "Notify users (new course)"
+      : "Notify users (updates)";
+
   const handlePublish = async (isDraft: boolean) => {
     try {
       console.log('handlePublish called with isDraft:', isDraft);
@@ -1905,7 +1953,8 @@ const NewCoursePage:FC<ICourseForm> = ({ item, onClose, isModal = false }) => {
         updateCourseMutation.mutate(
           { id: courseToEdit.id, data: courseData },
           {
-            onSuccess() {
+            onSuccess(res) {
+              syncCourseNotificationState(res);
               const message = isDraft ? "Draft saved successfully" : "Course updated successfully";
               toast.success(message);
               if (!isDraft) {
@@ -1933,7 +1982,8 @@ const NewCoursePage:FC<ICourseForm> = ({ item, onClose, isModal = false }) => {
       } else {
         console.log('Creating new course');
         createCourseMutation.mutate(courseData, {
-          onSuccess() {
+          onSuccess(res) {
+            syncCourseNotificationState(res);
             const message = isDraft ? "Draft saved successfully" : "Course created successfully";
             toast.success(message);
             if (!isDraft) {
@@ -3408,7 +3458,27 @@ const NewCoursePage:FC<ICourseForm> = ({ item, onClose, isModal = false }) => {
             )}
 
             {/* Action Buttons */}
-            <div className="flex justify-center gap-4">
+            <div className="flex flex-col items-center gap-4">
+              {showNotifyButton && (
+                <div className="w-full max-w-xl rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                  You have unpublished changes for learners. Send a push notification when you are ready.
+                </div>
+              )}
+              <div className="flex justify-center gap-4 flex-wrap">
+              {showNotifyButton && (
+                <button
+                  onClick={handleNotifyUsers}
+                  disabled={isNotifying || isDraftSaving || isPublishing}
+                  className={`px-8 py-3 rounded-lg font-medium transition-all flex items-center gap-2 ${
+                    isNotifying
+                      ? 'bg-amber-300 text-amber-800 cursor-not-allowed'
+                      : 'bg-amber-500 hover:bg-amber-600 text-white'
+                  }`}
+                >
+                  <Bell size={18} />
+                  {isNotifying ? 'Sending...' : notifyButtonLabel}
+                </button>
+              )}
               <button
                 onClick={() => handleSaveDraft()}
                 disabled={isDraftSaving || isPublishing}
@@ -3432,6 +3502,7 @@ const NewCoursePage:FC<ICourseForm> = ({ item, onClose, isModal = false }) => {
               >
                 {isPublishing ? 'Publishing...' : courseToEdit ? 'Update Course' : 'Publish Course'}
               </button>
+              </div>
             </div>
           </div>
         );

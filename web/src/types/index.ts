@@ -597,6 +597,8 @@ export interface ICourse {
   coverIcon: string;
   description: string;
   isPublished: boolean;
+  pendingNotificationType?: 'created' | 'updated' | null;
+  lastNotifiedAt?: string | null;
   createdAt: string;
   updatedAt: string;
   staff: IStaff;
@@ -1324,6 +1326,7 @@ export interface IDashboardFilters {
   role: string; // "" means all; "TRAINEE" | "TESTER"
   year: string; // "" means all, e.g. "2025" | "2026"
   month: string; // "" means all, e.g. "Jan" | "Feb" ... "Dec"
+  hospitalId: string; // "" means all
 }
 
 export interface ICHWStats {

@@ -1,131 +1,125 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Modal } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useQueryClient } from '@tanstack/react-query';
 import Questionnaire from '@/components/Questionnaire';
-import { getCourseById, getFinalTestById, addCoursereview, getStudentCourseProgressByCourseId } from '@/services/course.api';
-import { ICourse, ITest } from '@/types';
+import { getFinalTestById, addCoursereview } from '@/services/course.api';
+import { ITest } from '@/types';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import CourseReviewCard from '@/components/CourseReviewCard';
 import StorageService from '@/services/storage.service';
+import {
+  fetchCourseWorkspace,
+  normalizeCourseId,
+  useCourseWorkspace,
+} from '@/hooks/useCourseWorkspace';
+import { findNextIncompleteSectionId } from '@/utils/courseWorkspace';
 
 export default function FinalTestScreen() {
   const { courseId } = useLocalSearchParams<{ courseId: string }>();
+  const courseIdStr = normalizeCourseId(courseId);
   const router = useRouter();
-  const [course, setCourse] = useState<ICourse | null>(null);
+  const queryClient = useQueryClient();
+  const { data: workspace, isLoading: workspaceLoading } = useCourseWorkspace(courseIdStr);
+  const course = workspace?.course ?? null;
   const [finalTest, setFinalTest] = useState<ITest | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [testLoading, setTestLoading] = useState(true);
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [pendingAnswers, setPendingAnswers] = useState<Record<string, string[]> | null>(null);
   const questionnaireRef = useRef<any>(null);
 
-  // Course review status helper
-  const storeCourseReviewStatus = async (courseId: string, isReviewed: boolean) => {
-    await StorageService.storeCourseReviewStatus(courseId, isReviewed);
+  const storeCourseReviewStatus = async (id: string, isReviewed: boolean) => {
+    await StorageService.storeCourseReviewStatus(id, isReviewed);
   };
 
   useEffect(() => {
-    loadCourse();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    let cancelled = false;
 
-  const loadCourse = async () => {
-    try {
-      if (courseId) {
-        const response = await getCourseById(courseId as string);
-        const fetchedCourse = response.data;
-        setCourse(fetchedCourse);
-        const finalTestResponse = await getFinalTestById(fetchedCourse.finalTest[0].id);
-        setFinalTest(finalTestResponse.data);
+    const loadFinalTest = async () => {
+      if (!course?.finalTest?.[0]?.id) {
+        if (!cancelled) setTestLoading(false);
+        return;
       }
-    } catch (error) {
-      console.log('Error loading course or finaltest:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  // Called when Questionnaire is completed
+      try {
+        const finalTestResponse = await getFinalTestById(course.finalTest[0].id);
+        if (!cancelled) setFinalTest(finalTestResponse.data);
+      } catch (error) {
+        console.log('Error loading final test:', error);
+      } finally {
+        if (!cancelled) setTestLoading(false);
+      }
+    };
+
+    if (!workspaceLoading && course) {
+      setTestLoading(true);
+      void loadFinalTest();
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [workspaceLoading, course]);
+
   const handleTestComplete = async (testAnswers: Record<string, string[]>) => {
-    // Instead of showing results, show review modal
-    console.log('handleTestComplete called, showing review modal');
     setPendingAnswers(testAnswers);
     setShowReviewModal(true);
   };
 
-  // Called after review is submitted
   const handleReviewSubmit = async (reviewData: any) => {
-    console.log('Review submitted:', reviewData);
-    
     try {
-      // Submit review to backend
       await addCoursereview({
         courseId: reviewData.courseId,
         comment: reviewData.comment,
         categoryRatings: reviewData.reviewCriteria,
-        rating: reviewData.rating
+        rating: reviewData.rating,
       });
-      
-      console.log('Review successfully submitted to backend');
-      
-      // Mark course as reviewed locally
-      if (courseId) {
-        await storeCourseReviewStatus(courseId as string, true);
-        console.log('Course marked as reviewed locally');
+
+      if (courseIdStr) {
+        await storeCourseReviewStatus(courseIdStr, true);
       }
-      
+
       setShowReviewModal(false);
     } catch (error) {
       console.log('Error submitting review:', error);
-      // Still close modal and mark as reviewed locally even if backend fails
       setShowReviewModal(false);
-      if (courseId) {
-        await storeCourseReviewStatus(courseId as string, true);
+      if (courseIdStr) {
+        await storeCourseReviewStatus(courseIdStr, true);
       }
     }
-    
-    // Show results/marks in Questionnaire first
-    if (questionnaireRef.current && questionnaireRef.current.showResults) {
+
+    if (questionnaireRef.current?.showResults) {
       questionnaireRef.current.showResults();
     }
-    
-    // Navigate to chapters after a short delay to show results
+
     setTimeout(async () => {
+      if (!courseIdStr) return;
+
       try {
-        // Get latest progress and decide next destination
-        const progressResp = await getStudentCourseProgressByCourseId(courseId as string);
+        const latestWorkspace = await fetchCourseWorkspace(queryClient, courseIdStr, { force: true });
+        const latestCourse = latestWorkspace.course;
+        const progress = latestWorkspace.progress;
 
-        // If final exam is available, navigate there; otherwise go to first incomplete section
-        const courseResp = await getCourseById(courseId as string);
-        const course = courseResp.data;
-
-        if (course.finalExam && Array.isArray(course.finalExam) && course.finalExam.length > 0) {
-          // Navigate to final exam page
-          router.push(`/courses/${courseId}/final-exam`);
+        if (latestCourse.finalExam?.length > 0) {
+          router.push(`/courses/${courseIdStr}/final-exam`);
           return;
         }
 
-        // Otherwise fallback to previous behavior: find first incomplete section
-        let nextSectionId = null;
-        if (progressResp.data && progressResp.data.chapterProgress) {
-          nextSectionId = course.sections[0]?.id;
-          outer: for (const section of course.sections) {
-            for (const ch of section.chapters) {
-              const completed = progressResp.data.chapterProgress.find((cp: any) => cp.chapterId === ch.id && cp.isCompleted);
-              if (!completed) {
-                nextSectionId = section.id;
-                break outer;
-              }
-            }
-          }
-        }
+        const nextSectionId = progress?.chapterProgress
+          ? findNextIncompleteSectionId(latestCourse, progress.chapterProgress)
+          : latestCourse.sections[0]?.id;
 
-        router.push({ pathname: `/courses/${courseId}/chapters`, params: { sectionId: nextSectionId } });
+        router.push({
+          pathname: `/courses/${courseIdStr}/chapters`,
+          params: { sectionId: nextSectionId },
+        });
       } catch (e) {
         console.log('Failed to navigate after review submission', e);
       }
-    }, 2000); // 2 second delay to show results
+    }, 2000);
   };
 
+  const loading = workspaceLoading || testLoading;
   if (loading) return <LoadingSpinner />;
   if (!course || !finalTest) return null;
 
@@ -145,7 +139,7 @@ export default function FinalTestScreen() {
       />
       <Modal visible={showReviewModal} animationType="slide" transparent={false}>
         <CourseReviewCard
-          courseId={courseId as string}
+          courseId={courseIdStr as string}
           courseCoverIcon={course.coverIcon}
           courseTitle={course.title}
           submitButtonText="Ohereza"

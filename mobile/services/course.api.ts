@@ -1,4 +1,4 @@
-import { ICourseResponse, IOneCourseResponse, IStudentStatisticsResponse, ITestResponse, TAttempTestResponse, CreateAttempTestDto, IChapterResponse, IAttemptsResponse, IProgressResponse, CreateCourseReviewDto, TCourseReviewResponse, CreateSectionReviewDto, TSectionReviewResponse, CreateChapterReviewDto, TChapterReviewResponse, IDocumentsByCourseResponse, IStudentsByCourseResponse, IMySectionReviewItem, IMyChapterReviewItem, IPostCourseRecommendationsResponse } from "@/types";
+import { ICourseResponse, IOneCourseResponse, IStudentStatisticsResponse, ITestResponse, TAttempTestResponse, CreateAttempTestDto, IChapterResponse, IAttemptsResponse, IProgressResponse, ICourseWorkspaceResponse, CreateCourseReviewDto, TCourseReviewResponse, CreateSectionReviewDto, TSectionReviewResponse, CreateChapterReviewDto, TChapterReviewResponse, IDocumentsByCourseResponse, IStudentsByCourseResponse, IMySectionReviewItem, IMyChapterReviewItem, IPostCourseRecommendationsResponse } from "@/types";
 import httpClient from "./httpClient";
 
 
@@ -64,6 +64,15 @@ export const getAttempTestById = async (id: string): Promise<IAttemptsResponse> 
 export const getStudentCourseProgressByCourseId = async (courseId: string): Promise<IProgressResponse> => {
     const response = await httpClient.get(`/progress/student/course/${courseId}`);
     return (response as any).data as IProgressResponse;
+};
+
+export const getCourseWorkspace = async (
+  courseId: string,
+  chapterId?: string,
+): Promise<ICourseWorkspaceResponse> => {
+  const query = chapterId ? `?chapterId=${encodeURIComponent(chapterId)}` : '';
+  const response = await httpClient.get(`/progress/student/course/${courseId}/workspace${query}`);
+  return (response as any).data as ICourseWorkspaceResponse;
 };
 
 export const getPostCourseRecommendations = async (

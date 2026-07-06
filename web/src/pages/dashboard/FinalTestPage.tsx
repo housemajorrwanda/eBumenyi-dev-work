@@ -27,7 +27,12 @@ import {
   submitFinalExamAttempt,
   getCourseFinalTestIds,
 } from "@/services/finaltest.service";
-import { generateCertificate } from "@/services/certificates.service";
+import {
+  generateCertificate,
+  prepareCertificate,
+  storeCertificatePdf,
+} from "@/services/certificates.service";
+import { renderCertificateToBase64 } from "@/utils/renderCertificate";
 import { IQuestionnaire } from "@/types";
 
 interface Props {
@@ -82,10 +87,34 @@ const FinalTestPage: React.FC<Props> = ({ mode }) => {
   useEffect(() => { loadTest(); }, [loadTest]);
 
   useEffect(() => {
-    if (result?.isCompleted && isFinalExam && courseId) {
-      setIsGeneratingCert(true);
-      generateCertificate(courseId).catch(() => {}).finally(() => setIsGeneratingCert(false));
-    }
+    if (!result?.isCompleted || !isFinalExam || !courseId) return;
+    setIsGeneratingCert(true);
+    (async () => {
+      try {
+        let prepared;
+        try {
+          prepared = await prepareCertificate(courseId);
+        } catch {
+          await generateCertificate(courseId);
+          return;
+        }
+
+        if (prepared.canvasJson) {
+          const base64Pdf = await renderCertificateToBase64(
+            JSON.parse(prepared.canvasJson),
+            prepared.tokenValues,
+            prepared.certId,
+          );
+          await storeCertificatePdf(prepared.certId, courseId, base64Pdf);
+        } else {
+          await generateCertificate(courseId);
+        }
+      } catch {
+        // best-effort — don't surface errors to the student
+      } finally {
+        setIsGeneratingCert(false);
+      }
+    })();
   }, [result, isFinalExam, courseId]);
 
   const toggleOption = (questionId: string, optionId: string, allowMultiple: boolean) => {

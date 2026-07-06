@@ -11,6 +11,7 @@ import {
   TextInput,
   ActivityIndicator,
 } from 'react-native';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -216,7 +217,7 @@ function PublishModal({
 
                 {/* User list */}
                 {loadingCandidates ? (
-                  <ActivityIndicator style={{ marginTop: 16 }} color={themeColors.primary} />
+                  <LoadingSpinner variant="inline" message="" />
                 ) : (
                   <View style={[styles.userList, { borderColor }]}>
                     {filteredCandidates.length === 0 ? (
@@ -402,9 +403,7 @@ export default function AdminRecordingsScreen() {
         }
       >
         {isLoading ? (
-          <View style={styles.center}>
-            <ActivityIndicator color={themeColors.primary} />
-          </View>
+          <LoadingSpinner />
         ) : recordings.length === 0 ? (
           <View style={styles.center}>
             <Video size={48} color={isDark ? '#374151' : '#d1d5db'} />

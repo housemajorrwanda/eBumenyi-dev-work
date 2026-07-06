@@ -242,11 +242,17 @@ const AdminCHOGroupDetailPage = () => {
   });
 
   const { mutate: updateGroup, isPending: isUpdating } = useMutation({
-    mutationFn: () => adminUpdateGroup(id!, {
-      name: editName || undefined,
-      sector: editSector,
-      description: editDescription,
-    }),
+    mutationFn: () => {
+      const sectors = editSector
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      return adminUpdateGroup(id!, {
+        name: editName || undefined,
+        sectors,
+        description: editDescription,
+      });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-cho-group-detail", id] });
       queryClient.invalidateQueries({ queryKey: ["admin-cho-groups"] });
@@ -272,7 +278,7 @@ const AdminCHOGroupDetailPage = () => {
 
   const openEdit = () => {
     setEditName(group?.name ?? "");
-    setEditSector(group?.sector ?? "");
+    setEditSector((group?.sectors ?? []).join(", "));
     setEditDescription(group?.description ?? "");
     setIsEditing(true);
   };
@@ -355,12 +361,12 @@ const AdminCHOGroupDetailPage = () => {
               />
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-gray-600">Sector</label>
+              <label className="text-xs font-semibold text-gray-600">Sectors</label>
               <input
                 type="text"
                 value={editSector}
                 onChange={(e) => setEditSector(e.target.value)}
-                placeholder="e.g. Nyarugenge"
+                placeholder="e.g. Nyarugenge (comma-separated for multiple)"
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#3363AD]/30 focus:border-[#3363AD]"
               />
             </div>
@@ -397,10 +403,10 @@ const AdminCHOGroupDetailPage = () => {
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Group Info</p>
           <div className="space-y-2">
-            {group.sector && (
+            {(group.sectors?.length ?? 0) > 0 && (
               <div className="flex items-center gap-2 text-sm text-gray-700">
                 <MapPin className="w-4 h-4 text-[#3363AD] shrink-0" />
-                <span>{group.sector}</span>
+                <span>{group.sectors!.join(", ")}</span>
               </div>
             )}
             {group.description && (

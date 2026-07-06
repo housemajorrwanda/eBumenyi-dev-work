@@ -183,7 +183,7 @@ export const RecentActivityCard: React.FC<RecentActivityCardProps> = ({
       </div>
 
       {/* Activity list */}
-      <div className='px-4 pb-2 overflow-y-auto' style={{ maxHeight: 320 }}>
+      <div className='px-4 pb-2 overflow-y-auto' style={{ maxHeight: 680 }}>
         {isLoading ? (
           <div className='space-y-3 pt-3 animate-pulse'>
             {[...Array(4)].map((_, i) => (

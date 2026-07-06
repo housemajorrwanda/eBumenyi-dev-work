@@ -49,18 +49,18 @@ export const API_BASE_URL = resolveApiBaseUrl(BACKEND_BASE_URL);
 export const ASSETS_BASE_URL =
   readEnv('EXPO_PUBLIC_ASSETS_BASE_URL', 'assetsBaseUrl') || BACKEND_BASE_URL;
 
-export const UPLOADS_VIDEOS_PATH =
-  readEnv('EXPO_PUBLIC_UPLOADS_VIDEOS_PATH', 'uploadsVideosPath') ||
-  '/uploads/videos';
+// API endpoint base URL
+export const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || "https://apitest.ebumenyi.online/api";
 
-export const UPLOADS_DOCUMENTS_PATH =
-  readEnv('EXPO_PUBLIC_UPLOADS_DOCUMENTS_PATH', 'uploadsDocumentsPath') ||
-  '/uploads/documents';
+// Assets and uploads base URL
+export const ASSETS_BASE_URL = process.env.EXPO_PUBLIC_ASSETS_BASE_URL || BACKEND_BASE_URL || "https://apitest.ebumenyi.online";
 
 export const UPLOADS_IMAGES_PATH =
   readEnv('EXPO_PUBLIC_UPLOADS_IMAGES_PATH', 'uploadsImagesPath') ||
   '/uploads/images';
 
-export const WELTEL_WEB_URL =
-  readEnv('EXPO_PUBLIC_WELTEL_WEB_URL', 'weltelWebUrl') ||
-  'https://rw-chw1.weltelhealth.net';
+// WelTel in-app web destination
+export const WELTEL_WEB_URL = process.env.EXPO_PUBLIC_WELTEL_WEB_URL || 'https://rw-chw1.weltelhealth.net';
+
+// Meeting server base URL
+export const MEETING_BASE_URL = (process.env.EXPO_PUBLIC_MEETING_BASE_URL || 'https://meeting.ebumenyi.online').replace(/\/$/, '');

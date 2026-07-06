@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
 import {
   Calendar,
   Clock,
@@ -194,12 +195,7 @@ const EventViewModal: React.FC<EventViewModalProps> = ({
         <View style={styles.modalCard}>
           {/* ─── Loading ─── */}
           {isLoading && !resolvedEvent && (
-            <View style={styles.centeredState}>
-              <ActivityIndicator size="large" color={themeColors.primary} />
-              <Text style={styles.centeredStateText}>
-                {t('calendar.loading') || 'Loading event details…'}
-              </Text>
-            </View>
+            <LoadingSpinner message={t('calendar.loading') || 'Loading event details…'} />
           )}
 
           {/* ─── Error ─── */}

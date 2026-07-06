@@ -10,7 +10,7 @@ import {
   CourseSlide,
   TestConfig,
 } from "@/types/courseBuilder.d";
-import { getCourseById, updateCourse } from "@/services/course.service";
+import { getCourseById, updateCourse, notifyCourseUsers } from "@/services/course.service";
 import { ICourse, ISection, IChapter, ISlide } from "@/types";
 import { courseKeys } from "@/utils/constants/queryKeys";
 
@@ -126,12 +126,25 @@ function mapICourseToCourseBuilderData(course: ICourse): CourseBuilderData {
     coverIcon: course.coverIcon ?? "",
     sections,
     isPublished: course.isPublished,
+    pendingNotificationType: course.pendingNotificationType ?? null,
+    lastNotifiedAt: course.lastNotifiedAt ?? null,
     createdAt: course.createdAt,
     updatedAt: course.updatedAt,
     preTest,
     finalTest,
     finalExam,
   };
+}
+
+/** Map sequential slide index to persisted slideNumber, reserving activityAt for mid-test. */
+function getSlideNumberForSave(
+  slideIndex: number,
+  activityAt?: number,
+  hasMidTest = false,
+): number {
+  const base = slideIndex + 1;
+  if (!hasMidTest || !activityAt || activityAt < 1) return base;
+  return base >= activityAt ? base + 1 : base;
 }
 
 function buildApiPayload(data: CourseBuilderData): Record<string, unknown> {
@@ -162,7 +175,11 @@ function buildApiPayload(data: CourseBuilderData): Record<string, unknown> {
           .sort((a, b) => a.order - b.order)
           .map((slide, sli) => ({
             note: slide.title,
-            slideNumber: sli + 1,
+            slideNumber: getSlideNumberForSave(
+              sli,
+              chapter.activityAt,
+              !!chapter.midTest,
+            ),
             file: slide.fileUrl,
             isPublished: true,
           })),
@@ -205,6 +222,14 @@ function buildApiPayload(data: CourseBuilderData): Record<string, unknown> {
         }
       : {}),
   };
+}
+
+async function fetchCourseBuilderData(
+  courseId: string,
+): Promise<CourseBuilderData | void> {
+  const freshResponse = await getCourseById(courseId);
+  const freshCourse = freshResponse?.data as ICourse | undefined;
+  if (freshCourse) return mapICourseToCourseBuilderData(freshCourse);
 }
 
 export default function NewCoursesBuilder() {
@@ -264,14 +289,8 @@ export default function NewCoursesBuilder() {
     try {
       const payload = buildApiPayload(updatedCourse);
       await updateCourse(updatedCourse.id, payload);
-      // Silently fetch fresh data to populate newly-created testIds
-      try {
-        const freshResponse = await getCourseById(updatedCourse.id);
-        const freshCourse = freshResponse?.data as ICourse | undefined;
-        if (freshCourse) return mapICourseToCourseBuilderData(freshCourse);
-      } catch {
-        // silent — testId will update on next successful save
-      }
+      // Update response is a shallow course — refetch full tree so midTest ids are available.
+      return await fetchCourseBuilderData(updatedCourse.id);
     } catch (error) {
       const rawMsg =
         (error as { response?: { data?: { message?: string } } })?.response
@@ -284,17 +303,38 @@ export default function NewCoursesBuilder() {
     }
   };
 
-  const handlePublishCourse = async (updatedCourse: CourseBuilderData) => {
+  const handlePublishCourse = async (
+    updatedCourse: CourseBuilderData,
+  ): Promise<CourseBuilderData | void> => {
     try {
       const payload = buildApiPayload({ ...updatedCourse, isPublished: true });
       await updateCourse(updatedCourse.id, payload);
       await queryClient.invalidateQueries({ queryKey: detailQueryKey });
       await queryClient.invalidateQueries({ queryKey: courseKeys.all });
       toast.success("Course published successfully!");
+      return await fetchCourseBuilderData(updatedCourse.id);
     } catch (error) {
       const msg =
         (error as { response?: { data?: { message?: string } } })?.response
           ?.data?.message ?? "Failed to publish course";
+      toast.error(msg);
+      throw error;
+    }
+  };
+
+  const handleNotifyUsers = async (courseId: string) => {
+    try {
+      const response = await notifyCourseUsers(courseId);
+      await queryClient.invalidateQueries({ queryKey: detailQueryKey });
+      toast.success(response.message || "Users notified successfully");
+      const course = response.data?.course;
+      if (course) {
+        return mapICourseToCourseBuilderData(course);
+      }
+    } catch (error) {
+      const msg =
+        (error as { response?: { data?: { message?: string } } })?.response
+          ?.data?.message ?? "Failed to notify users";
       toast.error(msg);
       throw error;
     }
@@ -332,6 +372,7 @@ export default function NewCoursesBuilder() {
       courseData={courseData}
       onAutoSave={handleAutoSave}
       onPublish={handlePublishCourse}
+      onNotifyUsers={handleNotifyUsers}
       onBack={handleBack}
     />
   );

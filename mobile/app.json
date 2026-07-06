@@ -39,6 +39,7 @@
         "foregroundImage": "./assets/logo/chw.png",
         "backgroundColor": "#ffffff"
       },
+      "softwareKeyboardLayoutMode": "resize",
       "edgeToEdgeEnabled": true,
       "package": "com.gilberthappi.chwapp",
       "googleServicesFile": "./google-services.json",

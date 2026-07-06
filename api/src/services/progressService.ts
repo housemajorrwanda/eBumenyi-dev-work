@@ -1,6 +1,12 @@
 import { prisma } from "../utils/client";
 import AppError from "../utils/error";
 import { NotificationHelper } from "../utils/notificationHelper";
+import {
+  extractStudentFirstName,
+  generateConversationalRecommendations,
+  type ConversationalMessage,
+} from "./recommendationNlpService";
+import { CourseService } from "./courseService";
 
 export class ProgressService {
   // Slide progress: mark slideProgress.isCompleted true when student views slide
@@ -279,6 +285,8 @@ export class ProgressService {
         });
       }
 
+      await this.emitCourseProgressUpdated(io, studentId, courseId, 100, true);
+
       return {
         message: "Course progress recomputed (no slides)",
         statusCode: 200,
@@ -376,6 +384,14 @@ export class ProgressService {
         console.warn("[ProgressService] Course completion notify failed:", notifErr);
       }
     }
+
+    await this.emitCourseProgressUpdated(
+      io,
+      studentId,
+      courseId,
+      rounded,
+      isCompleted,
+    );
 
     return { message: "Course progress recomputed", statusCode: 200 } as {
       message: string;
@@ -649,29 +665,16 @@ export class ProgressService {
     };
   }
 
-  // API: Get progress by student id and course id (return course, chapter, slide progress lists for a specific course)
-  public static async getProgressByStudentAndCourse(
-    studentId: string,
-    courseId: string,
-  ) {
-    // verify student exists
-    const student = await prisma.student.findUnique({
-      where: { id: studentId },
-    });
-    if (!student) throw new AppError("Student not found", 404);
+  private static findChapterInCourse(course: { sections?: Array<{ chapters?: Array<{ id: string }> }> }, chapterId: string) {
+    for (const section of course.sections ?? []) {
+      for (const chapter of section.chapters ?? []) {
+        if (chapter.id === chapterId) return chapter;
+      }
+    }
+    return null;
+  }
 
-    // verify course exists
-    const course = await prisma.course.findUnique({
-      where: { id: courseId },
-    });
-    if (!course) throw new AppError("Course not found", 404);
-
-    // Recompute progress for this course only - use comprehensive recomputation
-    await this.recomputeAllProgressForStudent(studentId);
-
-    // Then specifically recompute the course progress to ensure it's up to date
-    await this.recomputeCourseProgressForStudent(studentId, courseId);
-
+  private static async buildCourseProgressPayload(studentId: string, courseId: string) {
     // Get chapter progress for chapters in this course
     const chapterProgress = await prisma.chapterProgress.findMany({
       where: {
@@ -789,15 +792,110 @@ export class ProgressService {
     });
     const completedSlideIds = completedSlideRows.map((r) => r.slideId);
 
+    const courseProgressRow = await prisma.courseProgress.findFirst({
+      where: { studentId, courseId },
+    });
+
+    return {
+      chapterProgress,
+      completedSlideIds,
+      preTestStatus,
+      finalTestStatus,
+      finalExamStatus,
+      courseProgress: {
+        progress: courseProgressRow?.progress ?? 0,
+        isCompleted: courseProgressRow?.isCompleted ?? false,
+      },
+    };
+  }
+
+  private static async emitCourseProgressUpdated(
+    io: any,
+    studentId: string,
+    courseId: string,
+    progress: number,
+    isCompleted: boolean,
+  ) {
+    if (!io) return;
+    try {
+      const student = await prisma.student.findUnique({
+        where: { id: studentId },
+        select: { userId: true },
+      });
+      if (student?.userId) {
+        io.to(`user:${student.userId}`).emit("course_progress_updated", {
+          courseId,
+          progress,
+          isCompleted,
+        });
+      }
+    } catch (err) {
+      console.warn("[ProgressService] course_progress_updated emit failed:", err);
+    }
+  }
+
+  // API: Get progress by student id and course id (return course, chapter, slide progress lists for a specific course)
+  public static async getProgressByStudentAndCourse(
+    studentId: string,
+    courseId: string,
+  ) {
+    const student = await prisma.student.findUnique({
+      where: { id: studentId },
+    });
+    if (!student) throw new AppError("Student not found", 404);
+
+    const course = await prisma.course.findUnique({
+      where: { id: courseId },
+    });
+    if (!course) throw new AppError("Course not found", 404);
+
+    await this.recomputeAllProgressForStudent(studentId);
+    await this.recomputeCourseProgressForStudent(studentId, courseId);
+
+    const data = await this.buildCourseProgressPayload(studentId, courseId);
+
     return {
       message: "Progress fetched",
       statusCode: 200,
+      data,
+    };
+  }
+
+  /**
+   * Single payload for the student learning UI: full course tree + progress (+ optional chapter).
+   * Recomputes only this course (not all courses) to keep navigation fast.
+   */
+  public static async getCourseWorkspace(
+    studentId: string,
+    courseId: string,
+    chapterId?: string,
+  ) {
+    const student = await prisma.student.findUnique({
+      where: { id: studentId },
+    });
+    if (!student) throw new AppError("Student not found", 404);
+
+    await this.recomputeCourseProgressForStudent(studentId, courseId);
+
+    const [courseResult, progress] = await Promise.all([
+      CourseService.getCourseById(courseId),
+      this.buildCourseProgressPayload(studentId, courseId),
+    ]);
+
+    const course = courseResult.data;
+    let chapter = null;
+    if (chapterId) {
+      chapter = this.findChapterInCourse(course, chapterId);
+      if (!chapter) throw new AppError("Chapter not found in course", 404);
+    }
+
+    return {
+      message: "Course workspace fetched",
+      statusCode: 200,
       data: {
-        chapterProgress,
-        completedSlideIds,
-        preTestStatus,
-        finalTestStatus,
-        finalExamStatus,
+        course,
+        progress,
+        chapter,
       },
     };
   }
@@ -1240,6 +1338,8 @@ export class ProgressService {
       expectedLessonMinutes: number;
       elapsedHours: number | null;
       summaryMessageRw: string;
+      conversationalMessages: ConversationalMessage[];
+      generatedByNlp: boolean;
       chapters: Array<{
         chapterId: string;
         sectionId: string;
@@ -1262,6 +1362,7 @@ export class ProgressService {
   }> {
     const student = await prisma.student.findUnique({
       where: { id: studentId },
+      include: { user: { select: { fullNames: true } } },
     });
     if (!student) throw new AppError("Student not found", 404);
 
@@ -1270,6 +1371,8 @@ export class ProgressService {
       select: { id: true, title: true },
     });
     if (!course) throw new AppError("Course not found", 404);
+
+    const studentFirstName = extractStudentFirstName(student.user?.fullNames);
 
     const certificate = await prisma.certificate.findUnique({
       where: {
@@ -1533,6 +1636,14 @@ export class ProgressService {
       chapters,
     );
 
+    const { messages: conversationalMessages, generatedByNlp } =
+      await generateConversationalRecommendations({
+        studentFirstName,
+        courseTitle: course.title,
+        completedQuickly,
+        chapters,
+      });
+
     return {
       message: "Recommendations fetched",
       statusCode: 200,
@@ -1543,6 +1654,8 @@ export class ProgressService {
         expectedLessonMinutes,
         elapsedHours,
         summaryMessageRw,
+        conversationalMessages,
+        generatedByNlp,
         chapters,
       },
     };

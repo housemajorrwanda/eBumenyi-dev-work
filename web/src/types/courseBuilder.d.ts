@@ -46,6 +46,8 @@ export interface CourseBuilderData {
   coverIcon: string; // uploaded image URL/data URL or legacy icon value
   sections: CourseSection[];
   isPublished: boolean;
+  pendingNotificationType?: 'created' | 'updated' | null;
+  lastNotifiedAt?: string | null;
   createdAt: string;
   updatedAt: string;
   preTest?: TestConfig;

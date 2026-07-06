@@ -19,6 +19,7 @@ import { ProgressService } from "../services/progressService";
 import {
   CreateCourseDto,
   CreateSuperCourseDto,
+  NotifyCourseUsersDto,
   UpdateSuperCourseDto,
 } from "../utils/interfaces/common";
 import { loggerMiddleware } from "../utils/loggers/loggingMiddleware";
@@ -182,6 +183,26 @@ export class CourseController {
     return CourseService.updateSuperCourse(updateData, creatorId, io);
   }
 
+  @Post("/{id}/notify-users")
+  @Security("jwt")
+  @Middlewares(
+    checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN),
+  )
+  public notifyCourseUsers(
+    @Path() id: string,
+    @Body() body: NotifyCourseUsersDto,
+    @Request() req: ExpressRequest,
+  ) {
+    const userId = req.user!.id;
+    const io = getIOInstance(req);
+    return CourseService.releaseCourseNotification(
+      id,
+      userId,
+      io,
+      body?.roles,
+    );
+  }
+
   @Get("/dashboard/statistics")
   @Security("jwt")
   @Middlewares(
@@ -203,6 +224,7 @@ export class CourseController {
     @Query() year?: string,
     @Query() month?: string,
     @Query() role?: string,
+    @Query() hospitalId?: string,
   ) {
     return CourseService.getDashboardStatistics({
       district,
@@ -211,6 +233,7 @@ export class CourseController {
       year,
       month,
       role,
+      hospitalId,
     });
   }
 

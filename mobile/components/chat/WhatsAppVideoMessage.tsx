@@ -3,11 +3,11 @@ import {
   View,
   StyleSheet,
   TouchableOpacity,
-  Modal,
   Text,
-  ActivityIndicator,
+  Modal,
   ViewStyle,
 } from 'react-native';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { Play } from 'lucide-react-native';
 
@@ -168,7 +168,7 @@ export const WhatsAppVideoMessage: React.FC<WhatsAppVideoMessageProps> = ({
 
         {isLoading && (
           <View style={styles.loadingOverlay}>
-            <ActivityIndicator size="large" color="#ffffff" />
+            <LoadingSpinner variant="inline" message="" isDark />
           </View>
         )}
 
@@ -202,8 +202,7 @@ export const WhatsAppVideoMessage: React.FC<WhatsAppVideoMessageProps> = ({
 
           {isLoading && (
             <View style={styles.fullscreenLoadingOverlay}>
-              <ActivityIndicator size="large" color="#ffffff" />
-              <Text style={styles.fullscreenLoadingText}>Loading…</Text>
+              <LoadingSpinner variant="inline" message="Loading…" isDark />
             </View>
           )}
 

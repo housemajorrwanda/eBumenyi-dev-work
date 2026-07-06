@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -6,87 +6,19 @@ import {
   ScrollView,
   TouchableOpacity,
   Modal,
-  ActivityIndicator,
   Pressable,
   Dimensions,
+  Animated,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Bot } from 'lucide-react-native';
 import { getPostCourseRecommendations } from '@/services/course.api';
-import type {
-  IPostCourseRecommendationsData,
-  IPostCourseRecommendationChapter,
-  PostCourseRecommendationReason,
-  PostCourseRecommendationSeverity,
-} from '@/types';
+import type { IPostCourseRecommendationsData } from '@/types';
 import { getApiErrorMessage } from '@/utils/apiError';
-
-function reasonLabelRw(reason: PostCourseRecommendationReason): string {
-  switch (reason) {
-    case 'below_pass':
-      return 'Amanota hasi';
-    case 'barely_passed':
-      return 'Wanyereye gusa';
-    case 'fast_pace_review':
-      return 'Subiramo (byihutiye)';
-    case 'incomplete_slides':
-      return 'Amashusho atarakozwa neza';
-    default:
-      return reason;
-  }
-}
-
-interface SeverityTheme {
-  label: string;
-  border: string;
-  badgeBg: string;
-  badgeText: string;
-  pillBg: string;
-  pillText: string;
-  chipBg: string;
-  chipText: string;
-  btnBorder: string;
-  btnText: string;
-}
-
-const SEVERITY_THEMES: Record<PostCourseRecommendationSeverity, SeverityTheme> = {
-  high: {
-    label: 'Bikomeye',
-    border: '#DC2626',
-    badgeBg: '#DC2626',
-    badgeText: '#FFFFFF',
-    pillBg: '#FEE2E2',
-    pillText: '#991B1B',
-    chipBg: '#FEE2E2',
-    chipText: '#991B1B',
-    btnBorder: '#DC2626',
-    btnText: '#B91C1C',
-  },
-  moderate: {
-    label: 'Biringaniye',
-    border: '#D97706',
-    badgeBg: '#D97706',
-    badgeText: '#FFFFFF',
-    pillBg: '#FEF3C7',
-    pillText: '#92400E',
-    chipBg: '#FEF3C7',
-    chipText: '#92400E',
-    btnBorder: '#D97706',
-    btnText: '#B45309',
-  },
-  low: {
-    label: 'Byoroheje',
-    border: '#059669',
-    badgeBg: '#059669',
-    badgeText: '#FFFFFF',
-    pillBg: '#D1FAE5',
-    pillText: '#065F46',
-    chipBg: '#E0F2FE',
-    chipText: '#075985',
-    btnBorder: '#059669',
-    btnText: '#047857',
-  },
-};
+import { useAuth } from '@/hooks/useAuth';
+import RecommendationBody from '@/components/RecommendationBody';
+import { toRecommendedQueryParam } from '@/constants/recommendations';
 
 export interface PostCourseRecommendationsModalProps {
   visible: boolean;
@@ -95,12 +27,63 @@ export interface PostCourseRecommendationsModalProps {
   onClose: () => void;
 }
 
+function TypingIndicator() {
+  const dot1 = useRef(new Animated.Value(0)).current;
+  const dot2 = useRef(new Animated.Value(0)).current;
+  const dot3 = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const DURATION = 350;
+    const DELAY = 150;
+    const makeAnim = (dot: Animated.Value, startDelay: number) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(startDelay),
+          Animated.timing(dot, { toValue: 1, duration: DURATION, useNativeDriver: true }),
+          Animated.timing(dot, { toValue: 0, duration: DURATION, useNativeDriver: true }),
+          Animated.delay(DELAY * 3 - startDelay),
+        ]),
+      );
+    const a1 = makeAnim(dot1, 0);
+    const a2 = makeAnim(dot2, DELAY);
+    const a3 = makeAnim(dot3, DELAY * 2);
+    a1.start();
+    a2.start();
+    a3.start();
+    return () => {
+      a1.stop();
+      a2.stop();
+      a3.stop();
+    };
+  }, [dot1, dot2, dot3]);
+
+  const lift = (dot: Animated.Value) =>
+    dot.interpolate({ inputRange: [0, 1], outputRange: [0, -4] });
+
+  return (
+    <View style={styles.typingRow}>
+      <View style={styles.assistantAvatar}>
+        <Bot size={18} color="#3363AD" />
+      </View>
+      <View style={styles.typingBubble}>
+        {[dot1, dot2, dot3].map((dot, i) => (
+          <Animated.View
+            key={i}
+            style={[styles.typingDot, { transform: [{ translateY: lift(dot) }] }]}
+          />
+        ))}
+      </View>
+    </View>
+  );
+}
+
 export default function PostCourseRecommendationsModal({
   visible,
   courseId,
   onClose,
 }: PostCourseRecommendationsModalProps) {
   const router = useRouter();
+  const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = Dimensions.get('window');
   const [recLoading, setRecLoading] = useState(false);
@@ -118,7 +101,7 @@ export default function PostCourseRecommendationsModal({
     if (!courseId || courseId === 'undefined') {
       setRecLoading(false);
       setRecError(
-        'Id ya somo ntabwo ihari. Subira winjire ku rubuga rw’impamyabumenyi.',
+        'Id ya somo ntabwo ihari. Subira winjire ku rubuga rw\u2019impamyabumenyi.',
       );
       setRecData(null);
       return;
@@ -145,8 +128,8 @@ export default function PostCourseRecommendationsModal({
     };
   }, [visible, courseId]);
 
-  const buildRecommendedParam = (data: IPostCourseRecommendationsData): string =>
-    data.chapters.map((c) => `${c.chapterId}:${c.severity}`).join(',');
+  const buildRecommendedParam = (data: IPostCourseRecommendationsData) =>
+    toRecommendedQueryParam(data.chapters);
 
   const goToCourseChapter = (sectionId: string | undefined) => {
     if (!recData) return;
@@ -165,115 +148,14 @@ export default function PostCourseRecommendationsModal({
     goToCourseChapter(recData.chapters[0]?.sectionId);
   };
 
-  const renderRecommendationBody = (data: IPostCourseRecommendationsData) => {
-    const hasChapters = data.chapters.length > 0;
-
-    if (!hasChapters) {
-      return (
-        <>
-          <Text style={styles.recModalBody}>{data.summaryMessageRw}</Text>
-          <TouchableOpacity
-            style={styles.recModalPrimaryBtn}
-            onPress={goToCourseFromRecommendation}
-          >
-            <Text style={styles.recModalPrimaryBtnText}>Jya ku isomo</Text>
-          </TouchableOpacity>
-        </>
-      );
-    }
-
-    return (
-      <>
-        <Text style={styles.recModalCourseTitle}>{data.courseTitle}</Text>
-        {data.completedQuickly ? (
-          <View style={styles.recCallout}>
-            <Text style={styles.recCalloutTitle}>Warangiye vuba</Text>
-            <Text style={styles.recCalloutBody}>
-              Warangije isomo vuba ku buryo butandukanye n&apos;igihe cy&apos;amasomo;
-              reba neza ibice byerekana hano no ku isomo.
-            </Text>
-          </View>
-        ) : null}
-        <Text style={styles.recModalSectionLabel}>
-          Turagusaba kongera usubiremo ibi bice by&apos;inyongera:
-        </Text>
-        {data.chapters.map((ch: IPostCourseRecommendationChapter) => {
-          const theme = SEVERITY_THEMES[ch.severity] ?? SEVERITY_THEMES.moderate;
-          const visibleReasons = ch.reasons.filter((r) => r !== 'no_attempt');
-          return (
-            <View
-              key={ch.chapterId}
-              style={[styles.recChapterCard, { borderLeftColor: theme.border }]}
-            >
-              <View style={styles.recChapterTopRow}>
-                <View
-                  style={[styles.recChapterBadge, { backgroundColor: theme.badgeBg }]}
-                >
-                  <Text
-                    style={[styles.recChapterBadgeText, { color: theme.badgeText }]}
-                  >
-                    {ch.chapterNumber}
-                  </Text>
-                </View>
-                <Text style={styles.recChapterTitle} numberOfLines={4}>
-                  {ch.chapterTitle}
-                </Text>
-                <View
-                  style={[styles.recSeverityPill, { backgroundColor: theme.pillBg }]}
-                >
-                  <View style={[styles.recSeverityDot, { backgroundColor: theme.border }]} />
-                  <Text style={[styles.recSeverityPillText, { color: theme.pillText }]}>
-                    {theme.label}
-                  </Text>
-                </View>
-              </View>
-              {visibleReasons.length > 0 ? (
-                <View style={styles.recChipWrap}>
-                  {visibleReasons.map((r) => (
-                    <View
-                      key={r}
-                      style={[styles.recChip, { backgroundColor: theme.chipBg }]}
-                    >
-                      <Text style={[styles.recChipText, { color: theme.chipText }]}>
-                        {reasonLabelRw(r)}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-              ) : null}
-              <View style={styles.recMetricsBox}>
-                {ch.attemptCount > 0 ? (
-                  <Text style={styles.recMetricsText}>
-                    Inshuro: {ch.attemptCount} · Amanota hejuru: {ch.bestMarks ?? '—'} ·
-                    Agenzu: {ch.marksToPass ?? '—'}
-                  </Text>
-                ) : (
-                  <Text style={styles.recMetricsMuted}>
-                    Amasomo yo kuri iki cyiciro ntago yizwe neza, subiramo.
-                  </Text>
-                )}
-              </View>
-              <TouchableOpacity
-                style={[styles.recChapterBtn, { borderColor: theme.btnBorder }]}
-                onPress={() => goToCourseChapter(ch.sectionId)}
-                activeOpacity={0.85}
-              >
-                <Text style={[styles.recChapterBtnText, { color: theme.btnText }]}>
-                  Jya ku cyiciro
-                </Text>
-              </TouchableOpacity>
-            </View>
-          );
-        })}
-        <TouchableOpacity
-          style={styles.recModalPrimaryBtn}
-          onPress={goToCourseFromRecommendation}
-        >
-          <Text style={styles.recModalPrimaryBtnText}>Jya ku isomo</Text>
-        </TouchableOpacity>
-      </>
-    );
-  };
+  const userContext = useMemo(
+    () => ({
+      fullNames: user?.fullNames,
+      district: user?.district,
+      sector: user?.sector,
+    }),
+    [user?.fullNames, user?.district, user?.sector],
+  );
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
@@ -286,11 +168,20 @@ export default function PostCourseRecommendationsModal({
           ]}
         >
           <View style={styles.recModalGrabber} />
-          <Text style={styles.recModalTitle}>Inama z&apos;inyongera</Text>
+          <View style={styles.headerRow}>
+            <View style={styles.headerAvatar}>
+              <Bot size={20} color="#fff" />
+            </View>
+            <View>
+              <Text style={styles.recModalTitle}>Inama z&apos;inyongera</Text>
+              <Text style={styles.recModalSubtitle}>Umujyanama w&apos;amasomo</Text>
+            </View>
+          </View>
+
           {recLoading ? (
             <View style={styles.recModalLoading}>
-              <ActivityIndicator size="large" color="#3363AD" />
-              <Text style={styles.recModalHint}>Turimo gutegura inama…</Text>
+              <TypingIndicator />
+              <Text style={styles.recModalHint}>Turimo gutegura inama zawe…</Text>
             </View>
           ) : recError ? (
             <Text style={styles.recModalError}>{recError}</Text>
@@ -300,9 +191,16 @@ export default function PostCourseRecommendationsModal({
               contentContainerStyle={styles.recModalScrollContent}
               showsVerticalScrollIndicator
             >
-              {renderRecommendationBody(recData)}
+              <RecommendationBody
+                key={`${recData.courseId}-${user?.fullNames ?? 'anon'}`}
+                data={recData}
+                userContext={userContext}
+                onGoToChapter={(sectionId) => goToCourseChapter(sectionId)}
+                onGoToCourse={goToCourseFromRecommendation}
+              />
             </ScrollView>
           ) : null}
+
           <TouchableOpacity style={styles.recModalCloseBtn} onPress={onClose}>
             <Text style={styles.recModalCloseBtnText}>Funga</Text>
           </TouchableOpacity>
@@ -322,10 +220,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.45)',
   },
   recModalCard: {
-    backgroundColor: '#fff',
+    backgroundColor: '#F0F4F8',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingTop: 8,
     zIndex: 1,
     shadowColor: '#000',
@@ -339,191 +237,99 @@ const styles = StyleSheet.create({
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#E5E7EB',
+    backgroundColor: '#CBD5E1',
     marginBottom: 12,
   },
-  recModalTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#3363AD',
-    marginBottom: 10,
-  },
-  recModalCourseTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
     marginBottom: 14,
-    lineHeight: 22,
+    paddingHorizontal: 4,
+  },
+  headerAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#3363AD',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  recModalTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#1e293b',
+  },
+  recModalSubtitle: {
+    fontSize: 13,
+    color: '#64748B',
+    marginTop: 1,
   },
   recModalScroll: {},
   recModalScrollContent: {
     paddingBottom: 12,
   },
-  recModalBody: {
-    fontSize: 15,
-    lineHeight: 24,
-    color: '#1f2937',
-    marginBottom: 16,
-  },
-  recModalSectionLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 12,
-    lineHeight: 20,
-  },
-  recCallout: {
-    backgroundColor: '#FFFBEB',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 14,
-    borderWidth: 1,
-    borderColor: '#FDE68A',
-  },
-  recCalloutTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#B45309',
-    marginBottom: 4,
-  },
-  recCalloutBody: {
-    fontSize: 13,
-    lineHeight: 19,
-    color: '#92400E',
-  },
-  recChapterCard: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderLeftWidth: 4,
-    borderLeftColor: '#3363AD',
-  },
-  recChapterTopRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-  },
-  recSeverityPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
-    alignSelf: 'flex-start',
-  },
-  recSeverityDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 999,
-  },
-  recSeverityPillText: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.2,
-  },
-  recChapterBadge: {
-    minWidth: 32,
+  assistantAvatar: {
+    width: 32,
     height: 32,
-    borderRadius: 10,
-    backgroundColor: '#3363AD',
+    borderRadius: 16,
+    backgroundColor: '#E8EEF7',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 8,
+    marginRight: 8,
+    flexShrink: 0,
   },
-  recChapterBadgeText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 14,
-  },
-  recChapterTitle: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#1e293b',
-    lineHeight: 21,
-  },
-  recChipWrap: {
+  typingRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 10,
-  },
-  recChip: {
-    backgroundColor: '#E8EEF7',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 999,
-  },
-  recChipText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#3363AD',
-  },
-  recMetricsBox: {
-    marginTop: 10,
-    paddingTop: 8,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#CBD5E1',
-  },
-  recMetricsText: {
-    fontSize: 13,
-    color: '#475569',
-    lineHeight: 18,
-  },
-  recMetricsMuted: {
-    fontSize: 13,
-    color: '#64748B',
-    fontStyle: 'italic',
-  },
-  recChapterBtn: {
-    marginTop: 12,
-    alignSelf: 'flex-start',
-    backgroundColor: '#fff',
-    borderWidth: 1.5,
-    borderColor: '#3363AD',
+    alignItems: 'flex-end',
     paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 10,
+    paddingHorizontal: 2,
   },
-  recChapterBtnText: {
-    color: '#3363AD',
-    fontWeight: '700',
-    fontSize: 14,
+  typingBubble: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    borderBottomLeftRadius: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  typingDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: '#94A3B8',
   },
   recModalLoading: {
-    paddingVertical: 24,
-    alignItems: 'center',
+    paddingVertical: 20,
+    paddingHorizontal: 2,
     gap: 12,
   },
   recModalHint: {
     fontSize: 14,
-    color: '#6B7280',
+    color: '#64748B',
+    textAlign: 'center',
+    marginTop: 4,
   },
   recModalError: {
     fontSize: 15,
     color: '#b91c1c',
     marginBottom: 12,
-  },
-  recModalPrimaryBtn: {
-    backgroundColor: '#3363AD',
-    paddingVertical: 12,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  recModalPrimaryBtnText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 16,
+    paddingHorizontal: 4,
   },
   recModalCloseBtn: {
     marginTop: 8,
     paddingVertical: 10,
     alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    marginHorizontal: 4,
   },
   recModalCloseBtnText: {
     color: '#3363AD',

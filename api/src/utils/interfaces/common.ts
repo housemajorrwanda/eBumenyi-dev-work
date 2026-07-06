@@ -180,6 +180,7 @@ export interface ILoginResponse extends Omit<
 > {
   token: string;
   userRoles: IUserRole[];
+  completedTours: string[];
 }
 export interface ILoginUser extends Pick<IUser, "fullNames" | "phoneNumber"> {}
 
@@ -288,6 +289,15 @@ export interface UserSettingsResponse {
   updatedAt: Date;
 }
 
+// Onboarding
+export interface CompleteTourDto {
+  tourKey: string;
+}
+
+export interface OnboardingStatusResponse {
+  completedTours: string[];
+}
+
 // Course
 export interface CreateCourseDto {
   creatorId: string; // staff id
@@ -303,8 +313,14 @@ export interface TCourseResponse {
   coverIcon: string;
   description?: string | null;
   isPublished: boolean;
+  pendingNotificationType?: "created" | "updated" | null;
+  lastNotifiedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface NotifyCourseUsersDto {
+  roles?: Array<"TRAINEE" | "TESTER" | "CHO" | "TRAINER" | "STAFF" | "ADMIN">;
 }
 
 // Section
@@ -562,21 +578,19 @@ export interface SuperCourseChapterDto {
   lessonDuration?: number;
   isPublished?: boolean;
   slides: SuperCourseSlideDto[];
-  midTest?:
-    | {
-        questionToBeAnswered: number;
-        marksToPass: number;
-        description?: string;
-        questionnaires?: Array<{
-          question: string;
-          questionImage?: string;
-          feedbackStatement?: string;
-          allowMultiple: boolean;
-          options: Array<{ label: string; image?: string }>;
-          answers?: Array<{ label: string; image?: string }>;
-        }>;
-    }
-    | null;
+  midTest?: {
+    questionToBeAnswered: number;
+    marksToPass: number;
+    description?: string;
+    questionnaires?: Array<{
+      question: string;
+      questionImage?: string;
+      feedbackStatement?: string;
+      allowMultiple: boolean;
+      options: Array<{ label: string; image?: string }>;
+      answers?: Array<{ label: string; image?: string }>;
+    }>;
+  } | null;
 }
 
 export interface SuperCourseSectionDto {
