@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  Image, ActivityIndicator,
+  Image,
 } from 'react-native';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -40,9 +41,7 @@ export default function SavedPostsScreen() {
       </View>
 
       {isLoading ? (
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#4D81D2" />
-        </View>
+        <LoadingSpinner />
       ) : savedPosts.length === 0 ? (
         <View style={styles.centered}>
           <Bookmark size={48} color="#d1d5db" />

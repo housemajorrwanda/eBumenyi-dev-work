@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   Image,
   StyleSheet,
-  Dimensions,
+  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -17,6 +17,7 @@ import { useQuery } from '@tanstack/react-query';
 import { getMe } from '@/services/auth';
 import { useNotificationsSocket } from '@/hooks/useNotificationsSocket';
 import { useModuleSwitcher } from '@/contexts/ModuleSwitcherContext';
+import { useAuth } from '@/hooks/useAuth';
 
 type Props = {
   title?: string;
@@ -26,6 +27,7 @@ export default function Header({ title }: Props) {
   const router = useMeetingRouter();
   const { isDark, themeColors } = useTheme();
   const { open: openModuleSwitcher } = useModuleSwitcher();
+  const { user: cachedUser } = useAuth();
   const previousUserIdRef = useRef<string | null>(null);
 
   // fetch current user info for display
@@ -33,6 +35,9 @@ export default function Header({ title }: Props) {
     queryKey: ['USER_INFO'],
     queryFn: getMe,
     gcTime: 0,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    retry: false,
   });
 
   // Detect user changes
@@ -55,21 +60,66 @@ export default function Header({ title }: Props) {
 
   // fetch notifications via Socket (real-time) - only need unread count for badge
   const { unreadCount } = useNotificationsSocket();
+  const { width: screenWidth } = useWindowDimensions();
 
-  // Split name and get last part for small devices
-  const fullName = userData?.fullNames || '';
+  const isCompact = screenWidth < 360;
+  const isVeryCompact = screenWidth < 340;
+  const avatarSize = isVeryCompact ? 44 : isCompact ? 48 : 60;
+  const iconSize = isVeryCompact ? 22 : isCompact ? 24 : 28;
+  const bellSize = isVeryCompact ? 24 : isCompact ? 28 : 32;
+  const actionGap = isCompact ? 4 : 8;
+  const headerPadding = isCompact ? 8 : 4;
 
-  let displayName;
-  const screenWidth = Dimensions.get('window').width;
-  const isSmallDevice = screenWidth < 350;
+  // Prefer fresh API data, fall back to session cache (important on web right after login).
+  const profile = userData ?? cachedUser;
+  const fullName = profile?.fullNames || '';
 
-  if (isSmallDevice && fullName) {
+  let displayName = fullName || 'User';
+  if (isCompact && fullName) {
     const nameParts = fullName.trim().split(/\s+/);
     displayName =
       nameParts.length > 0 ? nameParts[nameParts.length - 1] : 'User';
-  } else {
-    displayName = fullName || 'User';
   }
+
+  const userRole = profile?.role ?? profile?.roles?.[0];
+  const displayRole = ['TRAINEE', 'TESTER'].includes(String(userRole))
+    ? 'Umujyanama'
+    : userRole || 'CHW';
+  const district = profile?.district ?? 'Kayonza';
+  const subtitle = isVeryCompact ? displayRole : `${displayRole} | ${district}`;
+
+  const dynamicStyles = {
+    avatarContainer: {
+      width: avatarSize,
+      height: avatarSize,
+      borderRadius: avatarSize / 2,
+    },
+    avatarImageWrapper: {
+      width: avatarSize,
+      height: avatarSize,
+      borderRadius: avatarSize / 2,
+    },
+    avatarImage: {
+      borderRadius: avatarSize / 2,
+    },
+    editButton: {
+      width: Math.max(16, avatarSize * 0.33),
+      height: Math.max(16, avatarSize * 0.33),
+      borderRadius: Math.max(8, avatarSize * 0.17),
+    },
+    editIconSize: Math.max(12, avatarSize * 0.27),
+    userName: {
+      fontSize: isVeryCompact ? 12 : isCompact ? 12 : 14,
+    },
+    location: {
+      fontSize: isVeryCompact ? 10 : isCompact ? 10 : 12,
+    },
+    notificationButton: {
+      width: isCompact ? 34 : 40,
+      height: isCompact ? 34 : 40,
+      borderRadius: isCompact ? 17 : 20,
+    },
+  };
 
   return (
     <SafeAreaView
@@ -82,13 +132,13 @@ export default function Header({ title }: Props) {
             ? ['#312e81', '#1e1b4b']
             : [themeColors.primary, themeColors.primary]
         }
-        style={styles.header}
+        style={[styles.header, { paddingHorizontal: headerPadding }]}
       >
         <View style={styles.profileSection}>
           <View style={styles.profileInfo}>
-            <View style={styles.avatarContainer}>
+            <View style={[styles.avatarContainer, dynamicStyles.avatarContainer]}>
               <TouchableOpacity
-                style={styles.avatarImageWrapper}
+                style={[styles.avatarImageWrapper, dynamicStyles.avatarImageWrapper]}
                 onPress={() => router.push('/profile')}
                 accessibilityLabel="View profile"
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -96,15 +146,16 @@ export default function Header({ title }: Props) {
                 <Image
                   source={{
                     uri:
-                      userData?.photo ??
+                      profile?.photo ??
                       'https://img.freepik.com/premium-vector/user-profile-icon-flat-style-member-avatar-vector-illustration-isolated-background-human-permission-sign-business-concept_157943-15752.jpg',
                   }}
-                  style={styles.avatarImage}
+                  style={[styles.avatarImage, dynamicStyles.avatarImage]}
                 />
               </TouchableOpacity>
               <TouchableOpacity
                 style={[
                   styles.editButton,
+                  dynamicStyles.editButton,
                   {
                     borderColor: themeColors.primary,
                     backgroundColor: '#ffffff',
@@ -115,36 +166,35 @@ export default function Header({ title }: Props) {
                 hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
               >
                 <SquarePen
-                  size={16}
+                  size={dynamicStyles.editIconSize}
                   color={isDark ? '#111827' : themeColors.primary}
                 />
               </TouchableOpacity>
             </View>
-            <View>
-              <Text style={[styles.userName, { fontFamily: 'Inter-SemiBold' }]}>
+            <View style={styles.profileText}>
+              <Text
+                style={[styles.userName, dynamicStyles.userName, { fontFamily: 'Inter-SemiBold' }]}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
                 {displayName}
               </Text>
-              <Text style={[styles.location, { fontFamily: 'Inter-Regular' }]}>
-                {(() => {
-                  const userRole = userData?.role ?? userData?.roles?.[0];
-                  const displayRole = ['TRAINEE', 'TESTER'].includes(
-                    String(userRole),
-                  )
-                    ? 'Umujyanama'
-                    : userRole || 'CHW';
-                  return `${displayRole} | ${userData?.district ?? 'Kayonza'}`;
-                })()}
+              <Text
+                style={[styles.location, dynamicStyles.location, { fontFamily: 'Inter-Regular' }]}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {subtitle}
               </Text>
             </View>
           </View>
-
-          <View style={styles.rightActions}>
+          <View style={[styles.rightActions, { gap: actionGap }]}>
             <TouchableOpacity
               style={styles.actionButton}
               onPress={openModuleSwitcher}
               accessibilityLabel="Switch application"
             >
-              <LayoutGrid size={28} color="white" />
+              <LayoutGrid size={iconSize} color="white" />
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.actionButton}
@@ -152,13 +202,13 @@ export default function Header({ title }: Props) {
                 router.push('/auth/study-plan');
               }}
             >
-              <CalendarDaysIcon size={32} color="white" />
+              <CalendarDaysIcon size={bellSize} color="white" />
             </TouchableOpacity>
             <TouchableOpacity
-              style={styles.notificationButton}
+              style={[styles.notificationButton, dynamicStyles.notificationButton]}
               onPress={() => router.push('/notifications')}
             >
-              <BellIcon size={32} color="white" />
+              <BellIcon size={bellSize} color="white" />
               {unreadCount > 0 && (
                 <View
                   style={[
@@ -190,34 +240,36 @@ export default function Header({ title }: Props) {
 const styles = StyleSheet.create({
   header: {
     width: '100%',
-    minHeight: 96,
-    paddingHorizontal: 4,
+    minHeight: 88,
     paddingBottom: 2,
     justifyContent: 'flex-end',
   },
   profileSection: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 6,
+    gap: 4,
   },
   profileInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    flex: 7,
+    flex: 1,
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  profileText: {
+    flex: 1,
+    minWidth: 0,
   },
   rightActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    flex: 3,
-    justifyContent: 'flex-end',
+    flexShrink: 0,
   },
   actionButton: {
-    minWidth: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 1,
+    paddingVertical: 6,
+    paddingHorizontal: 2,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
@@ -235,16 +287,11 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   avatarContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
     overflow: 'visible',
     position: 'relative',
+    flexShrink: 0,
   },
   avatarImageWrapper: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
@@ -253,9 +300,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 0,
     bottom: 0,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
     backgroundColor: '#ffffff',
     alignItems: 'center',
     justifyContent: 'center',
@@ -267,10 +311,8 @@ const styles = StyleSheet.create({
   avatarImage: {
     width: '100%',
     height: '100%',
-    borderRadius: 30,
   },
   location: {
-    fontSize: 12,
     color: 'rgba(255,255,255,0.8)',
   },
   right: {
@@ -278,13 +320,9 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.8)',
   },
   userName: {
-    fontSize: 14,
     color: 'white',
   },
   notificationButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },

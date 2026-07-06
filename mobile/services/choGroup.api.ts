@@ -2,7 +2,6 @@ import httpClient from './httpClient';
 import {
   ICHOGroup,
   ICHOGroupMember,
-  ICHOGroupInvitation,
   ICHOGroupMonitoring,
   IStudentSearchResult,
 } from '@/types';
@@ -41,7 +40,12 @@ export const choRemoveMyMember = async (studentId: string): Promise<void> => {
 
 export const choUpdateMyGroup = async (data: {
   name?: string;
-  sector?: string;
+  district?: string;
+  sectors?: string[];
+  cells?: string[];
+  villages?: string[];
+  cell?: string;
+  village?: string;
   description?: string;
 }): Promise<ICHOGroup> => {
   const response = await httpClient.patch('/cho-groups/mine', data);
@@ -56,24 +60,6 @@ export const searchCHWCandidates = async (
   const params = search ? `?search=${encodeURIComponent(search)}` : '';
   const response = await httpClient.get(`/cho-groups/mine/chw-candidates${params}`);
   return (response as any).data.data ?? [];
-};
-
-// ─── CHW: invitations ─────────────────────────────────────────────────────────
-
-export const getMyInvitations = async (): Promise<ICHOGroupInvitation[]> => {
-  const response = await httpClient.get('/cho-groups/invitations/mine');
-  return (response as any).data.data;
-};
-
-export const respondToInvitation = async (
-  invitationId: string,
-  accept: boolean,
-): Promise<any> => {
-  const response = await httpClient.patch(
-    `/cho-groups/invitations/${invitationId}`,
-    { accept },
-  );
-  return (response as any).data;
 };
 
 // ─── legacy alias kept for backward compat ───────────────────────────────────

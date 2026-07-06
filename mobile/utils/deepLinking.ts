@@ -1,19 +1,36 @@
 import * as Linking from 'expo-linking';
+import { MEETING_BASE_URL } from '@/config/constants';
+
+const meetingHost = (() => {
+  try {
+    return new URL(MEETING_BASE_URL).hostname;
+  } catch {
+    return 'meeting.ebumenyi.online';
+  }
+})();
 
 /**
- * Check if a URL is a valid meeting URL
- * Format: https://meeting.ebumenyi.online/meeting/{meetingId}
+ * Check if a URL is a valid meeting URL.
+ * Accepts any host — the meeting ID path pattern is what matters,
+ * not the specific host (which changes between local/production).
  */
 export const isValidMeetingUrl = (url: string): boolean => {
   try {
     const parsed = new URL(url);
-    return (
-      parsed.hostname === 'meeting.ebumenyi.online' &&
-      parsed.pathname.match(/^\/meeting\/[a-z0-9\-]+$/) !== null
-    );
+    return parsed.pathname.match(/^\/meeting\/[a-z0-9-]+$/i) !== null;
   } catch {
     return false;
   }
+};
+
+/**
+ * Normalize any meeting URL (localhost, IP, production domain) to the
+ * current environment's MEETING_BASE_URL so the WebView always loads
+ * the reachable address.
+ */
+export const normalizeMeetingUrl = (url: string): string | null => {
+  const id = extractMeetingId(url);
+  return id ? `${MEETING_BASE_URL}/meeting/${id}` : null;
 };
 
 /**
@@ -36,10 +53,8 @@ export const parseLinkingURL = (url: string | null) => {
   if (!url) return null;
 
   try {
-    // Remove any leading/trailing whitespace
     url = url.trim();
 
-    // Check if it's a meeting URL
     if (isValidMeetingUrl(url)) {
       const meetingId = extractMeetingId(url);
       if (meetingId) {
@@ -53,7 +68,6 @@ export const parseLinkingURL = (url: string | null) => {
       }
     }
 
-    // For other URLs, parse them normally
     const parsed = Linking.parse(url);
     return parsed;
   } catch (error) {
@@ -66,21 +80,16 @@ export const parseLinkingURL = (url: string | null) => {
  * Create a meeting deep link
  */
 export const createMeetingLink = (meetingId: string): string => {
-  return `https://meeting.ebumenyi.online/meeting/${meetingId}`;
+  return `${MEETING_BASE_URL}/meeting/${meetingId}`;
 };
 
 /**
  * Check if URL is internal to the app (should stay in app)
  */
 export const isInternalUrl = (url: string): boolean => {
-  const internalDomains = [
-    'meeting.ebumenyi.online',
-    'ebumenyi.online',
-  ];
-
   try {
     const parsed = new URL(url);
-    return internalDomains.some(domain => parsed.hostname?.includes(domain));
+    return parsed.hostname === meetingHost || parsed.hostname?.includes('ebumenyi.online');
   } catch {
     return false;
   }
@@ -91,7 +100,10 @@ export const isInternalUrl = (url: string): boolean => {
  * Returns true if the URL should be handled by the app (not opened externally)
  */
 export const shouldHandleUrlInWebView = (url: string): boolean => {
-  // Only allow meeting.ebumenyi.online URLs
-  const parsed = new URL(url);
-  return parsed.hostname === 'meeting.ebumenyi.online';
+  try {
+    const parsed = new URL(url);
+    return parsed.hostname === meetingHost;
+  } catch {
+    return false;
+  }
 };

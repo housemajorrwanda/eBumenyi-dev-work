@@ -5,8 +5,8 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
-  ActivityIndicator,
 } from 'react-native';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -97,10 +97,7 @@ export default function AnnouncementDetailScreen() {
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Itangazo</Text>
         </LinearGradient>
-        <View style={styles.centeredState}>
-          <ActivityIndicator size="large" color={themeColors.primary} />
-          <Text style={styles.centeredStateText}>Gufungura itangazo...</Text>
-        </View>
+        <LoadingSpinner message="Gufungura itangazo..." />
       </View>
     );
   }

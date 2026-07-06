@@ -5,7 +5,6 @@ export default function CHOGroupLayout() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="index" />
       <Stack.Screen name="invite" />
-      <Stack.Screen name="invitations" />
     </Stack>
   );
 }

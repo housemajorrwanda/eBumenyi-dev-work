@@ -39,6 +39,7 @@
         "foregroundImage": "./assets/logo/chw.png",
         "backgroundColor": "#ffffff"
       },
+      "softwareKeyboardLayoutMode": "resize",
       "edgeToEdgeEnabled": true,
       "package": "com.gilberthappi.chwapp",
       "googleServicesFile": "./google-services.json",
@@ -131,7 +132,7 @@
     ],
     "runtimeVersion": "1.0.0",
     "updates": {
-      "url": "https://u.expo.dev/0f17f4a3-d9fb-4380-8bb9-2c6ae108949d",
+      "url": "https://u.expo.dev/695ed06b-8e35-4885-8284-179930c88ef4",
       "fallbackToCacheTimeout": 0,
       "checkAutomatically": "ON_LOAD",
       "enabled": true
@@ -144,9 +145,9 @@
       "environment": "production",
       "router": {},
       "eas": {
-        "projectId": "0f17f4a3-d9fb-4380-8bb9-2c6ae108949d"
+        "projectId": "695ed06b-8e35-4885-8284-179930c88ef4"
       }
     },
-    "owner": "happigilbert"
+    "owner": "isangepro"
   }
 }

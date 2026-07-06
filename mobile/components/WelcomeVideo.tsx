@@ -44,7 +44,8 @@ export default function WelcomeVideo({ uri = DEFAULT_URI, userId, autoMarkSeen =
       (async () => {
         try {
           const val = await AsyncStorage.getItem(storageKey);
-          if (!val) {
+          // Legacy bug wrote '1' before the video was shown — treat as not seen
+          if (!val || val === '1') {
             setVisible(true);
           }
         } catch (e) {

@@ -1,9 +1,7 @@
 import { IUserData } from '@/types';
 import httpClient from './httpClient';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SocketService } from './socket.service';
-import { DeviceEventEmitter } from 'react-native';
-import { AUTH_CHANGED_EVENT } from '@/hooks/useAuth';
+import { persistAuthSession, getAccessToken } from '@/utils/authSession';
 
 export interface ISignupRequest {
   email?: string;
@@ -24,6 +22,18 @@ export interface ISignupRequest {
   gender?: string;
 }
 
+async function completeLogin(data: Record<string, unknown> & { token: string; roles?: string[] }) {
+  await persistAuthSession(data);
+
+  try {
+    console.log('🔌 [AUTH] Initializing socket after login...');
+    await SocketService.initialize();
+    console.log('🔌 [AUTH] Socket initialized successfully');
+  } catch (error) {
+    console.log('🔌 [AUTH] Failed to initialize socket:', error);
+  }
+}
+
 export const login = async (
   fullNames: string,
   phoneNumber: string,
@@ -35,22 +45,7 @@ export const login = async (
   });
   const data = (response as any).data?.data;
   if (data?.token) {
-    await AsyncStorage.setItem('accessToken', data.token);
-    if (data.roles && data.roles.length)
-      await AsyncStorage.setItem('role', data.roles[0]);
-    await AsyncStorage.setItem('userData', JSON.stringify(data));
-
-    // Initialize socket connection after token is saved
-    try {
-      console.log('🔌 [AUTH] Initializing socket after login...');
-      await SocketService.initialize();
-      console.log('🔌 [AUTH] Socket initialized successfully');
-    } catch (error) {
-      console.log('🔌 [AUTH] Failed to initialize socket:', error);
-    }
-
-    // Emit event so useAuth reloads
-    DeviceEventEmitter.emit(AUTH_CHANGED_EVENT);
+    await completeLogin(data);
   }
   return response;
 };
@@ -66,22 +61,7 @@ export const loginWithIdAndPhone = async (
   });
   const data = (response as any).data?.data;
   if (data?.token) {
-    await AsyncStorage.setItem('accessToken', data.token);
-    if (data.roles && data.roles.length)
-      await AsyncStorage.setItem('role', data.roles[0]);
-    await AsyncStorage.setItem('userData', JSON.stringify(data));
-
-    // Initialize socket connection after token is saved
-    try {
-      console.log('🔌 [AUTH] Initializing socket after login...');
-      await SocketService.initialize();
-      console.log('🔌 [AUTH] Socket initialized successfully');
-    } catch (error) {
-      console.log('🔌 [AUTH] Failed to initialize socket:', error);
-    }
-
-    // Emit event so useAuth reloads
-    DeviceEventEmitter.emit(AUTH_CHANGED_EVENT);
+    await completeLogin(data);
   }
   return response;
 };
@@ -115,22 +95,7 @@ export const verifyLogin = async (
   });
   const data = (response as any).data?.data;
   if (data?.token) {
-    await AsyncStorage.setItem('accessToken', data.token);
-    if (data.roles && data.roles.length)
-      await AsyncStorage.setItem('role', data.roles[0]);
-    await AsyncStorage.setItem('userData', JSON.stringify(data));
-
-    // Initialize socket connection after token is saved
-    try {
-      console.log('🔌 [AUTH] Initializing socket after OTP verification...');
-      await SocketService.initialize();
-      console.log('🔌 [AUTH] Socket initialized successfully');
-    } catch (error) {
-      console.log('🔌 [AUTH] Failed to initialize socket:', error);
-    }
-
-    // Emit event so useAuth reloads
-    DeviceEventEmitter.emit(AUTH_CHANGED_EVENT);
+    await completeLogin(data);
   }
   return response;
 };
@@ -171,7 +136,7 @@ export const checkValiditOfToken = async (): Promise<any> => {
  */
 export const initializeSocketForExistingUser = async (): Promise<boolean> => {
   try {
-    const token = await AsyncStorage.getItem('accessToken');
+    const token = await getAccessToken();
     if (token) {
       console.log(
         '🔌 [AUTH] User already authenticated, initializing socket...',

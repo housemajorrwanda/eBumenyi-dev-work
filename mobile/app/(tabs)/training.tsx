@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
-import { View, Text, ScrollView, StyleSheet, TextInput, Animated, Easing, RefreshControl } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TextInput, Animated, Easing, RefreshControl, useWindowDimensions } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useNotificationsContext } from '@/contexts/NotificationsContext';
@@ -11,6 +11,11 @@ import { validateUserToken } from '@/utils/tokenValidation';
 import CourseCard from '@/components/CourseCard';
 import { getLastViewedSlidePath } from '@/services/location';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { CopilotProvider, CopilotStep, useCopilot } from 'react-native-copilot';
+import { WalkthroughableView } from '@/components/onboarding/walkthroughable';
+import MascotTooltip from '@/components/onboarding/MascotTooltip';
+import { useOnboarding } from '@/contexts/OnboardingContext';
+import { TOUR_KEYS } from '@/services/onboarding.service';
 
 // Simple debounce function
 const debounce = (func: Function, delay: number) => {
@@ -90,11 +95,61 @@ const AnimatedNoCoursesIcon = ({ isDark }: { isDark: boolean }) => {
   );
 };
 
-export default function TrainingScreen() {
+const SkeletonCourseGrid = ({ isDark }: { isDark: boolean }) => {
+  const pulse = useRef(new Animated.Value(0)).current;
+  const { width } = useWindowDimensions();
+  const cardWidth = (width - 40) / 2; // matches grid padding
+
+  useEffect(() => {
+    const anim = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1, duration: 750, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0, duration: 750, useNativeDriver: true }),
+      ])
+    );
+    anim.start();
+    return () => anim.stop();
+  }, [pulse]);
+
+  const opacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.45, 1] });
+  const bg = isDark ? '#1f2937' : '#E8EDF8';
+  const shimmer = isDark ? '#374151' : '#D0D9EE';
+
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', paddingHorizontal: 10 }}>
+      {Array.from({ length: 6 }).map((_, i) => (
+        <Animated.View
+          key={i}
+          style={{
+            width: cardWidth,
+            borderRadius: 12,
+            marginBottom: 16,
+            overflow: 'hidden',
+            backgroundColor: bg,
+            opacity,
+            elevation: 2,
+          }}
+        >
+          {/* image area */}
+          <View style={{ height: 88, backgroundColor: shimmer }} />
+          {/* title lines */}
+          <View style={{ padding: 10, gap: 6 }}>
+            <View style={{ height: 9, borderRadius: 5, backgroundColor: shimmer, width: '85%' }} />
+            <View style={{ height: 9, borderRadius: 5, backgroundColor: shimmer, width: '60%' }} />
+          </View>
+        </Animated.View>
+      ))}
+    </View>
+  );
+};
+
+function TrainingScreenContent() {
   const router = useRouter();
   const { isDark } = useTheme();
   const queryClient = useQueryClient();
   const { notifications } = useNotificationsContext();
+  const { start, copilotEvents } = useCopilot();
+  const { hasCompleted, markComplete, syncReady, triggerSync } = useOnboarding();
   const [searchData, setSearchData] = useState<ICourseResponse | null>(null);
   const [isValidatingToken, setIsValidatingToken] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -113,6 +168,7 @@ export default function TrainingScreen() {
         
         // Token is valid, continue with normal flow
         setIsValidatingToken(false);
+        triggerSync();
       } catch (error) {
         console.log('Token validation error:', error);
         // On error, redirect to login for safety
@@ -121,7 +177,7 @@ export default function TrainingScreen() {
     };
 
     checkTokenValidity();
-  }, [router]);
+  }, [router, triggerSync]);
 
   // Listen for course notifications and refresh
   useEffect(() => {
@@ -192,6 +248,7 @@ export default function TrainingScreen() {
     useCallback(() => {
       if (!isValidatingToken) {
         queryClient.invalidateQueries({ queryKey: ['STUDENT_STATS'] });
+        queryClient.invalidateQueries({ queryKey: ['ALL_COURSES'] });
       }
     }, [isValidatingToken, queryClient])
   );
@@ -205,7 +262,24 @@ export default function TrainingScreen() {
     }
   };
 
-  if (isValidatingToken) return <LoadingSpinner />;
+  // Start training tour once after data loads (guards against skeleton being spotlit)
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    if (!isValidatingToken && syncReady && !isCoursesLoading) {
+      if (!hasCompleted(TOUR_KEYS.TRAINING)) {
+        timer = setTimeout(() => start(), 500);
+      }
+    }
+    return () => { if (timer) clearTimeout(timer); };
+  }, [isValidatingToken, syncReady, isCoursesLoading]);
+
+  useEffect(() => {
+    const handleStop = () => { markComplete(TOUR_KEYS.TRAINING).catch(() => {}); };
+    copilotEvents.on('stop', handleStop);
+    return () => { copilotEvents.off('stop', handleStop); };
+  }, [copilotEvents]);
+
+  if (isValidatingToken) return <LoadingSpinner isDark={isDark} />;
 
   return (
     <View style={[styles.container, { backgroundColor: isDark ? '#111827' : '#ffffff' }]}>
@@ -224,18 +298,24 @@ export default function TrainingScreen() {
           Amasomo yahariwe umujyanama
         </Text>
       </View>
-            {/* Search Input */}
-      <View style={styles.searchContainer}>
-        <TextInput
-          style={[styles.searchInput, { 
-            backgroundColor: isDark ? '#1f2937' : '#f3f4f6',
-            color: isDark ? '#ffffff' : '#111827'
-          }]}
-          placeholder="🔍 Andika izina ry' isomo hano..."
-          placeholderTextColor={isDark ? '#9ca3af' : '#6b7280'}
-          onChangeText={debouncedSearch}
-        />
-      </View>
+      {/* Search Input */}
+      <CopilotStep
+        text="Andika hano izina ry'isomo ushaka. Gushakisha biroroshye no kuba byihuse!"
+        order={1}
+        name="training-search"
+      >
+        <WalkthroughableView style={styles.searchContainer}>
+          <TextInput
+            style={[styles.searchInput, {
+              backgroundColor: isDark ? '#1f2937' : '#f3f4f6',
+              color: isDark ? '#ffffff' : '#111827'
+            }]}
+            placeholder="🔍 Andika izina ry' isomo hano..."
+            placeholderTextColor={isDark ? '#9ca3af' : '#6b7280'}
+            onChangeText={debouncedSearch}
+          />
+        </WalkthroughableView>
+      </CopilotStep>
       <ScrollView
         style={styles.content}
         showsVerticalScrollIndicator={false}
@@ -251,35 +331,53 @@ export default function TrainingScreen() {
         }
       >
 
-        <View style={[styles.coursesGrid]}> 
-          {isCoursesLoading ? (
-            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-              <LoadingSpinner />
-            </View>
-          ) : courses.length === 0 ? (
-            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-              <AnimatedNoCoursesIcon isDark={isDark} />
-              <Text style={{ color: isDark ? '#fff' : '#4D81D2', fontSize: 16, fontWeight: '600', marginTop: 8 }}>Ntamasomo abonetse</Text>
-            </View>
-          ) : (
-            courses.map((course, index) => (
-              <CourseCard
-                key={course.id || index}
-                course={{
-                  courseId: course.id,
-                  coverIcon: course.coverIcon,
-                  title: course.title,
-                }}
-                onPress={() => handleCoursePress(course, index)}
-                showCapIcon
-                progress={course?.progresses[0]?.progress}
-                width={'48%'}
-              />
-            ))
-          )}
-        </View>
+        <CopilotStep
+          text="Hano ubona amasomo yose ahariwe. Kanda ku isomo kugira ngo utangire kwiga!"
+          order={2}
+          name="training-courses"
+        >
+          <WalkthroughableView style={styles.coursesGrid}>
+            {isCoursesLoading ? (
+              <SkeletonCourseGrid isDark={isDark} />
+            ) : courses.length === 0 ? (
+              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+                <AnimatedNoCoursesIcon isDark={isDark} />
+                <Text style={{ color: isDark ? '#fff' : '#4D81D2', fontSize: 16, fontWeight: '600', marginTop: 8 }}>Ntamasomo abonetse</Text>
+              </View>
+            ) : (
+              courses.map((course, index) => (
+                <CourseCard
+                  key={course.id || index}
+                  course={{
+                    courseId: course.id,
+                    coverIcon: course.coverIcon,
+                    title: course.title,
+                  }}
+                  onPress={() => handleCoursePress(course, index)}
+                  showCapIcon
+                  progress={course?.progresses[0]?.progress}
+                  width={'48%'}
+                />
+              ))
+            )}
+          </WalkthroughableView>
+        </CopilotStep>
       </ScrollView>
     </View>
+  );
+}
+
+export default function TrainingScreen() {
+  return (
+    <CopilotProvider
+      tooltipComponent={MascotTooltip}
+      overlay="svg"
+      backdropColor="rgba(0, 0, 0, 0.65)"
+      animationDuration={300}
+      stepNumberComponent={() => null}
+    >
+      <TrainingScreenContent />
+    </CopilotProvider>
   );
 }
 

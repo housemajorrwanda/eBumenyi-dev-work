@@ -1,16 +1,16 @@
 import axios from "axios";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Platform } from "react-native";
 import { API_BASE_URL } from "@/config/constants";
+import { getAccessToken } from "@/utils/authSession";
 
 const httpClient = axios.create({
 	baseURL: API_BASE_URL,
+	...(Platform.OS === "web" ? { withCredentials: true } : {}),
 });
 
 httpClient.interceptors.request.use((request) => {
-	// ensure headers object exists
 	request.headers = request.headers ?? {};
-	// AsyncStorage is asynchronous; return a promise that resolves with the request
-	return AsyncStorage.getItem("accessToken").then((accessToken) => {
+	return getAccessToken().then((accessToken) => {
 		if (accessToken) {
 			request.headers!.Authorization = accessToken;
 		}
@@ -19,6 +19,7 @@ httpClient.interceptors.request.use((request) => {
 		} else {
 			request.headers!["Content-Type"] = "application/json";
 		}
+		request.headers!.Accept = "application/json";
 		return request;
 	}) as any;
 });

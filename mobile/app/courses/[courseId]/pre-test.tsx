@@ -1,37 +1,56 @@
 import React, { useEffect, useState } from 'react';
-import {Alert } from 'react-native';
+import { Alert } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import Questionnaire from '@/components/Questionnaire';
-import { getCourseById, getPretestById } from '@/services/course.api';
-import { ICourse, ITest } from '@/types';
+import { getPretestById } from '@/services/course.api';
+import { ITest } from '@/types';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
-
+import { useCourseWorkspace, normalizeCourseId } from '@/hooks/useCourseWorkspace';
 
 export default function PreTestScreen() {
   const { courseId } = useLocalSearchParams<{ courseId: string }>();
-  const [course, setCourse] = useState<ICourse | null>(null);
+  const courseIdStr = normalizeCourseId(courseId);
+  const { data: workspace, isLoading: workspaceLoading } = useCourseWorkspace(courseIdStr);
+  const course = workspace?.course ?? null;
   const [preTest, setPreTest] = useState<ITest | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [testLoading, setTestLoading] = useState(true);
   const router = useRouter();
-  useEffect(() => {
-    loadCourse();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
-  const loadCourse = async () => {
-    try {
-      if (courseId) {
-        const response = await getCourseById(courseId as string);
-        const fetchedCourse = response.data;
-        setCourse(fetchedCourse);
-            const preTestResponse = await getPretestById(fetchedCourse?.preTests[0].id);
-            setPreTest(preTestResponse.data);
-          }
-    } catch (error) {
-      console.log('Error loading course or pretest:', error);
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadPreTest = async () => {
+      if (!course?.preTests?.[0]?.id) {
+        if (!cancelled) setTestLoading(false);
+        return;
+      }
+
+      try {
+        const preTestResponse = await getPretestById(course.preTests[0].id);
+        if (!cancelled) setPreTest(preTestResponse.data);
+      } catch (error) {
+        console.log('Error loading pretest:', error);
+      } finally {
+        if (!cancelled) setTestLoading(false);
+      }
+    };
+
+    if (!workspaceLoading && course) {
+      setTestLoading(true);
+      void loadPreTest();
     }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [workspaceLoading, course]);
+
+  const navigateToFirstSection = () => {
+    const firstSectionId = course?.sections?.[0]?.id;
+    router.replace({
+      pathname: `/courses/${courseIdStr}/chapters`,
+      params: firstSectionId ? { sectionId: firstSectionId } : {},
+    });
   };
 
   const handleTestComplete = async () => {
@@ -39,24 +58,16 @@ export default function PreTestScreen() {
       Alert.alert('Isuzuma ribanziriza isomo ryakozwe neza', 'Komeza isomo', [
         {
           text: 'Komeza',
-          onPress: () => {
-            try {
-              const firstSectionId = course?.sections && course.sections.length > 0 ? course.sections[0].id : undefined;
-              router.push({ pathname: `/courses/${courseId}/chapters`, params: { sectionId: firstSectionId } });
-            } catch (err) {
-              console.log('Navigation after pre-test failed, falling back to chapters list', err);
-              router.push(`/courses/${courseId}/chapters`);
-            }
-          }
+          onPress: navigateToFirstSection,
         },
       ]);
     } catch (error) {
-      console.log("error:", error)
-      const firstSectionId = course?.sections && course.sections.length > 0 ? course.sections[0].id : undefined;
-      router.push({ pathname: `/courses/${courseId}/chapters`, params: { sectionId: firstSectionId } });
+      console.log('error:', error);
+      navigateToFirstSection();
     }
   };
 
+  const loading = workspaceLoading || testLoading;
   if (loading) return <LoadingSpinner />;
   if (!course || !preTest) return null;
 

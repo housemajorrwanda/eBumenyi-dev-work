@@ -648,18 +648,20 @@ const CalendarScreen = () => {
           colors={isDark ? [themeColors.primary, '#1e1b4b'] : [themeColors.primary, themeColors.primary]}
           style={[styles.header, { paddingTop: insets.top + 16 }]}
         >
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()} activeOpacity={0.7}>
-            <ChevronLeft size={20} color="#ffffff" />
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 12 }}>
+            <TouchableOpacity style={styles.backButton} onPress={() => router.back()} activeOpacity={0.7}>
+              <ChevronLeft size={20} color="#ffffff" />
+            </TouchableOpacity>
 
-          <View style={styles.headerContent}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <CalendarDays size={20} color="rgba(255,255,255,0.9)" />
-              <Text style={styles.headerTitle}>{t('calendar.title') || 'My Schedule'}</Text>
+            <View style={styles.headerContent}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <CalendarDays size={20} color="rgba(255,255,255,0.9)" />
+                <Text style={styles.headerTitle}>{t('calendar.title') || 'My Schedule'}</Text>
+              </View>
+              <Text style={styles.headerSubtitle}>
+                {t('calendar.subtitle') || 'Trainings, reminders & deadlines'}
+              </Text>
             </View>
-            <Text style={styles.headerSubtitle}>
-              {t('calendar.subtitle') || 'Trainings, reminders & deadlines'}
-            </Text>
           </View>
 
           {/* Month switcher */}
@@ -919,9 +921,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+    flexShrink: 0,
   },
-  headerContent: { marginBottom: 16, alignItems: 'center' },
+  headerContent: { flex: 1, alignItems: 'flex-start' },
   headerTitle: {
     fontSize: 22,
     fontFamily: 'Inter-Bold',

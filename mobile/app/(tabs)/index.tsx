@@ -3,10 +3,9 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Modal, Ale
 import Header from '@/components/Header';
 import StatsCard from '@/components/StatsCard';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { Trophy, BookOpen, Book, Clock, MessageCircle, Bell } from 'lucide-react-native';
+import { Trophy, BookOpen, Book, Clock, MessageCircle } from 'lucide-react-native';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { getStudentCourseStats } from '@/services/course.api';
-import { getMyInvitations } from '@/services/choGroup.api';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { IStudentCourse, CreateSystemReviewDto } from '@/types';
 import { formatDate } from '@/utils/format';
@@ -19,44 +18,56 @@ import { systemReviewAPI } from '@/services/systemReview.api';
 import WelcomeVideo from '@/components/WelcomeVideo';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { TOUR_KEYS } from '@/services/onboarding.service';
+import { useOnboarding } from '@/contexts/OnboardingContext';
+import { CopilotProvider, CopilotStep, useCopilot } from 'react-native-copilot';
+import { WalkthroughableView } from '@/components/onboarding/walkthroughable';
+import MascotTooltip from '@/components/onboarding/MascotTooltip';
 
-export default function HomeScreen() {
+function HomeScreenContent() {
   const { t } = useLanguage();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { start, copilotEvents } = useCopilot();
+  const { hasCompleted: hasDoneTour, markComplete: markTourComplete, syncReady, triggerSync } = useOnboarding();
   const [activeQuickAction, setActiveQuickAction] = useState<number>(1);
   const [isValidatingToken, setIsValidatingToken] = useState(true);
   const [showSystemReview, setShowSystemReview] = useState(false);
   const [isSystemReviewed, setIsSystemReviewed] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [userRoles, setUserRoles] = useState<string[]>([]);
 
   const WELCOME_STORAGE_KEY = 'welcome_video_shown';
   const [welcomeModalVisible, setWelcomeModalVisible] = useState(false);
 
-  // Load user roles from storage
-  useEffect(() => {
-    AsyncStorage.getItem('userData').then((raw) => {
-      if (raw) {
-        try {
-          const parsed = JSON.parse(raw);
-          setUserRoles(parsed.roles ?? []);
-        } catch {
-          // ignore
-        }
-      }
-    });
+  const hasWelcomeBeenSeen = useCallback(async (): Promise<boolean> => {
+    try {
+      const val = await AsyncStorage.getItem(WELCOME_STORAGE_KEY);
+      return Boolean(val && val !== '1');
+    } catch {
+      return false;
+    }
   }, []);
 
-  const isCHW = userRoles.some((r) => ['TRAINEE', 'TESTER'].includes(r));
+  /** Returns true if the welcome modal was opened. */
+  const showWelcomeVideoIfNeeded = useCallback(async (): Promise<boolean> => {
+    const seen = await hasWelcomeBeenSeen();
+    if (!seen) {
+      setWelcomeModalVisible(true);
+      return true;
+    }
+    return false;
+  }, [hasWelcomeBeenSeen]);
 
-  // CHW: fetch pending invitations count
-  const { data: pendingInvitations = [] } = useQuery({
-    queryKey: ['cho-invitations-mine'],
-    queryFn: getMyInvitations,
-    enabled: isCHW && !isValidatingToken,
-    retry: false,
-  });
+  const startAppTourIfNeeded = useCallback(() => {
+    if (!hasDoneTour(TOUR_KEYS.APP)) {
+      setTimeout(() => start(), 500);
+    }
+  }, [hasDoneTour, start]);
+
+  const handleWelcomeVideoDone = useCallback(() => {
+    setWelcomeModalVisible(false);
+    startAppTourIfNeeded();
+  }, [startAppTourIfNeeded]);
 
   // Token validation on component mount
   useEffect(() => {
@@ -70,8 +81,9 @@ export default function HomeScreen() {
           return;
         }
         
-        // Token is valid, continue with normal flow
+        // Token is valid — trigger onboarding sync now that we have a valid JWT
         setIsValidatingToken(false);
+        triggerSync();
       } catch (error) {
         console.log('Token validation error:', error);
         // On error, redirect to login for safety
@@ -80,24 +92,45 @@ export default function HomeScreen() {
     };
 
     checkTokenValidity();
-  }, [router]);
+  }, [router, triggerSync]);
 
-  // Check whether to show welcome modal once token validation finishes
+  // fetch student-course-stats (declared here so isLoading is in scope for the tour useEffect below)
+  const { data: courseStatsData, isLoading, error, refetch } = useQuery<any>({
+    queryKey: ['COURSE'],
+    queryFn: getStudentCourseStats,
+    gcTime: 0,
+    enabled: !isValidatingToken,
+  });
+
+  // Welcome video first, then app tour (first-time users only).
   useEffect(() => {
-    if (!isValidatingToken) {
-      (async () => {
-        try {
-          const val = await AsyncStorage.getItem(WELCOME_STORAGE_KEY);
-          if (!val) {
-            setWelcomeModalVisible(true);
-          }
-        } catch (err) {
-          console.log('Error reading welcome flag:', err);
-          setWelcomeModalVisible(true);
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let cancelled = false;
+
+    if (!isValidatingToken && syncReady && !isLoading) {
+      void (async () => {
+        const openedWelcome = await showWelcomeVideoIfNeeded();
+        if (cancelled || openedWelcome) return;
+        if (!hasDoneTour(TOUR_KEYS.APP)) {
+          timer = setTimeout(() => start(), 500);
         }
       })();
     }
-  }, [isValidatingToken]);
+
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [isValidatingToken, syncReady, isLoading, hasDoneTour, start, showWelcomeVideoIfNeeded]);
+
+  // Mark app tour complete when copilot stops
+  useEffect(() => {
+    const handleStop = () => {
+      markTourComplete(TOUR_KEYS.APP).catch(() => {});
+    };
+    copilotEvents.on('stop', handleStop);
+    return () => { copilotEvents.off('stop', handleStop); };
+  }, [copilotEvents, markTourComplete]);
 
   // Check system review status on component mount
   useEffect(() => {
@@ -139,14 +172,6 @@ export default function HomeScreen() {
     { id: 2, title: 'Watangiye', icon: '✓', color: '#EFF1F8' },
     { id: 3, title: 'Utaratangira', icon: '⏸', color: '#EFF1F8' },
   ];
-
-  // fetch student-course-stats
-  const { data: courseStatsData, isLoading, error, refetch } = useQuery<any>({
-    queryKey: ['COURSE'],
-    queryFn: getStudentCourseStats,
-    gcTime: 0,
-    enabled: !isValidatingToken,
-  });
 
   // Refresh course stats whenever the tab comes into focus (e.g. returning from a course)
   useFocusEffect(
@@ -194,7 +219,7 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      <Header title={t('home')}/>
+      <Header title={t('home')} />
       <ScrollView
         style={styles.content}
         showsVerticalScrollIndicator={false}
@@ -213,26 +238,32 @@ export default function HomeScreen() {
           <Text style={styles.sectionTitle}>Incamake y&apos; amasomo</Text>
           
           {/* Course Stats Row */}
-          <View style={styles.statsSecondaryRow}>
-            <StatsCard
-              Icon={Book}
-              number={courseStatsData?.summary?.totalCourses || 0}
-              title="Amasomo yose"
-              backgroundColor="#4D81D2"
-            />
-            <StatsCard
-              Icon={BookOpen}
-              number={courseStatsData?.summary?.enrolledCourses || 0}
-              title="Watangiye kwiga"
-              backgroundColor="#649af1ff"
-            />
-            <StatsCard
-              Icon={Clock}
-              number={courseStatsData?.summary?.unenrolledCourses || 0}
-              title="Ayo utaratangira"
-              backgroundColor="#4788f1ff"
-            />
-          </View>
+          <CopilotStep
+            text="Hano ubona incamake y'amasomo yawe: amasomo yose wahabwa, watangiye kwiga, n'ayo utaratangira."
+            order={2}
+            name="stats"
+          >
+            <WalkthroughableView style={styles.statsSecondaryRow}>
+              <StatsCard
+                Icon={Book}
+                number={courseStatsData?.summary?.totalCourses || 0}
+                title="Amasomo yose"
+                backgroundColor="#4D81D2"
+              />
+              <StatsCard
+                Icon={BookOpen}
+                number={courseStatsData?.summary?.enrolledCourses || 0}
+                title="Watangiye kwiga"
+                backgroundColor="#649af1ff"
+              />
+              <StatsCard
+                Icon={Clock}
+                number={courseStatsData?.summary?.unenrolledCourses || 0}
+                title="Ayo utaratangira"
+                backgroundColor="#4788f1ff"
+              />
+            </WalkthroughableView>
+          </CopilotStep>
 
           {/* Current Activity Banner - only show if there's last viewed location */}
           {courseStatsData?.lastViewedLocation?.courseId && (
@@ -279,74 +310,64 @@ export default function HomeScreen() {
         {/* Upcoming Courses */}
 
         
-          {courseStatsData?.courses?.slice(0, 8).filter((course: IStudentCourse) => !course.isEnrolled).length > 0 ? (
-                    <View style={styles.section}>
-             <Text style={styles.sectionTitle}>Amasomo agiye gukurikira</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.upcomingScrollContainer}>
-              {courseStatsData.courses.filter((course: IStudentCourse) => !course.isEnrolled).slice(0, 12).map((course: IStudentCourse) => (
-                <RevisedCourseCard
-                  key={course.courseId}
-                  course={course}
-                  onPress={() => router.push(getLastViewedSlidePath(courseStatsData, course.courseId))}
-                />
-              ))}
-            </ScrollView>
-
-        </View>
-          ) : (
-            
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Amasomo aheruka</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.upcomingScrollContainer}>
-            {courseStatsData?.courses?.slice(0, 8).map((course: IStudentCourse) => (
-              <RevisedCourseCard
-                key={`recent-${course.courseId}`}
-                course={course}
-                onPress={() => router.push(getLastViewedSlidePath(courseStatsData, course.courseId))}
-              />
-            ))}
-          </ScrollView>
-        </View>
-          )}
-        {/* Recent Courses */}
-        {/* CHW: Pending Invitations Banner */}
-        {isCHW && pendingInvitations.length > 0 && (
-          <TouchableOpacity
-            style={styles.invitationBanner}
-            onPress={() => router.push('/cho-group/invitations')}
-            activeOpacity={0.85}
+          <CopilotStep
+            text="Izi ni amasomo agiye gukurikira. Sura ujye ibumoso kugira ngo ubone menshi!"
+            order={1}
+            name="course-carousel"
           >
-            <View style={styles.invitationBannerLeft}>
-              <Bell size={18} color="#D97706" />
-              <View>
-                <Text style={styles.invitationBannerTitle}>
-                  Ubutumire bw'itsinda ({pendingInvitations.length})
-                </Text>
-                <Text style={styles.invitationBannerSub}>
-                  Kanda hano kugira ngo urebe no gusubiza
-                </Text>
-              </View>
-            </View>
-            <Text style={styles.invitationBannerArrow}>›</Text>
-          </TouchableOpacity>
-        )}
-
+            <WalkthroughableView style={styles.section}>
+              {courseStatsData?.courses?.slice(0, 8).filter((course: IStudentCourse) => !course.isEnrolled).length > 0 ? (
+                <>
+                  <Text style={styles.sectionTitle}>Amasomo agiye gukurikira</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.upcomingScrollContainer}>
+                    {courseStatsData.courses.filter((course: IStudentCourse) => !course.isEnrolled).slice(0, 12).map((course: IStudentCourse) => (
+                      <RevisedCourseCard
+                        key={course.courseId}
+                        course={course}
+                        onPress={() => router.push(getLastViewedSlidePath(courseStatsData, course.courseId))}
+                      />
+                    ))}
+                  </ScrollView>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.sectionTitle}>Amasomo aheruka</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.upcomingScrollContainer}>
+                    {courseStatsData?.courses?.slice(0, 8).map((course: IStudentCourse) => (
+                      <RevisedCourseCard
+                        key={`recent-${course.courseId}`}
+                        course={course}
+                        onPress={() => router.push(getLastViewedSlidePath(courseStatsData, course.courseId))}
+                      />
+                    ))}
+                  </ScrollView>
+                </>
+              )}
+            </WalkthroughableView>
+          </CopilotStep>
+        {/* Recent Courses */}
         {/* Quick Actions */}
-        <View style={styles.quickActions}>
-          {quickActions.map((action) => (
-            <TouchableOpacity
-              key={action.id}
-              style={[styles.quickAction, { backgroundColor: activeQuickAction === action.id ? '#4D81D2' : action.color }]}
-              activeOpacity={0.85}
-              onPress={() => setActiveQuickAction(action.id)}
-            >
-              <View style={styles.quickActionRow}>
-                <Text style={styles.quickActionIcon}>{action.icon}</Text>
-                <Text style={[styles.quickActionTitle, { color: activeQuickAction === action.id ? action.color : '#4D81D2' }]}>{action.title}</Text>
-              </View>
-            </TouchableOpacity>
-          ))}
-        </View>
+        <CopilotStep
+          text="Koresha ibi bice kugira ngo ubone amasomo yose, watangiye kwiga, cyangwa utaratangira. Shakisha no gukomeza aho wahagaritsemo!"
+          order={3}
+          name="filters"
+        >
+          <WalkthroughableView style={styles.quickActions}>
+            {quickActions.map((action) => (
+              <TouchableOpacity
+                key={action.id}
+                style={[styles.quickAction, { backgroundColor: activeQuickAction === action.id ? '#4D81D2' : action.color }]}
+                activeOpacity={0.85}
+                onPress={() => setActiveQuickAction(action.id)}
+              >
+                <View style={styles.quickActionRow}>
+                  <Text style={styles.quickActionIcon}>{action.icon}</Text>
+                  <Text style={[styles.quickActionTitle, { color: activeQuickAction === action.id ? action.color : '#4D81D2' }]}>{action.title}</Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </WalkthroughableView>
+        </CopilotStep>
         {/* Tab Content - switch by activeQuickAction */}
         <View style={styles.section}>
           {/* All Courses tab */}
@@ -530,7 +551,10 @@ export default function HomeScreen() {
           onRequestClose={() => setWelcomeModalVisible(false)}
         >
           <View style={{ flex: 1, backgroundColor: 'transparent' }}>
-            <WelcomeVideo onDone={() => { console.log('Welcome video finished'); setWelcomeModalVisible(false); }} />
+            <WelcomeVideo
+              forceVisible
+              onDone={handleWelcomeVideoDone}
+            />
           </View>
         </Modal>
       )}
@@ -563,6 +587,20 @@ export default function HomeScreen() {
         />
       </Modal>
     </View>
+  );
+}
+
+export default function HomeScreen() {
+  return (
+    <CopilotProvider
+      tooltipComponent={MascotTooltip}
+      overlay="svg"
+      backdropColor="rgba(0, 0, 0, 0.65)"
+      animationDuration={300}
+      stepNumberComponent={() => null}
+    >
+      <HomeScreenContent />
+    </CopilotProvider>
   );
 }
 
@@ -1320,40 +1358,5 @@ const styles = StyleSheet.create({
     },
     shadowOpacity: 0.3,
     shadowRadius: 8,
-  },
-  // CHW invitation banner
-  invitationBanner: {
-    marginHorizontal: 8,
-    marginVertical: 6,
-    backgroundColor: '#FEF3C7',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderLeftWidth: 4,
-    borderLeftColor: '#D97706',
-  },
-  invitationBannerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    flex: 1,
-  },
-  invitationBannerTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#92400E',
-  },
-  invitationBannerSub: {
-    fontSize: 11,
-    color: '#B45309',
-    marginTop: 1,
-  },
-  invitationBannerArrow: {
-    fontSize: 22,
-    color: '#D97706',
-    fontWeight: '600',
   },
 });

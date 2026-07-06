@@ -8,8 +8,8 @@ import {
   TouchableOpacity,
   TextInput,
   RefreshControl,
-  ActivityIndicator,
 } from 'react-native';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -141,18 +141,38 @@ export default function NotificationsPage() {
       } else {
         markAsRead(notification.id);
         
-        // Navigate based on actionUrl or metadata
-        if (notification.actionUrl) {
-          // Check if it's a meeting URL that needs special handling
-          if (isValidMeetingUrl(notification.actionUrl)) {
-            const meetingId = extractMeetingId(notification.actionUrl);
+        // Navigate based on actionUrl — skip entirely if no valid link
+        const actionUrl = (notification.actionUrl || '').trim();
+        if (actionUrl) {
+          if (isValidMeetingUrl(actionUrl)) {
+            const meetingId = extractMeetingId(actionUrl);
             if (meetingId) {
-              // Route to meeting screen with extracted ID
               router.push(`/meeting/${meetingId}`);
             }
+          } else if (actionUrl === '/certificate') {
+            router.push('/certificate');
           } else {
-            // For other URLs, push as-is
-            router.push(notification.actionUrl as any);
+            const match = actionUrl.match(/^\/([a-z_]+)\/(.+?)(?:\?|$)/i);
+            if (match) {
+              const [, resourceType, resourceId] = match;
+              switch (resourceType.toLowerCase()) {
+                case 'calendar': case 'event':
+                  router.push(`/calendar/${resourceId}`); break;
+                case 'chat': case 'conversation':
+                  router.push(`/chat/${resourceId}`); break;
+                case 'group':
+                  router.push(`/group/${resourceId}`); break;
+                case 'course': case 'courses':
+                  router.push(`/courses/${resourceId}`); break;
+                case 'chapter': case 'attempt':
+                  router.push(`/courses/${resourceId}`); break;
+                case 'community':
+                  router.push(`/community/${resourceId}`); break;
+                case 'announcement':
+                  router.push(`/announcements/${resourceId}`); break;
+                // Unknown route type — just mark-as-read, no navigation
+              }
+            }
           }
         }
       }
@@ -356,12 +376,7 @@ export default function NotificationsPage() {
           connected ? (
             <NotificationEmpty type={getEmptyStateType()} searchQuery={searchQuery} />
           ) : (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={themeColors.primary} />
-              <Text style={[styles.loadingText, { color: isDark ? '#9ca3af' : '#6b7280' }]}>
-                Shakisha amatangazo...
-              </Text>
-            </View>
+            <LoadingSpinner message="Shakisha amatangazo..." isDark={isDark} />
           )
         }
         showsVerticalScrollIndicator={false}

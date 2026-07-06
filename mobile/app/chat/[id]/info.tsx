@@ -6,9 +6,9 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
-  ActivityIndicator,
   Alert,
   Linking,
+  ActivityIndicator,
   useWindowDimensions,
 } from 'react-native';
 import {
@@ -33,6 +33,7 @@ import {
 import * as MessagingAPI from '@/services/messaging.api';
 import { getUserById } from '@/services/users.api';
 import { useAuth } from '@/hooks/useAuth';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 
 export default function DirectChatInfoScreen() {
@@ -161,10 +162,7 @@ export default function DirectChatInfoScreen() {
   if (chatLoading || (userLoading && !userFromChat)) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4D81D2" />
-          <Text style={styles.loadingText}>Gufungura amakuru...</Text>
-        </View>
+        <LoadingSpinner message="Gufungura amakuru..." />
       </SafeAreaView>
     );
   }
