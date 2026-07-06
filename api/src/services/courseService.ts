@@ -60,87 +60,209 @@ export interface AnalyticsFilters {
   year?: string;
   role?: string;
   month?: string;
+  hospitalId?: string;
 }
 
 export class CourseService {
-  private static async notifyTraineesAboutCourse(
+  private static readonly DEFAULT_COURSE_NOTIFY_ROLES = [
+    roles.TRAINEE,
+    roles.TESTER,
+    roles.CHO,
+  ];
+
+  private static resolveAnalyticsDistrictList(filters?: AnalyticsFilters): string[] {
+    if (filters?.district) return [filters.district];
+    if (filters?.province) return PROVINCE_DISTRICTS[filters.province] ?? [];
+    return [];
+  }
+
+  /** Student-scoped filters for dashboard analytics (role uses Student.role, not UserRole). */
+  private static buildAnalyticsStudentScope(filters?: AnalyticsFilters) {
+    const districtList = CourseService.resolveAnalyticsDistrictList(filters);
+
+    const userFilter: Record<string, unknown> = {};
+    if (districtList.length > 0) userFilter.district = { in: districtList };
+    if (filters?.gender) userFilter.gender = filters.gender;
+    if (filters?.hospitalId) userFilter.hospitalId = filters.hospitalId;
+
+    const studentWhere: Record<string, unknown> = {};
+    if (Object.keys(userFilter).length > 0) studentWhere.user = userFilter;
+    if (filters?.role) studentWhere.role = filters.role;
+
+    const progressWhere =
+      Object.keys(studentWhere).length > 0 ? { student: studentWhere } : {};
+
+    return { studentWhere, progressWhere, userFilter, districtList };
+  }
+
+  private static async markCoursePendingNotification(
+    tx: Prisma.TransactionClient | typeof prisma,
+    courseId: string,
+  ): Promise<void> {
+    const course = await tx.course.findUnique({
+      where: { id: courseId },
+      select: { lastNotifiedAt: true, pendingNotificationType: true },
+    });
+    if (!course) return;
+
+    const pendingType = course.lastNotifiedAt
+      ? "updated"
+      : (course.pendingNotificationType ?? "created");
+
+    await tx.course.update({
+      where: { id: courseId },
+      data: { pendingNotificationType: pendingType },
+    });
+  }
+
+  private static async notifyCourseAudience(
     courseId: string,
     courseTitle: string,
     eventType: "created" | "updated",
     io?: any,
-  ): Promise<void> {
-    try {
-      const learnerRoles = [roles.TRAINEE, roles.TESTER];
-      const trainees = await prisma.user.findMany({
-        where: {
-          userRoles: { some: { name: { in: learnerRoles } } },
-          student: { status: "ACTIVE" },
-        },
-        select: { id: true },
-      });
-      if (!trainees.length) return;
+    roleFilter?: string[],
+  ): Promise<number> {
+    const targetRoles = (
+      roleFilter?.length ? roleFilter : CourseService.DEFAULT_COURSE_NOTIFY_ROLES
+    ) as Array<(typeof roles)[keyof typeof roles]>;
 
-      const title =
-        eventType === "created"
-          ? "Isomo rishya ryongeweho"
-          : "Isomo ryavuguruwe";
-      const message =
-        eventType === "created"
-          ? `Isomo rishya "${courseTitle}" ryongeweho. Reba usome!`
-          : `Isomo "${courseTitle}" ryavuguruwe. Reba impinduka!`;
-      const actionUrl = `/course/${courseId}`;
+    const users = await prisma.user.findMany({
+      where: {
+        userRoles: { some: { name: { in: targetRoles as never } } },
+        OR: [
+          { student: { is: { status: "ACTIVE" } } },
+          { student: { is: null } },
+        ],
+      },
+      select: { id: true },
+    });
 
-      await Promise.allSettled(
-        trainees.map(async (trainee) => {
-          await NotificationService.createNotification(
-            trainee.id,
+    if (!users.length) return 0;
+
+    const title =
+      eventType === "created"
+        ? "Isomo rishya ryongeweho"
+        : "Isomo ryavuguruwe";
+    const message =
+      eventType === "created"
+        ? `Isomo rishya "${courseTitle}" ryongeweho. Reba usome!`
+        : `Isomo "${courseTitle}" ryavuguruwe. Reba impinduka!`;
+    const actionUrl = `/course/${courseId}`;
+
+    await Promise.allSettled(
+      users.map(async (user) => {
+        await NotificationService.createNotification(
+          user.id,
+          title,
+          message,
+          "info",
+          actionUrl,
+          "course",
+          courseId,
+          { courseTitle, eventType },
+          {
+            cooldownMs: 60_000,
+            dedupKey: `course:${courseId}:${eventType}:${user.id}`,
+          },
+        );
+        await pushService
+          .sendToUser(user.id, {
+            title,
+            body: message,
+            type: "info",
+            entityId: courseId,
+            deepLink: actionUrl,
+            data: { entityType: "course", actionUrl, courseTitle, eventType },
+          })
+          .catch((err) =>
+            console.warn(`[CourseService] Push failed for ${user.id}:`, err),
+          );
+        if (io) {
+          io.to(`user:${user.id}`).emit("notification", {
             title,
             message,
-            "info",
+            type: "info",
             actionUrl,
-            "course",
-            courseId,
-            { courseTitle, eventType },
-            {
-              cooldownMs: 60_000,
-              dedupKey: `course:${courseId}:${eventType}:${trainee.id}`,
-            },
-          );
-          await pushService
-            .sendToUser(trainee.id, {
-              title,
-              body: message,
-              type: "info",
-              entityId: courseId,
-              deepLink: actionUrl,
-              data: { entityType: "course", actionUrl, courseTitle, eventType },
-            })
-            .catch((err) =>
-              console.warn(
-                `[CourseService] Push failed for ${trainee.id}:`,
-                err,
-              ),
-            );
-          if (io) {
-            io.to(`user:${trainee.id}`).emit("notification", {
-              title,
-              message,
-              type: "info",
-              actionUrl,
-              entityType: "course",
-              entityId: courseId,
-              isRead: false,
-              createdAt: new Date().toISOString(),
-            });
-          }
-        }),
-      );
-      console.log(
-        `[CourseService] Notified ${trainees.length} trainees: course ${eventType}`,
-      );
-    } catch (err) {
-      console.warn("[CourseService] notifyTraineesAboutCourse failed:", err);
+            entityType: "course",
+            entityId: courseId,
+            isRead: false,
+            createdAt: new Date().toISOString(),
+          });
+        }
+      }),
+    );
+
+    console.log(
+      `[CourseService] Notified ${users.length} users (${targetRoles.join(", ")}): course ${eventType}`,
+    );
+    return users.length;
+  }
+
+  public static async releaseCourseNotification(
+    courseId: string,
+    requesterUserId: string,
+    io?: any,
+    roleFilter?: string[],
+  ) {
+    const course = await prisma.course.findUnique({
+      where: { id: courseId },
+      include: {
+        staff: { select: { userId: true } },
+      },
+    });
+    if (!course) throw new AppError("Course not found", 404);
+
+    const requesterRoles = await prisma.userRole.findMany({
+      where: { userId: requesterUserId },
+      select: { name: true },
+    });
+    const roleNames = requesterRoles.map((r) => r.name);
+    const isCreator = course.staff?.userId === requesterUserId;
+    const canNotify =
+      isCreator ||
+      roleNames.includes(roles.ADMIN as never) ||
+      roleNames.includes(roles.TRAINER as never) ||
+      roleNames.includes(roles.STAFF as never) ||
+      roleNames.includes(roles.CHO as never);
+
+    if (!canNotify) {
+      throw new AppError("You are not allowed to notify users for this course", 403);
     }
+
+    if (!course.pendingNotificationType) {
+      throw new AppError("No new changes to notify users about", 400);
+    }
+
+    if (!course.isPublished) {
+      throw new AppError("Publish the course before notifying users", 400);
+    }
+
+    const eventType = course.pendingNotificationType as "created" | "updated";
+    const notifiedCount = await CourseService.notifyCourseAudience(
+      courseId,
+      course.title,
+      eventType,
+      io,
+      roleFilter,
+    );
+
+    const updated = await prisma.course.update({
+      where: { id: courseId },
+      data: {
+        pendingNotificationType: null,
+        lastNotifiedAt: new Date(),
+      },
+    });
+
+    return {
+      message: `Notification sent to ${notifiedCount} user(s)`,
+      statusCode: 200,
+      data: {
+        course: updated,
+        notifiedCount,
+        eventType,
+      },
+    };
   }
   public static async createCourse(
     data: CreateCourseDto,
@@ -161,25 +283,9 @@ export class CourseService {
         title: data.title,
         coverIcon: data.coverIcon,
         description: data.description ?? null,
+        pendingNotificationType: "created",
       },
     });
-
-    if (io) {
-      NotificationHelper.notifyNewCourseCreated(
-        io,
-        course.id,
-        course.title,
-      ).catch((err) =>
-        console.warn("[CourseService] course create notify failed", err),
-      );
-    }
-
-    CourseService.notifyTraineesAboutCourse(
-      course.id,
-      course.title,
-      "created",
-      io,
-    ).catch(console.warn);
 
     return {
       message: "Course created successfully",
@@ -286,41 +392,7 @@ export class CourseService {
       },
     });
 
-    // Notify on publish/unpublish state changes
-    if (
-      data.isPublished !== undefined &&
-      data.isPublished !== existing.isPublished
-    ) {
-      const action = data.isPublished ? "published" : "unpublished";
-      const targets = await this.getCourseAudienceUserIds(
-        id,
-        existing.creatorId,
-      );
-      if (targets.length) {
-        await NotificationHelper.sendToUsers(
-          io,
-          targets,
-          `Course ${action}`,
-          `${existing.title} was ${action}.`,
-          "info",
-          `/courses/${id}`,
-          "course",
-          id,
-          { action },
-          30_000,
-          `course:${id}:${action}`,
-        ).catch((err: unknown) =>
-          console.warn("[CourseService] publish/unpublish notify failed", err),
-        );
-      }
-    }
-
-    CourseService.notifyTraineesAboutCourse(
-      id,
-      updated.title,
-      "updated",
-      io,
-    ).catch(console.warn);
+    await CourseService.markCoursePendingNotification(prisma, id);
 
     return {
       message: "Course updated successfully",
@@ -774,6 +846,7 @@ export class CourseService {
         coverIcon: data.coverIcon,
         description: data.description ?? null,
         isPublished: data.isPublished ?? true,
+        pendingNotificationType: "created",
       },
     });
   }
@@ -1056,19 +1129,22 @@ export class CourseService {
         timeout: CourseService.TRANSACTION_TIMEOUT, // 2 minutes
       },
     );
-    if (io) {
-      CourseService.notifyTraineesAboutCourse(
-        result.course.id,
-        result.course.title,
-        "created",
-        io,
-      ).catch(console.warn);
-    }
+    // Mark pending notification — creator releases manually from the web UI
+    await CourseService.markCoursePendingNotification(
+      prisma,
+      result.course.id,
+    );
+    const refreshed = await prisma.course.findUnique({
+      where: { id: result.course.id },
+    });
 
     return {
       message: "Super course created successfully",
       statusCode: 201,
-      data: result,
+      data: {
+        ...result,
+        course: refreshed ?? result.course,
+      },
     };
   }
 
@@ -1695,21 +1771,15 @@ export class CourseService {
           course.id,
           data.sections,
         );
-        return { course };
+        await CourseService.markCoursePendingNotification(tx, course.id);
+        const refreshed = await tx.course.findUnique({ where: { id: course.id } });
+        return { course: refreshed ?? course };
       },
       {
         maxWait: CourseService.MAX_WAIT, // 1 minute
         timeout: CourseService.TRANSACTION_TIMEOUT, // 2 minutes
       },
     );
-    if (io) {
-      CourseService.notifyTraineesAboutCourse(
-        data.courseId,
-        result.course.title,
-        "updated",
-        io,
-      ).catch(console.warn);
-    }
 
     return {
       message: "Super course updated successfully",
@@ -1792,22 +1862,8 @@ export class CourseService {
    * Get dashboard statistics
    */
   public static async getDashboardStatistics(filters?: AnalyticsFilters) {
-    const districtList = filters?.district
-      ? [filters.district]
-      : filters?.province
-        ? (PROVINCE_DISTRICTS[filters.province] ?? [])
-        : [];
-
-    const userFilter: any = {};
-    if (districtList.length > 0) userFilter.district = { in: districtList };
-    if (filters?.role)
-      userFilter.userRoles = { some: { name: filters.role as any } };
-    const hasUserFilter = Object.keys(userFilter).length > 0;
-
-    const studentWhere = hasUserFilter ? { user: userFilter } : {};
-    const progressWhere = hasUserFilter
-      ? { student: { user: userFilter } }
-      : {};
+    const { studentWhere, progressWhere, districtList } =
+      CourseService.buildAnalyticsStudentScope(filters);
 
     // Date ranges for trend calculations
     const thirtyDaysAgo = new Date();
@@ -1844,11 +1900,10 @@ export class CourseService {
     const totalStudents = await prisma.student.count({ where: studentWhere });
     const previousStudents = await prisma.student.count({
       where: {
+        ...studentWhere,
         user: {
+          ...(studentWhere.user as object | undefined),
           createdAt: { lt: thirtyDaysAgo },
-          ...(districtList.length > 0
-            ? { district: { in: districtList } }
-            : {}),
         },
       },
     });
@@ -1882,14 +1937,17 @@ export class CourseService {
     const staffTrend = CourseService.calculateTrend(totalStaff, previousStaff);
 
     // Get active users (current period)
+    const studentActivityScope: Record<string, unknown> = {
+      courseProgresses: { some: { updatedAt: { gte: thirtyDaysAgo } } },
+    };
+    if (districtList.length > 0) {
+      studentActivityScope.user = { district: { in: districtList } };
+    }
+    if (filters?.role) studentActivityScope.role = filters.role;
+
     const activeUsersWhere =
-      districtList.length > 0
-        ? {
-            student: {
-              user: { district: { in: districtList } },
-              courseProgresses: { some: { updatedAt: { gte: thirtyDaysAgo } } },
-            },
-          }
+      districtList.length > 0 || filters?.role
+        ? { student: studentActivityScope }
         : {
             OR: [
               {
@@ -1907,19 +1965,19 @@ export class CourseService {
             ],
           };
 
-    const activeUsers = await prisma.user.count({ where: activeUsersWhere });
+    const previousStudentActivityScope: Record<string, unknown> = {
+      courseProgresses: {
+        some: { updatedAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo } },
+      },
+    };
+    if (districtList.length > 0) {
+      previousStudentActivityScope.user = { district: { in: districtList } };
+    }
+    if (filters?.role) previousStudentActivityScope.role = filters.role;
 
-    // Get active users (previous period)
     const previousActiveUsersWhere =
-      districtList.length > 0
-        ? {
-            student: {
-              user: { district: { in: districtList } },
-              courseProgresses: {
-                some: { updatedAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo } },
-              },
-            },
-          }
+      districtList.length > 0 || filters?.role
+        ? { student: previousStudentActivityScope }
         : {
             OR: [
               {
@@ -1942,6 +2000,8 @@ export class CourseService {
               },
             ],
           };
+
+    const activeUsers = await prisma.user.count({ where: activeUsersWhere });
 
     const previousActiveUsers = await prisma.user.count({
       where: previousActiveUsersWhere,
@@ -2173,20 +2233,7 @@ export class CourseService {
    * Get comprehensive course analytics
    */
   public static async getCourseAnalytics(filters?: AnalyticsFilters) {
-    const districtList = filters?.district
-      ? [filters.district]
-      : filters?.province
-        ? (PROVINCE_DISTRICTS[filters.province] ?? [])
-        : [];
-
-    const userFilter: any = {};
-    if (districtList.length > 0) userFilter.district = { in: districtList };
-    if (filters?.role)
-      userFilter.userRoles = { some: { name: filters.role as any } };
-    const progressWhere =
-      Object.keys(userFilter).length > 0
-        ? { student: { user: userFilter } }
-        : {};
+    const { progressWhere } = CourseService.buildAnalyticsStudentScope(filters);
 
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -2376,6 +2423,8 @@ export class CourseService {
 
     const userFilter: any = {};
     if (districtList.length > 0) userFilter.district = { in: districtList };
+    if (filters?.gender) userFilter.gender = filters.gender;
+    if (filters?.hospitalId) userFilter.hospitalId = filters.hospitalId;
     const hasUserFilter = Object.keys(userFilter).length > 0;
 
     const studentWhere: any = hasUserFilter ? { user: userFilter } : {};
@@ -3489,20 +3538,9 @@ export class CourseService {
   }
 
   public static async getTestScoreAnalytics(filters?: AnalyticsFilters) {
-    const districtList = filters?.district
-      ? [filters.district]
-      : filters?.province
-        ? (PROVINCE_DISTRICTS[filters.province] ?? [])
-        : [];
-
-    const userFilter: any = {};
-    if (districtList.length > 0) userFilter.district = { in: districtList };
-    if (filters?.role)
-      userFilter.userRoles = { some: { name: filters.role as any } };
+    const { studentWhere } = CourseService.buildAnalyticsStudentScope(filters);
     const attemptWhere =
-      Object.keys(userFilter).length > 0
-        ? { student: { user: userFilter } }
-        : {};
+      Object.keys(studentWhere).length > 0 ? { student: studentWhere } : {};
 
     // Get all courses that have at least one attempt
     const courses = await prisma.course.findMany({
@@ -3624,31 +3662,20 @@ export class CourseService {
   }
 
   public static async getCommunicationsAnalytics(filters?: AnalyticsFilters) {
-    const userFilter: any = {};
-    if (filters?.gender) {
-      userFilter.gender = filters.gender;
-    }
-    if (filters?.district) {
-      userFilter.district = filters.district;
-    } else if (filters?.province) {
-      userFilter.district = {
-        in: PROVINCE_DISTRICTS[filters.province] || [],
-      };
-    }
-    if (filters?.role) {
-      userFilter.userRoles = { some: { name: filters.role as any } };
-    }
-
-    const hasUserFilter = Object.keys(userFilter).length > 0;
+    const { userFilter, districtList } =
+      CourseService.buildAnalyticsStudentScope(filters);
+    const senderFilter: Record<string, unknown> = { ...userFilter };
+    if (filters?.role) senderFilter.student = { role: filters.role };
 
     const dmWhere: any = { isDeleted: false };
     const gmWhere: any = { isDeleted: false };
     const cpWhere: any = { isDeleted: false };
 
-    if (hasUserFilter) {
-      dmWhere.sender = userFilter;
-      gmWhere.sender = userFilter;
-      cpWhere.author = userFilter;
+    const hasSenderFilter = Object.keys(senderFilter).length > 0;
+    if (hasSenderFilter) {
+      dmWhere.sender = senderFilter;
+      gmWhere.sender = senderFilter;
+      cpWhere.author = senderFilter;
     }
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -3767,18 +3794,7 @@ export class CourseService {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    const districtList = filters?.district
-      ? [filters.district]
-      : filters?.province
-        ? (PROVINCE_DISTRICTS[filters.province] ?? [])
-        : [];
-
-    const userFilter: any = {};
-    if (districtList.length > 0) userFilter.district = { in: districtList };
-    if (filters?.role)
-      userFilter.userRoles = { some: { name: filters.role as any } };
-    const studentWhere =
-      Object.keys(userFilter).length > 0 ? { user: userFilter } : {};
+    const { studentWhere } = CourseService.buildAnalyticsStudentScope(filters);
 
     // Get all students with user info and progress
     const students = await prisma.student.findMany({
@@ -3942,21 +3958,10 @@ export class CourseService {
   }
 
   public static async getCHWDashboardStats(filters?: AnalyticsFilters) {
-    const districtList = filters?.district
-      ? [filters.district]
-      : filters?.province
-        ? (PROVINCE_DISTRICTS[filters.province] ?? [])
-        : [];
-
-    const userFilter: any = {};
-    if (districtList.length > 0) userFilter.district = { in: districtList };
-    if (filters?.role)
-      userFilter.userRoles = { some: { name: filters.role as any } };
-    const hasUserFilter = Object.keys(userFilter).length > 0;
-    const baseStudentWhere = hasUserFilter ? { user: userFilter } : {};
-    const baseProgressWhere = hasUserFilter
-      ? { student: { user: userFilter } }
-      : {};
+    const { studentWhere, progressWhere, districtList } =
+      CourseService.buildAnalyticsStudentScope(filters);
+    const baseStudentWhere = studentWhere;
+    const baseProgressWhere = progressWhere;
 
     const [
       // Card 1: CHW (student) counts by status
@@ -4132,20 +4137,9 @@ export class CourseService {
   public static async getRecentActivityFeed(filters?: AnalyticsFilters) {
     const LIMIT = 10;
 
-    const districtList = filters?.district
-      ? [filters.district]
-      : filters?.province
-        ? (PROVINCE_DISTRICTS[filters.province] ?? [])
-        : [];
-
-    const activityUserFilter: any = {};
-    if (districtList.length > 0) activityUserFilter.district = { in: districtList };
-    if (filters?.gender) activityUserFilter.gender = filters.gender;
-    if (filters?.role) activityUserFilter.userRoles = { some: { name: filters.role as any } };
-
-    const combinedStudentWhere = Object.keys(activityUserFilter).length > 0
-      ? { student: { user: activityUserFilter } }
-      : {};
+    const { studentWhere } = CourseService.buildAnalyticsStudentScope(filters);
+    const combinedStudentWhere =
+      Object.keys(studentWhere).length > 0 ? { student: studentWhere } : {};
 
     const yearMonthWhere = (() => {
       if (!filters?.year && !filters?.month) return {};

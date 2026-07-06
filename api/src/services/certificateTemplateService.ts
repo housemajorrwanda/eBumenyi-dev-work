@@ -1,8 +1,36 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../utils/db";
 import AppError from "../utils/error";
+import { v2 as cloudinary } from "cloudinary";
+
+const MOCK_CERT_ID = "00000000-0000-0000-0000-000000000000";
 
 export class CertificateTemplateService {
+  static getMockTokenValues() {
+    const now = new Date();
+    const fmt = (d: Date) =>
+      d.toLocaleDateString("en-US", { day: "2-digit", month: "long", year: "numeric" });
+    return {
+      statusCode: 200,
+      message: "Mock token values",
+      data: {
+        certId: MOCK_CERT_ID,
+        tokenValues: {
+          "{{studentName}}":     "Jane Doe",
+          "{{certificateCode}}": "CHW-2026-MOCK01",
+          "{{currentDate}}":     fmt(now),
+          "{{courseName}}":      "Community Health Worker Training",
+          "{{courseDetails}}":   "Advanced Community Health Worker Program",
+          "{{progress}}":        "100%",
+          "{{courseDuration}}":  "12 Weeks",
+          "{{startDate}}":       "01 January 2026",
+          "{{endDate}}":         fmt(now),
+          "{{studentCode}}":     "STU-2026-001",
+          "{{instructorName}}":  "Dr. Jane Smith",
+        },
+      },
+    };
+  }
   static async list() {
     const templates = await prisma.certificateTemplate.findMany({
       orderBy: { updatedAt: "desc" },
@@ -12,9 +40,20 @@ export class CertificateTemplateService {
         thumbnail: true,
         createdAt: true,
         updatedAt: true,
+        courses: {
+          select: {
+            _count: { select: { certificates: true } },
+          },
+        },
       },
     });
-    return { statusCode: 200, message: "Templates fetched successfully", data: templates };
+
+    const data = templates.map(({ courses, ...t }) => ({
+      ...t,
+      issuedCount: courses.reduce((sum, c) => sum + c._count.certificates, 0),
+    }));
+
+    return { statusCode: 200, message: "Templates fetched successfully", data };
   }
 
   static async getById(id: string) {
@@ -89,5 +128,35 @@ export class CertificateTemplateService {
       select: { id: true, title: true, coverIcon: true },
     });
     return { statusCode: 200, message: "Linked courses fetched successfully", data: courses };
+  }
+
+  static async listBgImages() {
+    const images = await prisma.backgroundImage.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 30,
+      select: { id: true, url: true, createdAt: true },
+    });
+    return { statusCode: 200, message: "Background images fetched successfully", data: images };
+  }
+
+  static async deleteBgImage(id: string) {
+    const image = await prisma.backgroundImage.findUnique({ where: { id } });
+    if (!image) throw new AppError("Background image not found", 404);
+    const publicId = image.url.split("/").slice(-2).join("/").replace(/\.[^.]+$/, "");
+    await cloudinary.uploader.destroy(publicId, { resource_type: "image" }).catch(() => {});
+    await prisma.backgroundImage.delete({ where: { id } });
+    return { statusCode: 200, message: "Background image deleted successfully" };
+  }
+
+  static async uploadBgImage(dataUrl: string) {
+    const result = await cloudinary.uploader.upload(dataUrl, {
+      folder: "certificate-backgrounds",
+      resource_type: "image",
+    });
+    const saved = await prisma.backgroundImage.create({
+      data: { url: result.secure_url },
+      select: { id: true, url: true, createdAt: true },
+    });
+    return { statusCode: 201, message: "Background image saved", data: saved };
   }
 }

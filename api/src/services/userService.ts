@@ -25,6 +25,7 @@ import { Industry, RoleType, Prisma } from "@prisma/client";
 import { userValidations } from "./../varifications/user";
 import { normalizeRwandaPhone } from "../utils/normalizeRwandaPhone";
 import { WeltelService } from "./weltelService";
+import { OnboardingService } from "./onboardingService";
 
 export class UserService extends BaseService {
   private static normalizePhone(phone: string): string {
@@ -334,6 +335,10 @@ export class UserService extends BaseService {
         jwtSecret,
       );
 
+      const completedTours = await OnboardingService.getCompletedTours(
+        userData.id,
+      );
+
       return {
         message: "Kwinjira byagenze neza",
         statusCode: 200,
@@ -346,6 +351,7 @@ export class UserService extends BaseService {
           roles: rolesList,
           photo: userData.photo,
           industry: userData.industry,
+          completedTours,
         },
       };
     } catch (error) {
@@ -528,6 +534,8 @@ export class UserService extends BaseService {
 
       const rolesList = user.userRoles.map((r) => r.name);
 
+      const completedTours = await OnboardingService.getCompletedTours(user.id);
+
       return {
         message: "Kwinjira byagenze neza",
         statusCode: 200,
@@ -540,6 +548,7 @@ export class UserService extends BaseService {
           roles: rolesList,
           photo: user.photo,
           industry: user.industry,
+          completedTours,
         },
       };
     } catch (error) {
@@ -589,6 +598,8 @@ export class UserService extends BaseService {
 
       const userRoles = user.userRoles.map((r: { name: RoleType }) => r.name);
 
+      const completedTours = await OnboardingService.getCompletedTours(user.id);
+
       return {
         message: "Kwinjira byagenze neza",
         statusCode: 200,
@@ -601,6 +612,7 @@ export class UserService extends BaseService {
           roles: userRoles,
           photo: user.photo,
           industry: user.industry,
+          completedTours,
         },
       };
     } catch (error) {

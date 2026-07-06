@@ -3,7 +3,26 @@ import AppError from "../utils/error";
 import { CacheService } from "./cacheService";
 import { NotificationHelper } from "../utils/notificationHelper";
 
+const communityMemberUserInclude = {
+  user: {
+    select: { id: true, fullNames: true, photo: true },
+  },
+} as const;
+
 export class CommunityService {
+  /**
+   * Removes member rows whose user no longer exists.
+   * Prevents Prisma inconsistent-result errors on member.user includes.
+   */
+  private static async pruneOrphanCommunityMembers(): Promise<void> {
+    await prisma.$executeRaw`
+      DELETE FROM community_members AS cm
+      WHERE NOT EXISTS (
+        SELECT 1 FROM "User" AS u WHERE u.id = cm."userId"
+      )
+    `;
+  }
+
   /**
    * Create a new community
    */
@@ -52,11 +71,7 @@ export class CommunityService {
           select: { id: true, fullNames: true, photo: true },
         },
         members: {
-          include: {
-            user: {
-              select: { id: true, fullNames: true, photo: true },
-            },
-          },
+          include: communityMemberUserInclude,
         },
       },
     });
@@ -68,6 +83,8 @@ export class CommunityService {
    * Get all communities for a user
    */
   public static async getUserCommunities(userId: string) {
+    await this.pruneOrphanCommunityMembers();
+
     const communities = await prisma.community.findMany({
       where: {
         members: {
@@ -79,11 +96,7 @@ export class CommunityService {
           select: { id: true, fullNames: true, photo: true },
         },
         members: {
-          include: {
-            user: {
-              select: { id: true, fullNames: true, photo: true },
-            },
-          },
+          include: communityMemberUserInclude,
         },
       },
       orderBy: {
@@ -129,6 +142,8 @@ export class CommunityService {
     limit = 20,
     offset = 0,
   ) {
+    await this.pruneOrphanCommunityMembers();
+
     const community = await prisma.community.findFirst({
       where: {
         id: communityId,
@@ -139,11 +154,7 @@ export class CommunityService {
           select: { id: true, fullNames: true, photo: true },
         },
         members: {
-          include: {
-            user: {
-              select: { id: true, fullNames: true, photo: true },
-            },
-          },
+          include: communityMemberUserInclude,
         },
         _count: {
           select: { posts: true },
@@ -1328,11 +1339,7 @@ export class CommunityService {
           select: { id: true, fullNames: true, photo: true },
         },
         members: {
-          include: {
-            user: {
-              select: { id: true, fullNames: true, photo: true },
-            },
-          },
+          include: communityMemberUserInclude,
         },
       },
     });
