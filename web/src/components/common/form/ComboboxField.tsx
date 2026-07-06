@@ -1,4 +1,4 @@
-import { FC, Fragment, useEffect, useState } from "react";
+import { FC, Fragment, useEffect, useRef, useState } from "react";
 import {
   Combobox,
   ComboboxButton,
@@ -27,6 +27,7 @@ interface IOptionsField {
   placeholder?: string;
   onChange?: (value: string) => void;
   onCreate?: (query: string) => void;
+  onSearch?: (query: string) => void;
 }
 
 const ComboboxField: FC<IOptionsField> = ({
@@ -42,9 +43,11 @@ const ComboboxField: FC<IOptionsField> = ({
   createLabel,
   onCreate,
   placeholder,
+  onSearch,
 }) => {
   const [selected, setSelected] = useState<IOptionFieldOption | null>(null);
   const [query, setQuery] = useState("");
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const valueChanged = (value: IOptionFieldOption | null) => {
     if (value == null) {
@@ -70,8 +73,20 @@ const ComboboxField: FC<IOptionsField> = ({
     }
   };
 
-  const filteredPeople =
-    query === ""
+  useEffect(() => {
+    if (!onSearch) return;
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = setTimeout(() => {
+      onSearch(query);
+    }, 300);
+    return () => {
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    };
+  }, [query, onSearch]);
+
+  const filteredPeople = onSearch
+    ? options
+    : query === ""
       ? options
       : options.filter((option: IOptionFieldOption) => {
           const searchQuery = query.toLowerCase().trim();

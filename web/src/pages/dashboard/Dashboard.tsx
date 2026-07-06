@@ -4,21 +4,18 @@ import { LearnerSection } from "@/components/dashboard/LearnerSection";
 import { AdoptionSection } from "@/components/dashboard/AdoptionSection";
 import { DeveloperSection } from "@/components/dashboard/DeveloperSection";
 import { CHOSection } from "@/components/dashboard/CHOSection";
+import { DashboardGlobalFilters } from "@/components/dashboard/DashboardGlobalFilters";
 import { useAuth } from "@/hooks/useAuth";
-import { useDashboardStats } from "@/hooks/useDashboardStats";
 import { IDashboardFilters } from "@/types";
+import { useDashboardStats } from "@/hooks/useDashboardStats";
+import {
+  DEFAULT_DASHBOARD_FILTERS,
+} from "@/utils/constants/dashboardFilters";
 
 export const Dashboard: React.FC = () => {
   const { user } = useAuth();
 
-  const [filters, setFilters] = useState<IDashboardFilters>({
-    province: "",
-    district: "",
-    gender: "",
-    role: "TRAINEE",
-    year: "",
-    month: "",
-  });
+  const [filters, setFilters] = useState<IDashboardFilters>(DEFAULT_DASHBOARD_FILTERS);
 
   const userRoles: string[] = user?.roles
     ? Array.isArray(user.roles)
@@ -46,6 +43,7 @@ export const Dashboard: React.FC = () => {
 
   const isLearner = isAnyOf("TRAINEE", "TESTER", "CHO");
   const isCHO = is("CHO");
+  const showAnalyticsFilters = needsAnalytics;
   const hour = new Date().getHours();
   const greeting =
     hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
@@ -71,8 +69,9 @@ export const Dashboard: React.FC = () => {
           </p>
         </div>
 
-        {/* Filters will be injected here by AdoptionSection */}
-        <div id='global-filters-container' className='flex-shrink-0' />
+        {showAnalyticsFilters && (
+          <DashboardGlobalFilters filters={filters} onChange={setFilters} />
+        )}
       </div>
 
       {isAnyOf("ADMIN", "STAFF", "DEVELOPER") && (

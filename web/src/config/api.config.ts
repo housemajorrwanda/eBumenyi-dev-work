@@ -22,6 +22,15 @@ export const getApiBaseURL = (): string => {
   return `${backendURL}/api`;
 };
 
+/** Optional direct upload API (e.g. http://10.10.119.36:9000/api) bypassing Traefik/socat. */
+export const getUploadApiBaseURL = (): string => {
+  const uploadUrl = import.meta.env.VITE_UPLOAD_BASE_URL as string | undefined;
+  if (uploadUrl) {
+    return uploadUrl.replace(/\/api\/?$/i, "") + "/api";
+  }
+  return getApiBaseURL();
+};
+
 // Get the Socket base URL (backend URL without /api)
 export const getSocketBaseURL = (): string => {
   return getBackendBaseURL();

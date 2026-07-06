@@ -29,7 +29,7 @@ export const Phase3Section: React.FC<Phase3SectionProps> = ({
   hideKpis = false,
   filters: _filters,
 }) => {
-  if (isLoading) return <SectionSkeleton cards={4} rows={2} />;
+  if (isLoading && !dashboardStats) return <SectionSkeleton cards={4} rows={2} />;
 
   return (
     <div className="space-y-6">

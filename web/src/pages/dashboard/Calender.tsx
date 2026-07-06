@@ -44,7 +44,10 @@ import { getPublicHospitals } from "@/services/hospitals.service";
 
 const EBUMENYI_SCHEDULE_URL =
   import.meta.env.VITE_EBUMENYI_MEET_API_URL ||
-  "https://meeting.ebumenyi.online/api/meetings/schedule";
+  "http://localhost:3000/api/meetings/schedule";
+
+// Derive the meeting app base URL from the schedule URL (strip /api/meetings/schedule)
+const EBUMENYI_MEET_BASE_URL = EBUMENYI_SCHEDULE_URL.replace(/\/api\/meetings\/schedule\/?$/, "");
 
 function buildEventBackendPayload(eventData: any) {
   const [startTimeStr, endTimeStr] = eventData.time.split(" - ");
@@ -483,12 +486,17 @@ const Calendar: React.FC = () => {
         };
 
         if (calendarEventId) {
+          const existingStreamRoomId = editingEvent?.streamRoomId as string | undefined;
+          const existingLocation = editingEvent?.location as string | undefined;
+
+          // Notify Stream of the updated start time but don't let it
+          // overwrite the stored link — the room ID is fixed at creation.
           const scheduled = await scheduleEbumenyiMeeting({
             startsAt,
             hostEmail: eventData.hostEmail,
             title: eventData.title,
             userId: user.id,
-            meetingId: calendarEventId,
+            meetingId: existingStreamRoomId || calendarEventId,
           });
 
           if (!scheduled) {
@@ -499,8 +507,10 @@ const Calendar: React.FC = () => {
 
           await updateEvent(calendarEventId, {
             ...payload,
-            location: scheduled.meetingUrl,
-            streamRoomId: scheduled.streamRoomId,
+            // Preserve whatever is already stored; only fill from Stream's
+            // response when the event has no room yet (e.g. old data).
+            location: existingLocation || scheduled.meetingUrl,
+            streamRoomId: existingStreamRoomId || scheduled.streamRoomId,
           });
           finishSuccess();
         } else {
@@ -643,7 +653,23 @@ const Calendar: React.FC = () => {
   const formatLocation = (location: string) => {
     if (!location) return "";
 
-    // Check if it's a URL
+    // Check if it's a meeting URL — extract the meeting ID and rebuild with the local base URL
+    const meetingIdMatch = location.match(/\/meeting\/([a-z0-9-]+)/i);
+    if (meetingIdMatch) {
+      const meetingHref = `${EBUMENYI_MEET_BASE_URL}/meeting/${meetingIdMatch[1]}`;
+      return (
+        <a
+          href={meetingHref}
+          target='_blank'
+          rel='noopener noreferrer'
+          className='text-blue-600 hover:text-blue-800 underline'
+        >
+          Virtual Meeting
+        </a>
+      );
+    }
+
+    // Non-meeting URLs (physical location etc.)
     const urlPattern = /^https?:\/\//i;
     if (urlPattern.test(location)) {
       return (
@@ -653,7 +679,7 @@ const Calendar: React.FC = () => {
           rel='noopener noreferrer'
           className='text-blue-600 hover:text-blue-800 underline'
         >
-          Virtual Meeting
+          {location}
         </a>
       );
     }
@@ -1371,6 +1397,15 @@ const Calendar: React.FC = () => {
                           : "scheduled",
                       )}
                       <div className='flex gap-1'>
+                        {isAdmin && event.meetingType === 'EBUMENYI_MEETING' && (
+                          <button
+                            onClick={() => navigate(`/attendance/${event.id}`)}
+                            className='p-1 text-gray-400 hover:text-green-600'
+                            title='View attendance'
+                          >
+                            <Users className='w-4 h-4' />
+                          </button>
+                        )}
                         <button
                           onClick={() => handleViewEvent(event)}
                           className='p-1 text-gray-400 hover:text-blue-600'
@@ -1453,6 +1488,15 @@ const Calendar: React.FC = () => {
             </p>
           </div>
           <div className='flex items-center gap-3'>
+            {isAdmin && (
+              <button
+                onClick={() => navigate('/meetings')}
+                className='flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors'
+              >
+                <Users className='w-4 h-4' />
+                View Meetings
+              </button>
+            )}
             <button
               onClick={() => navigate(isAdmin ? "/recordings" : "/recordings/watch")}
               className='flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors'
@@ -2608,7 +2652,7 @@ const Calendar: React.FC = () => {
                 </p>
               </div>
 
-              <div className='flex items-center justify-end gap-3 pt-6 border-t'>
+              <div className='flex items-center justify-end gap-3 pt-6 border-t flex-wrap'>
                 <button
                   onClick={() => setShowDetailsModal(false)}
                   disabled={deleteEventMutation.isPending}
@@ -2616,6 +2660,18 @@ const Calendar: React.FC = () => {
                 >
                   Close
                 </button>
+                {isAdmin && selectedEvent.meetingType === 'EBUMENYI_MEETING' && (
+                  <button
+                    onClick={() => {
+                      setShowDetailsModal(false);
+                      navigate(`/attendance/${selectedEvent.id}`);
+                    }}
+                    className='flex items-center gap-2 px-4 py-2 bg-blue-50 text-primary border border-primary/20 rounded-lg font-medium hover:bg-blue-100 transition-colors'
+                  >
+                    <Users className='w-4 h-4' />
+                    Attendance
+                  </button>
+                )}
                 {selectedEvent.amOwner && (
                   <>
                     <button
@@ -3517,7 +3573,7 @@ const Calendar: React.FC = () => {
               </button>
               <button
                 onClick={() => {
-                  window.open("https://meeting.ebumenyi.online/sign-in", "_blank");
+                  window.open("http://localhost:3000/sign-in", "_blank");
                   setShowSignInModal(false);
                 }}
                 className='px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-900'

@@ -1,3 +1,5 @@
+/* eslint-disable react-hooks/exhaustive-deps */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import * as d3 from "d3";
 import { MapPin, Users, CheckCircle, Award, Building2, Activity, Plus, Minus, LocateFixed } from "lucide-react";
@@ -33,16 +35,14 @@ const METRIC_ICONS: Record<MapMetric, MetricIcon> = {
   active_chws:   Activity,
 };
 
-// ── SVG Icons for D3 ───────────────────────────────────────────────
-const BUILDING2_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></svg>`;
-const ACTIVITY_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>`;
-
 // ── Component types ───────────────────────────────────────────────
 interface RwandaDistrictMapProps {
   byDistrict: IDemographicRow[];
   activeDistrict: string;
   onDistrictClick: (district: string) => void;
   hospitals?: IHospital[];
+  hospitalId?: string;
+  province?: string;
 }
 
 interface TooltipState {
@@ -63,6 +63,8 @@ export const RwandaDistrictMap: React.FC<RwandaDistrictMapProps> = ({
   activeDistrict,
   onDistrictClick,
   hospitals = [],
+  hospitalId = "",
+  province = "",
 }) => {
   const svgRef       = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -109,6 +111,31 @@ export const RwandaDistrictMap: React.FC<RwandaDistrictMapProps> = ({
   }, [geoData, pathGen]);
 
   // ── Aggregations ──────────────────────────────────────────────
+  const districtNames = useMemo(() => {
+    if (!processedGeoData) return new Map<string, string>();
+    const lookup = new Map<string, string>();
+    for (const feature of processedGeoData.features) {
+      const name = feature.properties?.shapeName as string | undefined;
+      if (name) lookup.set(name.toLowerCase().trim(), name);
+    }
+    return lookup;
+  }, [processedGeoData]);
+
+  const resolveDistrict = useCallback(
+    (raw?: string | null): string | null => {
+      if (!raw?.trim()) return null;
+      return districtNames.get(raw.toLowerCase().trim()) ?? raw.trim();
+    },
+    [districtNames],
+  );
+
+  const matchesProvince = useCallback((hospitalProvince: string, filterProvince: string) => {
+    if (!filterProvince) return true;
+    const normalize = (value: string) =>
+      value.toLowerCase().trim().replace(/\s+city$/, "");
+    return normalize(hospitalProvince) === normalize(filterProvince);
+  }, []);
+
   const districtDataMap = useMemo(() => {
     const map = new Map<string, IDemographicRow>();
     for (const row of byDistrict) {
@@ -117,22 +144,57 @@ export const RwandaDistrictMap: React.FC<RwandaDistrictMapProps> = ({
     return map;
   }, [byDistrict]);
 
+  const scopedHospitals = useMemo(() => {
+    let rows = hospitals;
+    if (hospitalId) return rows.filter((h) => h.id === hospitalId);
+    if (activeDistrict) {
+      const district = resolveDistrict(activeDistrict);
+      rows = rows.filter((h) => resolveDistrict(h.district) === district);
+    } else if (province) {
+      rows = rows.filter((h) => matchesProvince(h.province, province));
+    }
+    return rows;
+  }, [hospitals, hospitalId, activeDistrict, province, resolveDistrict, matchesProvince]);
+
+  const totalScopedHospitals = scopedHospitals.length;
+
   const hospitalsByDistrict = useMemo(() => {
     const map = new Map<string, { hospitals: number; activeChws: number }>();
-    for (const h of hospitals) {
-      if (!h.district) continue;
-      const ex = map.get(h.district) ?? { hospitals: 0, activeChws: 0 };
-      map.set(h.district, {
-        hospitals:  ex.hospitals  + 1,
+    for (const h of scopedHospitals) {
+      const district = resolveDistrict(h.district);
+      if (!district) continue;
+      const ex = map.get(district) ?? { hospitals: 0, activeChws: 0 };
+      map.set(district, {
+        hospitals: ex.hospitals + 1,
         activeChws: ex.activeChws + (h.activeChws ?? 0),
       });
     }
     return map;
-  }, [hospitals]);
+  }, [scopedHospitals, resolveDistrict]);
+
+  const getDistrictHospitalStats = useCallback(
+    (districtName: string) => {
+      const direct = hospitalsByDistrict.get(districtName);
+      if (direct) return direct;
+
+      const resolved = resolveDistrict(districtName);
+      if (resolved) {
+        const byResolved = hospitalsByDistrict.get(resolved);
+        if (byResolved) return byResolved;
+      }
+
+      const target = (resolved ?? districtName).toLowerCase();
+      for (const [key, stats] of hospitalsByDistrict) {
+        if (key.toLowerCase() === target) return stats;
+      }
+      return null;
+    },
+    [hospitalsByDistrict, resolveDistrict],
+  );
 
   const getMetricValue = useCallback((districtName: string): number | null => {
     const demo = districtDataMap.get(districtName);
-    const hosp = hospitalsByDistrict.get(districtName);
+    const hosp = getDistrictHospitalStats(districtName);
     switch (activeMetric) {
       case "learners":      return demo?.total             ?? null;
       case "completion":    return demo?.completionRate    ?? null;
@@ -140,7 +202,7 @@ export const RwandaDistrictMap: React.FC<RwandaDistrictMapProps> = ({
       case "hospitals":     return hosp?.hospitals         ?? null;
       case "active_chws":   return hosp?.activeChws        ?? null;
     }
-  }, [activeMetric, districtDataMap, hospitalsByDistrict]);
+  }, [activeMetric, districtDataMap, getDistrictHospitalStats]);
 
   const metricDomain = useMemo((): [number, number] => {
     const config = MAP_METRICS.find(m => m.key === activeMetric)!;
@@ -183,7 +245,6 @@ export const RwandaDistrictMap: React.FC<RwandaDistrictMapProps> = ({
 
     const g = svg.append("g").attr("class", "map-container");
     g.append("g").attr("class", "districts");
-    g.append("g").attr("class", "district-markers");
     g.append("g").attr("class", "district-labels");
 
     // Mini Map Setup
@@ -218,9 +279,6 @@ export const RwandaDistrictMap: React.FC<RwandaDistrictMapProps> = ({
         
         // Keep labels fully visible regardless of zoom scale
         g.selectAll(".district-label").attr("opacity", 1);
-
-        // Inverse scaling for markers
-        g.selectAll(".marker-scaler").attr("transform", `scale(${1 / Math.sqrt(event.transform.k)})`);
         
         // Sync minimap
         const scale = event.transform.k;
@@ -300,7 +358,7 @@ export const RwandaDistrictMap: React.FC<RwandaDistrictMapProps> = ({
       .on("mouseenter", function (event: MouseEvent, d: any) {
         const name = d.properties.shapeName;
         const row  = districtDataMap.get(name);
-        const hosp = hospitalsByDistrict.get(name);
+        const hosp = getDistrictHospitalStats(name);
         const cr   = containerRef.current!.getBoundingClientRect();
         
         setTooltip({
@@ -365,12 +423,13 @@ export const RwandaDistrictMap: React.FC<RwandaDistrictMapProps> = ({
         .text(d.properties.shapeName);
 
       if (d.properties.hasData) {
+        const isCountMetric = activeMetric === "hospitals" || activeMetric === "active_chws";
         textNode.append("tspan")
           .attr("x", d.properties.centroid[0])
           .attr("y", d.properties.centroid[1] + 4)
-          .attr("font-size", "4px")
-          .attr("font-weight", "500")
-          .attr("fill", "#334155")
+          .attr("font-size", isCountMetric ? "4.5px" : "4px")
+          .attr("font-weight", isCountMetric ? "700" : "500")
+          .attr("fill", isCountMetric ? "#1d4ed8" : "#334155")
           .attr("paint-order", "stroke")
           .attr("stroke", "white")
           .attr("stroke-width", "1px")
@@ -381,48 +440,7 @@ export const RwandaDistrictMap: React.FC<RwandaDistrictMapProps> = ({
 
     labelsMerge.attr("opacity", 1);
 
-    const currentTransform = d3.zoomTransform(svg.node()!);
-
-    // 4. Update Markers
-    const isMarkerMetric = activeMetric === "hospitals" || activeMetric === "active_chws";
-    const markerData = isMarkerMetric ? enrichedFeatures.filter((f: any) => f.properties.hasData) : [];
-
-    const markers = g.select(".district-markers").selectAll("g.district-marker").data(markerData, (d: any) => d.properties.shapeName);
-
-    markers.exit().transition().duration(300).attr("opacity", 0).remove();
-
-    const markersEnter = markers.enter().append("g")
-      .attr("class", "district-marker")
-      .style("pointer-events", "none")
-      .attr("transform", (d: any) => `translate(${d.properties.centroid[0]}, ${d.properties.centroid[1]})`)
-      .attr("opacity", 0);
-
-    const scalersEnter = markersEnter.append("g").attr("class", "marker-scaler");
-    scalersEnter.append("circle").attr("class", "pulse").attr("fill", "#1d4ed8").attr("opacity", 0.15);
-    scalersEnter.append("circle").attr("class", "bg").attr("fill", "white").attr("stroke", "#1d4ed8").attr("stroke-width", 1).style("filter", "drop-shadow(0px 1px 2px rgba(0,0,0,0.15))");
-    scalersEnter.append("g").attr("class", "icon").attr("transform", "translate(-5, -5)").attr("color", "#1d4ed8");
-    const badgeEnter = scalersEnter.append("g").attr("class", "badge");
-    badgeEnter.append("circle").attr("fill", "#ef4444").attr("stroke", "white").attr("stroke-width", 0.5);
-    badgeEnter.append("text").attr("text-anchor", "middle").attr("dominant-baseline", "central").attr("font-size", "4.5px").attr("font-weight", "700").attr("fill", "white");
-
-    const markersMerge = markersEnter.merge(markers as any);
-    markersMerge.transition().duration(300).attr("opacity", 1);
-
-    markersMerge.each(function(d: any) {
-      const radius = Math.min(16, 5 + Math.sqrt(d.properties.val) * 2.5);
-      const scaler = d3.select(this).select(".marker-scaler");
-      
-      scaler.attr("transform", `scale(${1 / Math.sqrt(currentTransform.k || 1)})`);
-      scaler.select(".pulse").transition().duration(500).attr("r", radius + 6);
-      scaler.select(".bg").transition().duration(500).attr("r", radius);
-      scaler.select(".icon").html(activeMetric === "hospitals" ? BUILDING2_SVG : ACTIVITY_SVG);
-      
-      const badge = scaler.select(".badge").attr("transform", `translate(${radius - 3}, -${radius - 2})`);
-      badge.select("circle").attr("r", 4.5);
-      badge.select("text").text(d.properties.val > 99 ? "99+" : d.properties.val.toString());
-    });
-
-    // 5. Automatic Fit-To-Bounds Zoom (Only triggers when filter changes)
+    // 4. Automatic Fit-To-Bounds Zoom (Only triggers when filter changes)
     if (prevMetricRef.current !== activeMetric) {
       const isInitial = prevMetricRef.current === null;
       prevMetricRef.current = activeMetric;
@@ -452,7 +470,7 @@ export const RwandaDistrictMap: React.FC<RwandaDistrictMapProps> = ({
         }
       }
     }
-  }, [isMapInit, processedGeoData, districtDataMap, hospitalsByDistrict, activeMetric, activeDistrict, metricDomain, onDistrictClick, formatMetricValue, pathGen]);
+  }, [isMapInit, processedGeoData, districtDataMap, hospitalsByDistrict, getDistrictHospitalStats, activeMetric, activeDistrict, metricDomain, onDistrictClick, formatMetricValue, pathGen]);
 
 
   // ── Manual Navigation Controls ────────────────────────────────
@@ -494,6 +512,13 @@ export const RwandaDistrictMap: React.FC<RwandaDistrictMapProps> = ({
             );
           })}
         </div>
+        {(activeMetric === "hospitals" || activeMetric === "active_chws") && (
+          <p className="mt-1.5 text-[10px] text-gray-500">
+            {activeMetric === "hospitals"
+              ? `${totalScopedHospitals.toLocaleString()} hospitals across ${hospitalsByDistrict.size} districts — darker blue = more facilities; count shown on each district.`
+              : `${scopedHospitals.reduce((sum, h) => sum + (h.activeChws ?? 0), 0).toLocaleString()} active CHWs across ${hospitalsByDistrict.size} districts — count shown on each district.`}
+          </p>
+        )}
       </div>
 
       {isLoading ? (
@@ -528,21 +553,26 @@ export const RwandaDistrictMap: React.FC<RwandaDistrictMapProps> = ({
 
           {tooltip.visible && (
             <div className="absolute pointer-events-none z-20 bg-white border border-gray-200 rounded-lg shadow-xl px-3 py-2.5 text-xs min-w-[168px] transition-opacity duration-100" style={{ left: tooltip.x + 12, top: tooltip.y }}>
-              <p className="font-bold text-gray-900 text-[13px] mb-2">{tooltip.district} Deep Dive</p>
-              <div className="space-y-1">
-                {activeMetric !== "learners" && (
+              <p className="font-bold text-gray-900 text-[13px]">{tooltip.district}</p>
+              {tooltip.metricValue !== null && tooltip.metricValue > 0 && (
+                <p className="text-[#3363AD] font-semibold text-[12px] mt-0.5 mb-2">
+                  {activeMetricConfig.label}: {formatMetricValue(tooltip.metricValue)}
+                </p>
+              )}
+              <div className="space-y-1 border-t border-gray-100 pt-2">
+                {activeMetric !== "learners" && tooltip.total > 0 && (
                   <div className="flex items-center justify-between gap-6">
                     <span className="text-gray-500">Learners</span>
                     <span className="font-semibold text-gray-700">{tooltip.total.toLocaleString()}</span>
                   </div>
                 )}
-                {activeMetric !== "completion" && (
+                {activeMetric !== "completion" && tooltip.completionRate > 0 && (
                   <div className="flex items-center justify-between gap-6">
                     <span className="text-gray-500">Completion</span>
                     <span className={`font-semibold ${tooltip.completionRate >= 60 ? "text-green-600" : tooltip.completionRate >= 30 ? "text-amber-600" : "text-red-500"}`}>{tooltip.completionRate}%</span>
                   </div>
                 )}
-                {activeMetric !== "certification" && (
+                {activeMetric !== "certification" && tooltip.certificationRate > 0 && (
                   <div className="flex items-center justify-between gap-6">
                     <span className="text-gray-500">Certification</span>
                     <span className="font-semibold text-[#3363AD]">{tooltip.certificationRate}%</span>
@@ -551,13 +581,13 @@ export const RwandaDistrictMap: React.FC<RwandaDistrictMapProps> = ({
                 {activeMetric !== "hospitals" && tooltip.hospitalCount > 0 && (
                   <div className="flex items-center justify-between gap-6">
                     <span className="text-gray-500">Facilities</span>
-                    <span className="font-semibold text-gray-700">{tooltip.hospitalCount}</span>
+                    <span className="font-semibold text-gray-700">{tooltip.hospitalCount.toLocaleString()}</span>
                   </div>
                 )}
                 {activeMetric !== "active_chws" && tooltip.activeChwCount > 0 && (
                   <div className="flex items-center justify-between gap-6">
                     <span className="text-gray-500">Active CHWs</span>
-                    <span className="font-semibold text-gray-700">{tooltip.activeChwCount}</span>
+                    <span className="font-semibold text-gray-700">{tooltip.activeChwCount.toLocaleString()}</span>
                   </div>
                 )}
               </div>
@@ -569,10 +599,6 @@ export const RwandaDistrictMap: React.FC<RwandaDistrictMapProps> = ({
               <span className="text-xs font-medium text-gray-600 shrink-0 w-28">{activeMetricConfig.description}</span>
               <div className="flex-1 h-1.5 rounded-full" style={{ background: "linear-gradient(to right, #bfdbfe, #1e3a8a)" }} />
               <span className="text-xs font-bold text-[#1e3a8a] shrink-0 text-right">{legendMin} — {legendMax}</span>
-            </div>
-            <div className="flex items-center gap-1.5 mt-1">
-              <div className="w-2.5 h-2.5 rounded-full bg-[#cbd5e1] opacity-40 shrink-0" />
-              <span className="text-xs text-gray-400">No data (Dimmed)</span>
             </div>
           </div>
 

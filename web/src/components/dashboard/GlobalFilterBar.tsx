@@ -1,6 +1,13 @@
 import React from "react";
 import { Filter, X } from "lucide-react";
 import { IDashboardFilters } from "@/types";
+import { IOptionFieldOption } from "@/components/common/form/ComboboxField";
+import { HospitalFilterSelect } from "./HospitalFilterSelect";
+import {
+  DEFAULT_DASHBOARD_FILTERS,
+  DEFAULT_DASHBOARD_ROLE,
+  hasActiveDashboardFilters,
+} from "@/utils/constants/dashboardFilters";
 
 interface GlobalFilterBarProps {
   filters: IDashboardFilters;
@@ -10,16 +17,35 @@ interface GlobalFilterBarProps {
   genders: string[];
   years: string[];
   months: string[];
+  hospitals: IOptionFieldOption[];
+  onHospitalSearch: (query: string) => void;
 }
 
-const EMPTY: IDashboardFilters = {
-  province: "", district: "", gender: "", role: "", year: "", month: "",
-};
+const EMPTY: IDashboardFilters = DEFAULT_DASHBOARD_FILTERS;
 
 const ROLE_LABELS: Record<string, string> = {
   TRAINEE: "CHW",
   TESTER: "Tester",
+  CHO: "CHO",
 };
+
+const ROLE_OPTIONS: { value: string; label: string }[] = [
+  { value: "TRAINEE", label: "CHW" },
+  { value: "TESTER", label: "Tester" },
+  { value: "CHO", label: "CHO" },
+];
+
+const FILTER_CHIP_LABELS: Record<keyof IDashboardFilters, string> = {
+  province: "Province",
+  district: "District",
+  gender: "Gender",
+  role: "Role",
+  year: "Year",
+  month: "Month",
+  hospitalId: "Hospital",
+};
+
+const SELECT_CLS = "text-xs border rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-[#3363AD] bg-white transition-colors";
 
 const SelectFilter: React.FC<{
   label: string;
@@ -30,11 +56,8 @@ const SelectFilter: React.FC<{
   <select
     value={value}
     onChange={(e) => onChange(e.target.value)}
-    className={`text-xs border rounded px-1.5 py-0.5 focus:outline-none
-      focus:ring-1 focus:ring-[#3363AD] bg-white transition-colors min-w-[70px] ${
-      value
-        ? "border-[#3363AD] text-[#3363AD] font-medium"
-        : "border-gray-200 text-gray-600"
+    className={`${SELECT_CLS} min-w-[70px] ${
+      value ? "border-[#3363AD] text-[#3363AD] font-medium" : "border-gray-200 text-gray-600"
     }`}
     title={label}
   >
@@ -53,8 +76,12 @@ export const GlobalFilterBar: React.FC<GlobalFilterBarProps> = ({
   genders,
   years,
   months,
+  hospitals,
+  onHospitalSearch,
 }) => {
-  const hasActiveFilters = Object.values(filters).some((v) => v !== "");
+  const hasActiveFilters = hasActiveDashboardFilters(filters);
+  const isNonDefaultRole =
+    filters.role !== "" && filters.role !== DEFAULT_DASHBOARD_ROLE;
   const set = (key: keyof IDashboardFilters) => (value: string) => {
     if (key === "province") {
       onChange({ ...filters, province: value, district: "" });
@@ -66,14 +93,11 @@ export const GlobalFilterBar: React.FC<GlobalFilterBarProps> = ({
 
   return (
     <div className="bg-white border border-gray-100 rounded-lg px-2.5 py-1.5 shadow-sm">
-      {/* Compact horizontal layout */}
       <div className="flex items-center gap-1.5 flex-wrap">
-        {/* Filter icon */}
         <div className="flex items-center gap-1 text-xs font-medium text-gray-600 shrink-0">
           <Filter size={12} className="text-[#3363AD]" />
         </div>
 
-        {/* Dropdowns */}
         {provinces.length > 0 && (
           <SelectFilter
             label="Province"
@@ -101,17 +125,19 @@ export const GlobalFilterBar: React.FC<GlobalFilterBarProps> = ({
         <select
           value={filters.role}
           onChange={(e) => set("role")(e.target.value)}
-          className={`text-xs border rounded px-1.5 py-0.5 focus:outline-none
-            focus:ring-1 focus:ring-[#3363AD] bg-white transition-colors min-w-[70px] ${
-            filters.role
+          className={`${SELECT_CLS} min-w-[80px] ${
+            isNonDefaultRole
               ? "border-[#3363AD] text-[#3363AD] font-medium"
               : "border-gray-200 text-gray-600"
           }`}
-          title="CHW Role"
+          title="Role"
         >
-          <option value="">CHW Role</option>
-          <option value="TRAINEE">CHW</option>
-          <option value="TESTER">Tester</option>
+          <option value="">All roles</option>
+          {ROLE_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
         </select>
         {years.length > 0 && (
           <SelectFilter
@@ -129,8 +155,16 @@ export const GlobalFilterBar: React.FC<GlobalFilterBarProps> = ({
             onChange={set("month")}
           />
         )}
-        
-        {/* Clear button */}
+
+        <HospitalFilterSelect
+          value={filters.hospitalId}
+          options={hospitals}
+          onSearch={onHospitalSearch}
+          onChange={(value) =>
+            onChange({ ...filters, hospitalId: value, province: "", district: "" })
+          }
+        />
+
         {hasActiveFilters && (
           <button
             onClick={reset}
@@ -144,27 +178,39 @@ export const GlobalFilterBar: React.FC<GlobalFilterBarProps> = ({
         )}
       </div>
 
-      {/* Active filter count badge - compact version */}
       {hasActiveFilters && (
         <div className="mt-1 pt-1 border-t border-gray-50">
           <div className="flex items-center gap-1 flex-wrap">
             {Object.entries(filters)
-              .filter(([, v]) => v !== "")
-              .map(([key, value]) => (
-                <span
-                  key={key}
-                  className="flex items-center gap-0.5 bg-[#3363AD]/10 text-[#3363AD]
-                    text-[10px] px-1.5 py-0.5 rounded-full"
-                >
-                  {key === "role" ? (ROLE_LABELS[value] ?? value) : value}
-                  <button
-                    onClick={() => set(key as keyof IDashboardFilters)("")}
-                    className="hover:text-red-500 transition-colors"
+              .filter(([key, v]) => {
+                if (!v) return false;
+                if (key === "role" && v === DEFAULT_DASHBOARD_ROLE) return false;
+                return true;
+              })
+              .map(([key, value]) => {
+                const filterKey = key as keyof IDashboardFilters;
+                let displayValue = value;
+                if (filterKey === "role") displayValue = ROLE_LABELS[value] ?? value;
+                else if (filterKey === "hospitalId")
+                  displayValue =
+                    hospitals.find((h) => h.value === value)?.label ?? "Selected hospital";
+                const label = `${FILTER_CHIP_LABELS[filterKey]}: ${displayValue}`;
+                return (
+                  <span
+                    key={key}
+                    className="flex items-center gap-0.5 bg-[#3363AD]/10 text-[#3363AD]
+                      text-[10px] px-1.5 py-0.5 rounded-full"
                   >
-                    <X size={8} />
-                  </button>
-                </span>
-              ))}
+                    {label}
+                    <button
+                      onClick={() => set(filterKey)("")}
+                      className="hover:text-red-500 transition-colors"
+                    >
+                      <X size={8} />
+                    </button>
+                  </span>
+                );
+              })}
           </div>
         </div>
       )}

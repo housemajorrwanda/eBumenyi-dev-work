@@ -21,9 +21,15 @@ interface StudentTableActionsProps {
   item: IStudent;
   showPromote?: boolean;
   showDemote?: boolean;
+  showPromoteToCHW?: boolean;
 }
 
-const StudentTableActions: FC<StudentTableActionsProps> = ({ item, showPromote = false, showDemote = false }) => {
+const StudentTableActions: FC<StudentTableActionsProps> = ({
+  item,
+  showPromote = false,
+  showDemote = false,
+  showPromoteToCHW = false,
+}) => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [editOpen, setEditOpen] = useState(false);
@@ -104,6 +110,26 @@ const StudentTableActions: FC<StudentTableActionsProps> = ({ item, showPromote =
     },
   });
 
+  const { mutate: promoteToCHW, isPending: isPromotingToCHW } = useMutation({
+    mutationFn: () =>
+      updateStudent(item.id, {
+        role: "TRAINEE",
+        fullNames: item.fullName,
+        phoneNumber: item.phoneNumber,
+        district: item.district,
+        sector: item.sector,
+        cell: item.cell,
+        village: item.village,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: studentKeys.all });
+      toast.success(`${item.fullName} promoted to CHW.`);
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message ?? "Failed to promote to CHW.");
+    },
+  });
+
   const initialData = studentData
     ? {
         fullNames: studentData.studentInfo.fullName,
@@ -141,6 +167,15 @@ const StudentTableActions: FC<StudentTableActionsProps> = ({ item, showPromote =
           <Pencil className='w-4 text-[#3363AD]' />
           {loadingEdit ? "Loading..." : "Edit"}
         </div>
+        {showPromoteToCHW && (
+          <div
+            className='flex gap-2 py-1 px-2 hover:bg-[#3363AD]/5 cursor-pointer text-[#3363AD]'
+            onClick={() => promoteToCHW()}
+          >
+            <ArrowUpCircle className='w-4' />
+            {isPromotingToCHW ? "Promoting…" : "Promote to CHW"}
+          </div>
+        )}
         {showPromote && (
           <div
             className='flex gap-2 py-1 px-2 hover:bg-amber-50 cursor-pointer text-amber-600'

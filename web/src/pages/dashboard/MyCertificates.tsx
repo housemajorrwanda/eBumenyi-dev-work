@@ -8,16 +8,18 @@ import {
   AlertCircle,
   ExternalLink,
   GraduationCap,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/common/Button";
 import { Card } from "@/components/common/Card";
-import { getMyCertificates, IMyCertificate } from "@/services/certificates.service";
+import { getMyCertificates, regenerateMyCertificate, IMyCertificate } from "@/services/certificates.service";
 
 const MyCertificates: React.FC = () => {
   const navigate = useNavigate();
   const [certificates, setCertificates] = useState<IMyCertificate[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -28,6 +30,20 @@ const MyCertificates: React.FC = () => {
       setError("Failed to load certificates. Please try again.");
     } finally {
       setIsLoading(false);
+    }
+  }, []);
+
+  const handleRegenerate = useCallback(async (cert: IMyCertificate) => {
+    setRegeneratingId(cert.courseId);
+    try {
+      const updated = await regenerateMyCertificate(cert.courseId);
+      setCertificates((prev) =>
+        prev.map((c) => (c.courseId === cert.courseId ? { ...c, pdf: updated.pdf } : c))
+      );
+    } catch {
+      // silently ignore — user can retry
+    } finally {
+      setRegeneratingId(null);
     }
   }, []);
 
@@ -182,6 +198,18 @@ const MyCertificates: React.FC = () => {
                   ) : (
                     <span className="text-xs text-gray-400 italic">PDF not available</span>
                   )}
+                  <button
+                    onClick={() => handleRegenerate(cert)}
+                    disabled={regeneratingId === cert.courseId}
+                    title="Regenerate certificate"
+                    className="flex items-center justify-center gap-1.5 px-3 py-2 border border-gray-200 text-gray-600 rounded-lg text-xs font-medium hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {regeneratingId === cert.courseId ? (
+                      <Loader2 size={13} className="animate-spin" />
+                    ) : (
+                      <RefreshCw size={13} />
+                    )}
+                  </button>
                 </div>
               </div>
             </Card>

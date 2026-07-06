@@ -26,3 +26,13 @@ export const studentKeys = {
   list: (filter?: string) => [...studentKeys.lists(), filter] as const,
   stats: (filter?: string) => [...studentKeys.all, "stats", filter] as const,
 };
+
+export const dashboardKeys = {
+  all: ["dashboard"] as const,
+  stats: (filters: readonly string[]) =>
+    [...dashboardKeys.all, "stats", ...filters] as const,
+  adoption: (filters: readonly string[]) =>
+    [...dashboardKeys.all, "adoption", ...filters] as const,
+  filterOptions: () => [...dashboardKeys.all, "filter-options"] as const,
+  learner: () => [...dashboardKeys.all, "learner"] as const,
+};

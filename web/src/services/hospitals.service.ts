@@ -6,6 +6,12 @@ export const getAllHospitals = async (params?: string): Promise<IPaged<IHospital
   return (await api.get(`/hospitals${queryParams}`)).data;
 };
 
+/** Unpaginated list — use for map/analytics, not the hospitals table. */
+export const listAllHospitals = async (searchq?: string): Promise<IResponse<IHospital[]>> => {
+  const qs = searchq ? `?searchq=${encodeURIComponent(searchq)}` : "";
+  return (await api.get(`/hospitals/all${qs}`)).data;
+};
+
 export const getPublicHospitals = async (params?: {
   district?: string;
   sector?: string;
