@@ -198,6 +198,13 @@ export default function Header({ title }: Props) {
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.actionButton}
+              onPress={openModuleSwitcher}
+              accessibilityLabel="Switch application"
+            >
+              <LayoutGrid size={28} color="white" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.actionButton}
               onPress={() => {
                 router.push('/auth/study-plan');
               }}

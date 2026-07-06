@@ -182,6 +182,15 @@ function HomeScreenContent() {
     }, [isValidatingToken, queryClient])
   );
 
+  // Refresh course stats whenever the tab comes into focus (e.g. returning from a course)
+  useFocusEffect(
+    useCallback(() => {
+      if (!isValidatingToken) {
+        queryClient.invalidateQueries({ queryKey: ['COURSE'] });
+      }
+    }, [isValidatingToken, queryClient])
+  );
+
   // Handle pull-to-refresh
   const handleRefresh = async () => {
     setIsRefreshing(true);
