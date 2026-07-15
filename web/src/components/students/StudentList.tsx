@@ -10,6 +10,8 @@ import { getAllStudents, IStudent } from "@/services/students.service";
 import { getAllCoursesNoPagination } from "@/services/course.service";
 import StudentTableActions from "./StudentTableActions";
 import TableActions from "../table/TableActions";
+import { BulkStudentRoleActions } from "./BulkStudentRoleActions";
+import { useAuth } from "@/hooks/useAuth";
 import type { ICourse } from "@/types";
 
 interface StudentsListProps {
@@ -23,12 +25,15 @@ const StudentsList: FC<StudentsListProps> = ({
   filter,
   roleFilter,
 }) => {
+  const { hasRole } = useAuth();
+  const isAdmin = hasRole(["ADMIN"]);
+  const canChangeLearnerRole = hasRole(["ADMIN", "STAFF", "TRAINER"]);
   const [currentPage, setCurrentPage] = useState(1);
   const [searchKeyword, setSearchKeyword] = useState<string>("");
   const [limit, setLimit] = useState(15);
   const [sortBy, setSortBy] = useState<string>("createdAt");
   const [order, setOrder] = useState<"asc" | "desc">("desc");
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [selectedStudents, setSelectedStudents] = useState<Map<string, IStudent>>(new Map());
 
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [genderFilter, setGenderFilter] = useState<string>("");
@@ -110,10 +115,52 @@ const StudentsList: FC<StudentsListProps> = ({
   // Effect to reset pagination and search when filter changes
   useEffect(() => {
     resetFilters();
+    setSelectedStudents(new Map());
   }, [filter, roleFilter]);
+
+  const selectedRowIds = Array.from(selectedStudents.keys());
+
+  const handleSelectionChange = (pageSelectedIds: string[]) => {
+    setSelectedStudents((prev) => {
+      const next = new Map(prev);
+      const pageRows = data?.data ?? [];
+      const pageIdSet = new Set(pageRows.map((s) => s.id));
+
+      for (const pageId of pageIdSet) {
+        if (!pageSelectedIds.includes(pageId)) {
+          next.delete(pageId);
+        }
+      }
+
+      for (const id of pageSelectedIds) {
+        const row = pageRows.find((s) => s.id === id);
+        if (row) next.set(id, row);
+      }
+
+      return next;
+    });
+  };
+
+  const clearSelection = () => {
+    setSelectedStudents(new Map());
+  };
+
+  const showBulkActions =
+    selectedStudents.size > 0 &&
+    roleFilter &&
+    ((roleFilter === "TESTER" && canChangeLearnerRole) ||
+      (roleFilter === "TRAINEE" && isAdmin) ||
+      (roleFilter === "CHO" && isAdmin));
 
   const tableContent = (
     <>
+      {showBulkActions && roleFilter && (
+        <BulkStudentRoleActions
+          roleFilter={roleFilter}
+          selectedStudents={Array.from(selectedStudents.values())}
+          onClear={clearSelection}
+        />
+      )}
       <Table
         isLoading={isLoading}
         currentPage={data?.currentPage || 1}
@@ -121,8 +168,9 @@ const StudentsList: FC<StudentsListProps> = ({
         itemsPerPage={limit}
         onChangePage={onChangePage}
         // New features
-        selectable={true}
-        onSelectionChange={(ids) => setSelectedIds(ids)}
+        selectable={Boolean(roleFilter && ((roleFilter === "TESTER" && canChangeLearnerRole) || isAdmin))}
+        selectedRowIds={selectedRowIds}
+        onSelectionChange={handleSelectionChange}
         onSort={handleSort}
         currentSortKey={sortBy}
         currentSortOrder={order}
@@ -252,13 +300,16 @@ const StudentsList: FC<StudentsListProps> = ({
           {
             title: "Actions",
             key: "actions",
-            render: (row: IStudent) => {
-              return (
-                <TableActions>
-                  <StudentTableActions item={row} showPromote={roleFilter === "TRAINEE"} showDemote={roleFilter === "CHO"} />
-                </TableActions>
-              );
-            },
+            render: (row: IStudent) => (
+              <TableActions>
+                <StudentTableActions
+                  item={row}
+                  showPromote={roleFilter === "TRAINEE" && isAdmin}
+                  showDemote={roleFilter === "CHO" && isAdmin}
+                  showPromoteToCHW={roleFilter === "TESTER" && canChangeLearnerRole}
+                />
+              </TableActions>
+            ),
           },
         ]}
         data={data?.data || []}
@@ -273,21 +324,6 @@ const StudentsList: FC<StudentsListProps> = ({
 
   return (
     <PageContent isLoading={isLoading} hasPadding={true} title='CHWs'>
-      {selectedIds.length > 0 && (
-        <div className='mb-4 bg-[#3363AD]/5 border border-[#3363AD]/20 rounded-lg p-3 flex justify-between items-center text-[#3363AD]'>
-          <span className='text-sm font-medium'>
-            {selectedIds.length} CHWs selected
-          </span>
-          <div className='flex gap-2'>
-            <button className='text-xs font-semibold bg-white border border-[#3363AD]/20 px-3 py-1.5 rounded shadow-sm hover:bg-gray-50'>
-              Archive Selected
-            </button>
-            <button className='text-xs font-semibold bg-white border border-[#3363AD]/20 px-3 py-1.5 rounded shadow-sm hover:bg-gray-50'>
-              Message Selected
-            </button>
-          </div>
-        </div>
-      )}
       {tableContent}
     </PageContent>
   );

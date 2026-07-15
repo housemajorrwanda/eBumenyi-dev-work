@@ -5,9 +5,9 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  ActivityIndicator,
   Image,
 } from 'react-native';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
@@ -156,9 +156,7 @@ export default function StudentDetailScreen() {
         </View>
 
         {isLoading ? (
-          <View style={styles.centered}>
-            <ActivityIndicator size="large" color={themeColors.primary} />
-          </View>
+          <LoadingSpinner />
         ) : isError || !data ? (
           <View style={styles.centered}>
             <Text style={[styles.errorText, { color: textMuted }]}>Amakuru ntaboneka</Text>

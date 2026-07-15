@@ -1,6 +1,9 @@
-import { useState, useEffect, useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { getMyCertificates, IMyCertificate } from "@/services/certificates.service";
 import { getStudentStatistics, IStudentStatistics } from "@/services/progress.service";
+import { dashboardKeys } from "@/utils/constants/queryKeys";
+
+const DASHBOARD_CACHE_MS = 1000 * 60 * 30;
 
 interface LearnerDashboardData {
   studentStats: IStudentStatistics | null;
@@ -12,38 +15,29 @@ interface LearnerDashboardData {
 }
 
 export const useLearnerDashboard = (): LearnerDashboardData => {
-  const [studentStats, setStudentStats] = useState<IStudentStatistics | null>(null);
-  const [certificates, setCertificates] = useState<IMyCertificate[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchAll = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: dashboardKeys.learner(),
+    queryFn: async () => {
       const [stats, certs] = await Promise.all([
         getStudentStatistics(),
         getMyCertificates(),
       ]);
-      setStudentStats(stats);
-      setCertificates(certs);
-    } catch {
-      setError("Failed to fetch data. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+      return { studentStats: stats, certificates: certs };
+    },
+    staleTime: DASHBOARD_CACHE_MS,
+    gcTime: DASHBOARD_CACHE_MS,
+  });
 
-  useEffect(() => {
-    fetchAll();
-  }, [fetchAll]);
+  const certificates = data?.certificates ?? [];
 
   return {
-    studentStats,
+    studentStats: data?.studentStats ?? null,
     certificates,
     totalCertificates: certificates.length,
     isLoading,
-    error,
-    refetch: fetchAll,
+    error: error ? "Failed to fetch data. Please try again." : null,
+    refetch: () => {
+      void refetch();
+    },
   };
 };

@@ -600,9 +600,10 @@ const StudentsPage = () => {
 
                           {/* Meta */}
                           <div className="flex flex-col gap-1.5">
-                            {group.sector && (
+                            {(group.sectors?.length ?? 0) > 0 && (
                               <p className="text-xs text-gray-500 flex items-center gap-1.5">
-                                <MapPin className="w-3.5 h-3.5 shrink-0 text-gray-400" />{group.sector}
+                                <MapPin className="w-3.5 h-3.5 shrink-0 text-gray-400" />
+                                {group.sectors!.join(", ")}
                               </p>
                             )}
                             <p className="text-xs text-gray-500 flex items-center gap-1.5">

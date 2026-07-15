@@ -1,6 +1,6 @@
 import { CertificateCard } from '@/components/CertificateCard';
 import Header from '@/components/Header';
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -8,8 +8,6 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
-  Animated,
-  Easing,
   Dimensions,
   FlatList,
   RefreshControl,
@@ -17,74 +15,7 @@ import {
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import PostCourseRecommendationsModal from '@/components/PostCourseRecommendationsModal';
 import { getMyCertificates } from '@/services/certificate.api';
-
-const AnimatedCertificateIcon = () => {
-  const scaleAnim = useRef(new Animated.Value(1)).current;
-  const floatAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(scaleAnim, {
-          toValue: 1.12,
-          duration: 900,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-        Animated.timing(scaleAnim, {
-          toValue: 1,
-          duration: 900,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(floatAnim, {
-          toValue: -10,
-          duration: 1200,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-        Animated.timing(floatAnim, {
-          toValue: 0,
-          duration: 1200,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-  }, [scaleAnim, floatAnim]);
-
-  return (
-    <Animated.View
-      style={{
-        marginBottom: 16,
-        alignItems: 'center',
-        justifyContent: 'center',
-        shadowColor: '#4D81D2',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.25,
-        shadowRadius: 24,
-        elevation: 12,
-        backgroundColor: 'rgba(77,129,210,0.08)',
-        borderRadius: 80,
-        width: 120,
-        height: 120,
-        alignSelf: 'center',
-        transform: [
-          { scale: scaleAnim },
-          { translateY: floatAnim },
-        ],
-      }}
-    >
-      <Text style={{ fontSize: 64, textAlign: 'center', textShadowColor: '#4D81D2', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 8 }}>
-        📜
-      </Text>
-    </Animated.View>
-  );
-};
+import { LoadingSpinner } from '@/components/LoadingSpinner';
 
 export default function CertificateScreen() {
   const queryClient = useQueryClient();
@@ -149,9 +80,7 @@ export default function CertificateScreen() {
     return (
       <View style={styles.container}>
         <Header title='Impamyabumenyi'/>
-        <View style={styles.loadingContainer}>
-          <AnimatedCertificateIcon />
-        </View>
+        <LoadingSpinner message="Gufungura impamyabumenyi..." />
       </View>
     );
   }

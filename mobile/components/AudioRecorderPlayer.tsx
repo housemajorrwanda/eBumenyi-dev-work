@@ -5,7 +5,6 @@ import {
   Text, 
   TouchableOpacity, 
   StyleSheet, 
-  ActivityIndicator, 
   Alert, 
   ViewStyle, 
   Animated, 
@@ -25,6 +24,7 @@ import {
   Download,
   CheckCircle
 } from 'lucide-react-native';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -393,10 +393,7 @@ export default function AudioRecorderPlayer({
     >
       {isLoading && (
         <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color={themeColors.primary} />
-          <Text style={[styles.loadingText, { color: isDark ? '#cbd5e1' : '#64748b' }]}>
-            Processing...
-          </Text>
+          <LoadingSpinner variant="inline" message="Processing..." isDark={isDark} />
         </View>
       )}
 

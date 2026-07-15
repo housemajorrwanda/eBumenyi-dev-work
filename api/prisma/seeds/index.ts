@@ -51,7 +51,7 @@ async function main() {
       sector: "Remera",
       cell: "Rukiri I",
       village: "Nyagatovu",
-      contact: "250788200001",
+      contact: "+250788200001",
       email: "kfh@health.gov.rw",
     },
   });
@@ -59,7 +59,7 @@ async function main() {
   const developer = await upsertUser("developer@gmail.com", {
     id: "user-seed-developer",
     fullNames: "CHW Developer",
-    phoneNumber: "250788111111",
+    phoneNumber: "+250788111111",
     district: "Nyarugenge",
     sector: "Nyamirambo",
     cell: "Biryogo",
@@ -72,7 +72,7 @@ async function main() {
   const admin = await upsertUser("admin@gmail.com", {
     id: "user-seed-admin",
     fullNames: "Rwanda Biomedical Centre (RBC)",
-    phoneNumber: "2507886666111",
+    phoneNumber: "+250788666111",
     district: "Nyarugenge",
     sector: "Nyamirambo",
     cell: "Biryogo",
@@ -90,7 +90,7 @@ async function main() {
   const trainer = await upsertUser("trainer.alice@chwplatform.rw", {
     id: "user-seed-trainer",
     fullNames: "Alice Ingabire",
-    phoneNumber: "250788333001",
+    phoneNumber: "+250788333001",
     district: "Gasabo",
     sector: "Kacyiru",
     cell: "Kamatamu",
@@ -110,7 +110,7 @@ async function main() {
   const supervisor = await upsertUser("supervisor.grace@chwplatform.rw", {
     id: "user-seed-supervisor",
     fullNames: "Grace Uwase",
-    phoneNumber: "250788444001",
+    phoneNumber: "+250788444001",
     district: "Nyarugenge",
     sector: "Nyamirambo",
     cell: "Kimisagara",
@@ -125,7 +125,7 @@ async function main() {
   const trainee = await upsertUser("trainee.amina@chwplatform.rw", {
     id: "user-seed-trainee",
     fullNames: "Amina Mukamurenzi",
-    phoneNumber: "250788555001",
+    phoneNumber: "+250788555001",
     district: "Gasabo",
     sector: "Remera",
     cell: "Rukiri II",

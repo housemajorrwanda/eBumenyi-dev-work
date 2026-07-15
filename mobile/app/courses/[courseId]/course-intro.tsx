@@ -1,67 +1,47 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { View, Text, StyleSheet, ScrollView, Image, Dimensions } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { assets } from '@/theme';
 import { CourseHeader } from '@/components/CourseHeader';
-import { ICourse } from '@/types';
-import { getCourseById } from '@/services/course.api';
+import { useCourseWorkspace, normalizeCourseId } from '@/hooks/useCourseWorkspace';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import Footer from '@/components/Footer';
 import Button from '@/components/Button';
- 
+
 export default function CourseIntroScreen() {
   const router = useRouter();
   const { courseId } = useLocalSearchParams();
-  const [loading, setLoading] = useState(true);
-  const [course, setCourse] = useState<ICourse | null>(null);
+  const courseIdStr = normalizeCourseId(courseId as string | string[] | undefined);
+  const { data: workspace, isLoading: loading } = useCourseWorkspace(courseIdStr);
+  const course = workspace?.course ?? null;
   const screenHeight = Dimensions.get('window').height;
 
-  const loadCourse = async () => {
-    try {
-      if (courseId) {
-        const response = await getCourseById(courseId as string);
-        setCourse(response.data);
-      }
-    } catch (error) {
-      console.log('Error loading course:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadCourse();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-    if (loading) return <LoadingSpinner />;
+  if (loading) return <LoadingSpinner />;
   if (!course) return null;
 
   const handleStart = () => {
-    router.push(`/courses/${courseId}/chapters`);
+    router.push(`/courses/${courseIdStr}/chapters`);
   };
+
   return (
     <View style={styles.container}>
-      <ScrollView 
-        style={styles.scrollContainer} 
+      <ScrollView
+        style={styles.scrollContainer}
         showsVerticalScrollIndicator={true}
         contentContainerStyle={styles.scrollContent}
       >
         <View style={styles.content}>
-                <CourseHeader course={course} currentPage="intro" />
-          {/* Title Section */}
+          <CourseHeader course={course} currentPage="intro" />
           <View style={styles.titleSection}>
-            {/* decorative elements replaced with header background image */}
             <View style={styles.headerBackgroundContainer}>
-              <Image  source={{ uri: course.intro.bannerImage }} style={[styles.headerBackground, { opacity: 0.4 }]} />
+              <Image source={{ uri: course.intro.bannerImage }} style={[styles.headerBackground, { opacity: 0.4 }]} />
             </View>
-            
+
             <Text style={styles.courseTitle}>
               {course.intro.title}
             </Text>
           </View>
 
-          {/* Course Description */}
           <View style={[styles.descriptionCard, { height: screenHeight * 0.3 }]}>
             <View style={styles.descriptionHeader}>
               <View style={styles.iconContainer}>
@@ -69,9 +49,9 @@ export default function CourseIntroScreen() {
               </View>
               <Text style={styles.descriptionTitle}>Incamake</Text>
             </View>
-            
-            <ScrollView 
-              style={styles.descriptionScrollView} 
+
+            <ScrollView
+              style={styles.descriptionScrollView}
               showsVerticalScrollIndicator={true}
               nestedScrollEnabled={true}
               contentContainerStyle={styles.descriptionContent}
@@ -82,34 +62,32 @@ export default function CourseIntroScreen() {
             </ScrollView>
           </View>
 
-          {/* Video Section */}
           <View style={styles.videoSection}>
             <View style={styles.videoContainer}>
               <Image
                 source={{ uri: course.intro.thumbnail }}
                 style={styles.videoThumbnail}
               />
-             </View>
+            </View>
           </View>
 
-          {/* Action Button */}
           <View style={styles.actionSection}>
-             <Button
-                      title='Tangira isomo'
-                      onPress={handleStart}
-                      variant="secondary"
-                      style={{ marginTop: 16 }}
-                      icon={<Image source={assets.loginIcon} style={{ width: 18, height: 18, tintColor: '#fff' }} />}
-                      loading={loading}
-                      disabled={loading}
-                    />
+            <Button
+              title="Tangira isomo"
+              onPress={handleStart}
+              variant="secondary"
+              style={{ marginTop: 16 }}
+              icon={<Image source={assets.loginIcon} style={{ width: 18, height: 18, tintColor: '#fff' }} />}
+              loading={loading}
+              disabled={loading}
+            />
           </View>
         </View>
       </ScrollView>
-      
+
       <Footer
         activeTab="training"
-        onTabPress={tabName => {
+        onTabPress={(tabName) => {
           if (tabName === 'index') {
             router.push('/');
           } else {

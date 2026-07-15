@@ -22,6 +22,10 @@ const ApiClient = () => {
     } else {
       console.warn("No token found in localStorage. Using cookie-based auth.");
     }
+    // Let the browser set multipart boundary — manual Content-Type breaks file uploads
+    if (request.data instanceof FormData) {
+      delete request.headers["Content-Type"];
+    }
     return request;
   });
 

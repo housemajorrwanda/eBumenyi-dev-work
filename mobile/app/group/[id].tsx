@@ -6,13 +6,13 @@ import {
   FlatList,
   KeyboardAvoidingView,
   Platform,
-  ActivityIndicator,
   Keyboard,
   TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { IMessage, IConversation } from '@/types';
 import { MessageBubble } from '@/components/chat/MessageBubble';
 import { GroupMessageBubble } from '@/components/chat/GroupMessageBubble';
@@ -120,10 +120,7 @@ export default function GroupRoom() {
  if (isLoading || !conversation) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4D81D2" />
-          <Text style={styles.loadingText}>Gufungura ubutumwa...</Text>
-        </View>
+        <LoadingSpinner message="Gufungura ubutumwa..." />
       </SafeAreaView>
     );
   }
@@ -188,7 +185,7 @@ export default function GroupRoom() {
               ListFooterComponent={
                 isFetchingNextPage ? (
                   <View style={styles.loadingMoreContainer}>
-                    <ActivityIndicator size="small" color="#4D81D2" />
+                  <LoadingSpinner variant="inline" message="" />
                   </View>
                 ) : null
               }

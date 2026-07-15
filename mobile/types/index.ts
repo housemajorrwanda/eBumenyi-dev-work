@@ -406,6 +406,11 @@ export interface IAttemptsResponse {
   data: IAttempt[];
 }
 
+export interface ICourseProgressSnapshot {
+  progress: number;
+  isCompleted: boolean;
+}
+
 export interface IProgressResponse {
   message: string;
   statusCode: number;
@@ -415,7 +420,20 @@ export interface IProgressResponse {
     finalTestStatus: IFinalTestStatus;
     finalExamStatus: IFinalExamStatus;
     preTestStatus: IPreTestStatus;
+    courseProgress?: ICourseProgressSnapshot;
   };
+}
+
+export interface ICourseWorkspaceData {
+  course: ICourse;
+  progress: IProgressResponse['data'];
+  chapter?: IChapter | null;
+}
+
+export interface ICourseWorkspaceResponse {
+  message: string;
+  statusCode: number;
+  data: ICourseWorkspaceData;
 }
 
 export interface IChapterProgress {
@@ -608,7 +626,12 @@ export interface CreateCoursePerformanceFeedbackDto {
 export interface ICHOGroup {
   id: string;
   name: string;
-  sector?: string | null;
+  district?: string | null;
+  sectors?: string[];
+  cells?: string[];
+  villages?: string[];
+  cell?: string | null;
+  village?: string | null;
   description?: string | null;
   choId: string;
   groupChatId?: string | null;

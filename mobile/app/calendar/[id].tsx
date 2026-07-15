@@ -5,8 +5,8 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
-  ActivityIndicator,
 } from 'react-native';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
 import {
   Calendar,
   Clock,
@@ -29,7 +29,7 @@ import { EventType, ICalendarEvent } from '@/types';
 import { getCalendarEventById } from '@/services/calender';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
-import { isValidMeetingUrl, extractMeetingId } from '@/utils/deepLinking';
+import { isValidMeetingUrl, extractMeetingId, normalizeMeetingUrl } from '@/utils/deepLinking';
 
 const eventTypeColors: Record<string, string> = {
   TRAINING: '#22c55e',
@@ -87,23 +87,16 @@ export default function CalendarEventDetailScreen() {
       return;
     }
 
-    // Validate and join meeting
-    if (isValidMeetingUrl(event.location)) {
-      const meetingId = extractMeetingId(event.location);
-      if (meetingId) {
-        router.push(`/meeting/${meetingId}`);
-      } else {
-        Toast.show({
-          type: 'error',
-          text1: t('calendar.error.invalidTitle') || 'Invalid Meeting',
-          text2: t('calendar.error.invalidMessage') || 'Could not parse meeting link',
-        });
-      }
+    // Extract meeting ID from stored URL (may be localhost, IP, or production domain)
+    // and rebuild with the current env's MEETING_BASE_URL so the WebView can reach it.
+    const meetingId = extractMeetingId(event.location);
+    if (meetingId) {
+      router.push(`/meeting/${meetingId}`);
     } else {
       Toast.show({
         type: 'error',
         text1: t('calendar.error.invalidTitle') || 'Invalid Meeting',
-        text2: t('calendar.error.invalidMessage') || 'Invalid meeting link format',
+        text2: t('calendar.error.invalidMessage') || 'Could not parse meeting link',
       });
     }
   };
@@ -177,12 +170,7 @@ export default function CalendarEventDetailScreen() {
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Amakuru y&apos;igikorwa</Text>
         </LinearGradient>
-        <View style={styles.centeredState}>
-          <ActivityIndicator size="large" color={themeColors.primary} />
-          <Text style={styles.centeredStateText}>
-            {t('calendar.loading') || 'Loading event details…'}
-          </Text>
-        </View>
+        <LoadingSpinner message={t('calendar.loading') || 'Loading event details…'} />
       </View>
     );
   }

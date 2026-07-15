@@ -48,6 +48,8 @@ export interface TableProps {
   
   // New features
   selectable?: boolean;
+  /** When set, checkboxes reflect this list (enables cross-page selection in parent). */
+  selectedRowIds?: string[];
   onSelectionChange?: (selectedIds: string[]) => void;
   onSort?: (key: string, direction: "asc" | "desc") => void;
   currentSortKey?: string;
@@ -75,6 +77,7 @@ const Table: FC<TableProps> = ({
   headerComponent,
   paginate = true,
   selectable = false,
+  selectedRowIds,
   onSelectionChange,
   onSort,
   currentSortKey,
@@ -105,28 +108,33 @@ const Table: FC<TableProps> = ({
     return () => clearTimeout(handleSearch);
   }, [searchText, searchFun]);
 
-  // Handle row selection
+  // Handle row selection (onSelectionChange receives IDs selected on the current page)
+  const pageIds = data.map((r, i) => r.id || i.toString());
+  const pageSelectedIds = selectedRowIds
+    ? pageIds.filter((id) => selectedRowIds.includes(id))
+    : Array.from(selectedIds);
+
   const handleSelectAll = (checked: boolean) => {
-    if (checked) {
-      const allIds = data.map((r, i) => r.id || i.toString());
-      setSelectedIds(new Set(allIds));
-      if (onSelectionChange) onSelectionChange(allIds);
-    } else {
-      setSelectedIds(new Set());
-      if (onSelectionChange) onSelectionChange([]);
+    const nextPageIds = checked ? pageIds : [];
+    if (!selectedRowIds) {
+      setSelectedIds(new Set(nextPageIds));
     }
+    if (onSelectionChange) onSelectionChange(nextPageIds);
   };
 
   const handleSelectRow = (id: string, checked: boolean) => {
-    const newSet = new Set(selectedIds);
+    const base = selectedRowIds ? pageSelectedIds : Array.from(selectedIds);
+    const newSet = new Set(base);
     if (checked) newSet.add(id);
     else newSet.delete(id);
-    setSelectedIds(newSet);
+    if (!selectedRowIds) {
+      setSelectedIds(newSet);
+    }
     if (onSelectionChange) onSelectionChange(Array.from(newSet));
   };
 
-  const allSelected = data.length > 0 && selectedIds.size === data.length;
-  const someSelected = selectedIds.size > 0 && selectedIds.size < data.length;
+  const allSelected = data.length > 0 && pageSelectedIds.length === data.length;
+  const someSelected = pageSelectedIds.length > 0 && pageSelectedIds.length < data.length;
 
   const handleSortClick = (columnKey: string) => {
     if (!onSort) return;
@@ -154,7 +162,7 @@ const Table: FC<TableProps> = ({
                 value={searchText}
                 onChange={(e) => handleTableSearch(e.target.value)}
                 className='block w-full rounded-lg border-0 py-2 pl-9 text-gray-900 ring-1 ring-inset ring-gray-200 placeholder:text-gray-400 focus:ring-1 focus:ring-inset focus:ring-[#3363AD] sm:text-sm sm:leading-6'
-                placeholder='Search CHWs...'
+                placeholder='Search ...'
               />
             </div>
           )}
@@ -274,7 +282,9 @@ const Table: FC<TableProps> = ({
             <tbody className="divide-y divide-gray-50">
               {data.map((row, rowIndex) => {
                 const rowId = row.id || rowIndex.toString();
-                const isSelected = selectedIds.has(rowId);
+                const isSelected = selectedRowIds
+                  ? selectedRowIds.includes(rowId)
+                  : selectedIds.has(rowId);
                 return (
                   <tr 
                     key={rowId} 

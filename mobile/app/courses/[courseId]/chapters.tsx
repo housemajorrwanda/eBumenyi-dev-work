@@ -17,9 +17,10 @@ import { assets } from '@/theme';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useFocusEffect } from 'expo-router';
 import type { ICourse, IChapter, ISection, IMySectionReviewItem, ICertificate } from '@/types';
-import { getCourseById, getStudentCourseStats, getStudentCourseProgressByCourseId, addCoursereview, 
+import { getStudentCourseStats, addCoursereview, 
   // addSectionreview,
    getMySectionReviews } from '@/services/course.api';
+import { useCourseWorkspace, normalizeCourseId, selectCourseProgressPercent, invalidateCourseProgressQueries } from '@/hooks/useCourseWorkspace';
 import { getCertificate, generateCertificate, regenerateMyCertificate } from '@/services/certificate.api';
 import { getCalendarEvents } from '@/services/calender';
 import { getMe } from '@/services/auth';
@@ -34,6 +35,10 @@ import * as Sharing from 'expo-sharing';
 
 import StorageService from '@/services/storage.service';
 import CourseReviewCard from '@/components/CourseReviewCard';
+import { onboardingService, TOUR_KEYS } from '@/services/onboarding.service';
+import { CopilotProvider, CopilotStep, useCopilot } from 'react-native-copilot';
+import { WalkthroughableView } from '@/components/onboarding/walkthroughable';
+import MascotTooltip from '@/components/onboarding/MascotTooltip';
 // import SectionReviewCard from '@/components/SectionReviewCard';
 import calculateTimeSpent from '@/utils/format';
 import { extractMeetingId, isValidMeetingUrl } from '@/utils/deepLinking';
@@ -174,22 +179,70 @@ const PulsingVideoCircle = ({ active }: { active: boolean }) => {
   );
 };
 
-export default function OneCourseScreen() {
+const AnimatedFingerPointer = ({ direction = 'left' }: { direction?: 'left' | 'up' }) => {
+  const bounceAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(bounceAnim, { toValue: 1, duration: 420, useNativeDriver: true }),
+        Animated.timing(bounceAnim, { toValue: 0, duration: 420, useNativeDriver: true }),
+      ])
+    ).start();
+    return () => bounceAnim.stopAnimation();
+  }, [bounceAnim]);
+
+  const translateX = bounceAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -8] });
+  const translateY = bounceAnim.interpolate({ inputRange: [0, 1], outputRange: [2, -6] });
+
+  return (
+    <Animated.Text
+      style={{
+        fontSize: direction === 'left' ? 20 : 14,
+        transform: direction === 'left' ? [{ translateX }] : [{ translateY }],
+      }}
+    >
+      {direction === 'left' ? '👈' : '👆'}
+    </Animated.Text>
+  );
+};
+
+
+function OneCourseScreenContent() {
   const router = useMeetingRouter();
   const { courseId, sectionId, recommended } = useLocalSearchParams();
+  const courseIdStr = normalizeCourseId(courseId as string | string[] | undefined);
+  const { start, copilotEvents } = useCopilot();
   const { recommendedChaptersMap } = useCourseRecommendations(
     courseId as string | undefined,
     recommended as string | string[] | undefined,
   );
   const insets = useSafeAreaInsets();
-  const [loading, setLoading] = useState(true);
   const [selectedCourse, setSelectedCourse] = useState('');
-  const [course, setCourse] = useState<ICourse | null>(null);
-  const [preTestDone, setPreTestDone] = useState(false);
-  const [finalTestStatus, setFinalTestStatus] = React.useState<{ attempted: boolean; passed: boolean; bestMarks: number; marksToPass: number; associatedCourseId?: string; } | null>(null);
-  const [finalExamStatus, setFinalExamStatus] = React.useState<{ attempted: boolean; passed: boolean; bestMarks: number; marksToPass: number; associatedCourseId?: string; } | null>(null);
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [now, setNow] = useState(() => new Date());
+  const initializedSelectionRef = useRef(false);
+
+  const { data: workspace, isLoading: loading, refetch: refetchWorkspace } = useCourseWorkspace(courseIdStr);
+  const course = workspace?.course ?? null;
+
+  const preTestDone = React.useMemo(() => {
+    if (!course) return false;
+    if (!Array.isArray(course.preTests) || course.preTests.length === 0) return true;
+    return Boolean(workspace?.progress?.preTestStatus?.attempted);
+  }, [course, workspace]);
+
+  const finalTestStatus = React.useMemo(() => {
+    const status = workspace?.progress?.finalTestStatus;
+    if (!status || !courseIdStr) return null;
+    return { ...status, associatedCourseId: courseIdStr };
+  }, [workspace, courseIdStr]);
+
+  const finalExamStatus = React.useMemo(() => {
+    const status = workspace?.progress?.finalExamStatus;
+    if (!status || !courseIdStr) return null;
+    return { ...status, associatedCourseId: courseIdStr };
+  }, [workspace, courseIdStr]);
 
   // Keep track of sections we've already shown the review modal for during THIS app session
   const shownSectionReviewsRef = useRef<Set<string>>(new Set());
@@ -358,11 +411,42 @@ export default function OneCourseScreen() {
     return courseStatsData?.courses?.find((c: any) => c.courseId === courseId);
   };
 
-  useEffect(() => {
-    loadCourse();
-  }, []);
+  const courseProgressPercent = React.useMemo(
+    () => selectCourseProgressPercent(workspace, getCurrentCourseStats()),
+    [workspace, courseStatsData, courseId],
+  );
 
-  // Fetch upcoming event using useQuery
+  useEffect(() => {
+    if (!course) return;
+
+    if (sectionId) {
+      if (
+        sectionId === 'pre-test' ||
+        sectionId === 'final-test' ||
+        sectionId === 'final-exam' ||
+        course.sections.some((s: ISection) => s.id === sectionId)
+      ) {
+        setSelectedCourse(sectionId as string);
+        initializedSelectionRef.current = true;
+        return;
+      }
+    }
+
+    if (initializedSelectionRef.current) return;
+
+    if (Array.isArray(course.preTests) && course.preTests.length > 0 && course.preTests[0]) {
+      setSelectedCourse('pre-test');
+    } else if (course.sections?.length > 0) {
+      setSelectedCourse(course.sections[0].id);
+    }
+    initializedSelectionRef.current = true;
+  }, [course, sectionId]);
+
+  useEffect(() => {
+    initializedSelectionRef.current = false;
+    setSelectedCourse('');
+    setShowReviewModal(false);
+  }, [courseIdStr]);
   const { data: calendarEvents } = useQuery({
     queryKey: ['CALENDAR_EVENTS'],
     queryFn: getCalendarEvents,
@@ -400,110 +484,6 @@ export default function OneCourseScreen() {
     return () => timers.forEach(clearTimeout);
   }, [eventStartMs, eventEndMs]);
 
-  const loadCourse = async () => {
-    try {
-      if (courseId) {
-        const response = await getCourseById(courseId as string);
-        setCourse(response.data);
-        // Set pre-test as the default selected section if it exists
-        if (response.data && Array.isArray(response.data.preTests) && response.data.preTests.length > 0 && response.data.preTests[0]) {
-          setSelectedCourse('pre-test');
-        } else if (response.data?.sections?.length > 0) {
-          // Fall back to first section if no pre-test
-          setSelectedCourse(response.data.sections[0].id);
-        }
-      }
-    } catch (error) {
-      console.log('Error loading course:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Set selected section from param if present
-  useEffect(() => {
-    if (sectionId && course) {
-      // Check if it's a special section or a regular section
-      if (sectionId === 'pre-test' || sectionId === 'final-test' || sectionId === 'final-exam' || 
-          course.sections.some((s: any) => s.id === sectionId)) {
-        setSelectedCourse(sectionId as string);
-      }
-    }
-  }, [sectionId, course]);
-
-  useEffect(() => {
-    // Determine pre-test status using the student's course progress endpoint.
-    // We only care whether the preTestStatus.attempted === true.
-    async function checkPreTest() {
-      if (!courseId || !course) return;
-
-      // If there is no preTest configured, consider pre-test done (unlocked)
-      if (!Array.isArray(course.preTests) || course.preTests.length === 0) {
-        setPreTestDone(true);
-        return;
-      }
-
-      try {
-        const resp = await getStudentCourseProgressByCourseId(Array.isArray(courseId) ? courseId[0] : courseId);
-        if (resp && resp.data && resp.data.preTestStatus) {
-          setPreTestDone(Boolean(resp.data.preTestStatus.attempted));
-        } else {
-          // If the progress API doesn't report a preTestStatus, fall back to not done
-          setPreTestDone(false);
-        }
-      } catch (e) {
-        console.log(`Course ${courseId}: Failed to fetch pre-test status`, e);
-        setPreTestDone(false);
-      }
-    }
-
-    checkPreTest();
-  }, [course, courseId]);
-
-  // Fetch final test status
-  useEffect(() => {
-    async function fetchFinalTestStatus() {
-      if (!courseId) return;
-      
-      // Reset modal when switching courses
-      setShowReviewModal(false);
-      
-      try {
-        const progressResp = await getStudentCourseProgressByCourseId(courseId as string);
-        if (progressResp.data) {
-          if (progressResp.data.finalTestStatus) {
-            const statusWithCourseId = {
-              ...progressResp.data.finalTestStatus,
-              associatedCourseId: Array.isArray(courseId) ? courseId[0] : courseId
-            };
-            setFinalTestStatus(statusWithCourseId);
-          } else {
-            setFinalTestStatus(null);
-          }
-
-          if (progressResp.data.finalExamStatus) {
-            const examStatus = {
-              ...progressResp.data.finalExamStatus,
-              associatedCourseId: Array.isArray(courseId) ? courseId[0] : courseId
-            };
-            setFinalExamStatus(examStatus);
-          } else {
-            setFinalExamStatus(null);
-          }
-        } else {
-          setFinalTestStatus(null);
-          setFinalExamStatus(null);
-        }
-      } catch (e) {
-        console.log(`Course ${courseId}: Failed to fetch final test status`, e);
-        setFinalTestStatus(null);
-        setFinalExamStatus(null);
-      }
-    }
-    fetchFinalTestStatus();
-  }, [courseId]);
-
-  // Check if review modal should be shown when final test status changes
   useEffect(() => {
     async function checkReviewStatus() {
       // Only check if we have finalTestStatus, courseId, and course data loaded
@@ -594,31 +574,61 @@ export default function OneCourseScreen() {
   // Track completed chapters — server is source of truth, local cache as immediate fallback
   const [completedChapters, setCompletedChapters] = useState<string[]>([]);
   useEffect(() => {
-    const loadCompletedChapters = async () => {
-      // Show local cache immediately for fast UI rendering
+    const syncCompletedChapters = async () => {
       const local = await StorageService.getCompletedChapters();
       setCompletedChapters(local);
-      if (!courseId) return;
-      try {
-        const response = await getStudentCourseProgressByCourseId(courseId as string);
-        const serverCompleted = response.data.chapterProgress
-          .filter((ch: any) => ch.isCompleted)
-          .map((ch: any) => ch.chapterId);
-        // Sync server completions to local cache for offline/course-content use
-        for (const id of serverCompleted) {
-          await StorageService.markChapterCompleted(id);
-        }
-        // Merge: server data is primary, but keep locally-marked chapters that may not be
-        // on the server yet (e.g. slides still syncing after finishing a chapter)
-        const merged = [...new Set([...serverCompleted, ...local])];
-        setCompletedChapters(merged);
-      } catch (error) {
-        console.log('Error loading server chapter progress:', error);
-        // Keep local data already set above
+
+      if (!workspace?.progress) return;
+
+      const serverCompleted = workspace.progress.chapterProgress
+        .filter((ch) => ch.isCompleted)
+        .map((ch) => ch.chapterId);
+
+      for (const id of serverCompleted) {
+        await StorageService.markChapterCompleted(id);
       }
+
+      setCompletedChapters([...new Set([...serverCompleted, ...local])]);
     };
-    loadCompletedChapters();
-  }, [courseId]);
+
+    syncCompletedChapters();
+  }, [workspace]);
+
+  // Re-sync when returning from lesson/test screens.
+  const hasMountedRef = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      if (!hasMountedRef.current) {
+        hasMountedRef.current = true;
+        return;
+      }
+      if (!courseIdStr) return;
+      void refetchWorkspace();
+      invalidateCourseProgressQueries(queryClient, courseIdStr);
+    }, [courseIdStr, refetchWorkspace, queryClient])
+  );
+
+  // Start course tour once, after course data has loaded.
+  // Timeout is returned for cleanup so React Strict Mode's double-effect doesn't fire start() twice.
+  useEffect(() => {
+    if (!course) return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    onboardingService.hasCompleted(TOUR_KEYS.COURSE).then((done) => {
+      if (!done) {
+        timer = setTimeout(() => start(), 600);
+      }
+    }).catch(() => {});
+    return () => { if (timer) clearTimeout(timer); };
+  }, [course]);
+
+  // Mark course tour complete when copilot stops
+  useEffect(() => {
+    const handleStop = () => {
+      onboardingService.markComplete(TOUR_KEYS.COURSE).catch(() => {});
+    };
+    copilotEvents.on('stop', handleStop);
+    return () => { copilotEvents.off('stop', handleStop); };
+  }, [copilotEvents]);
 
   // Re-sync all progress state when the screen regains focus (returning from lesson/test screens).
   // useFocusEffect fires on every focus event; skip the very first mount because the existing
@@ -754,6 +764,23 @@ export default function OneCourseScreen() {
   // derived flat list of chapters for rendering (changed to only chapters from selected section)
   const selectedSection = course ? course.sections.find((s: any) => s.id === selectedCourse) ?? course.sections[0] : null;
   const chaptersList: IChapter[] = selectedSection ? selectedSection.chapters : [];
+
+  // First unlocked, not-yet-completed chapter → gets the finger pointer
+  const secIdx = course.sections.findIndex((s: any) => s.id === (selectedSection?.id ?? ''));
+  let nextChapterId: string | null = null;
+  for (let i = 0; i < chaptersList.length; i++) {
+    if (isChapterUnlocked(secIdx, i) && !isChapterCompleted(chaptersList[i].id)) {
+      nextChapterId = chaptersList[i].id;
+      break;
+    }
+  }
+
+  // Next section tab index → finger pointer below that circle once current section is all done
+  const curSecIdx = course.sections.findIndex((s: any) => s.id === selectedCourse);
+  const curSecAllDone =
+    curSecIdx >= 0 &&
+    (course.sections[curSecIdx]?.chapters ?? []).every((ch: any) => completedChapters.includes(ch.id));
+  const nextSectionIndex = curSecAllDone && curSecIdx < course.sections.length - 1 ? curSecIdx + 1 : -1;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -915,20 +942,32 @@ export default function OneCourseScreen() {
               {/* <Text style={styles.ratingText}>{getRatingText(getCurrentCourseStats()?.progress || 0)}</Text>
               <Trophy size={16} color="#F59E0B" /> */}
               <Text style={styles.weeksText}>igihe wakoresheje: {calculateTimeSpent(getCurrentCourseStats()?.enrollmentDate, getCurrentCourseStats()?.completedAt)}</Text>
-              <View style={styles.progressCircle}>
-                <Text style={styles.progressPercentage}>
-                  {Math.round(getCurrentCourseStats()?.progress) || 0}%
-                </Text>
-              </View>
+              <CopilotStep
+                text="Hano ubona aho ugeze mu isomo. Ukomeze kwiga kugira ngo ugere kuri 100%!"
+                order={1}
+                name="course-progress"
+              >
+                <WalkthroughableView style={styles.progressCircle}>
+                  <Text style={styles.progressPercentage}>
+                    {Math.round(courseProgressPercent)}%
+                  </Text>
+                </WalkthroughableView>
+              </CopilotStep>
             </View>
           </View>
 
             <View style={styles.progressBarWrapper}>
-              <View style={[styles.progressBarFill, { width: `${getCurrentCourseStats()?.progress || 0}%` }]} />
+              <View style={[styles.progressBarFill, { width: `${courseProgressPercent}%` }]} />
             </View>
 
           {/* Course Tabs */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.courseTabsContainer} contentContainerStyle={styles.courseTabs}>
+          <CopilotStep
+            text="Izi ni ibyiciro by'isomo: isuzumabumenyi ribanziriza, ibyigwa, n'isuzuma rya nyuma. Tangira na 📋 mbere y'isomo!"
+            order={2}
+            name="course-tabs"
+          >
+            <WalkthroughableView style={styles.courseTabsContainer}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row' }} contentContainerStyle={styles.courseTabs}>
             {/* Pre-test Section - Section 0 */}
             {course && Array.isArray(course.preTests) && course.preTests.length > 0 && course.preTests[0] && (
                <TouchableOpacity
@@ -945,21 +984,23 @@ export default function OneCourseScreen() {
              
              {/* Regular Course Sections - Sections 1, 2, 3, etc. */}
              {course.sections.map((tab: ISection, index: number) => (
-               <TouchableOpacity
-                 key={tab.id}
-                 style={[
-                   styles.sectionNumberCircle,
-                   selectedCourse === tab.id && styles.sectionNumberCircleActive
-                 ]}
-                 onPress={() => setSelectedCourse(tab.id)}
-               >
-                <Text style={[
-                  styles.sectionNumber,
-                  selectedCourse === tab.id && styles.sectionNumberActive
-                ]}>
-                  {index + 1}
-                </Text>
-               </TouchableOpacity>
+               <View key={tab.id} style={{ alignItems: 'center' }}>
+                 <TouchableOpacity
+                   style={[
+                     styles.sectionNumberCircle,
+                     selectedCourse === tab.id && styles.sectionNumberCircleActive,
+                   ]}
+                   onPress={() => setSelectedCourse(tab.id)}
+                 >
+                   <Text style={[
+                     styles.sectionNumber,
+                     selectedCourse === tab.id && styles.sectionNumberActive,
+                   ]}>
+                     {index + 1}
+                   </Text>
+                 </TouchableOpacity>
+                 {nextSectionIndex === index && <AnimatedFingerPointer direction="up" />}
+               </View>
              ))}
              
              {/* Final Test Section - Section n */}
@@ -990,7 +1031,9 @@ export default function OneCourseScreen() {
                </TouchableOpacity>
              )}
           </ScrollView>
-          
+            </WalkthroughableView>
+          </CopilotStep>
+
           {/* Section Title */}
           <View style={styles.sectionTitleContainer}>
             <Text style={styles.sectionTitle}>
@@ -1010,7 +1053,12 @@ export default function OneCourseScreen() {
         </View>
 
         {/* Course Modules */}
-        <View style={styles.modulesList}>
+        <CopilotStep
+          text="Kanda ku giciro kugira ngo utangire kwiga. Ibyigwa bifungurwa bihinnye bihinnye — urangize kimwe kugira ngo ukurikiraho gifunguke!"
+          order={3}
+          name="course-chapters"
+        >
+          <WalkthroughableView style={styles.modulesList}>
           {/* Pre-Test Card: only when pre-test section is selected */}
           {selectedCourse === 'pre-test' && course && Array.isArray(course.preTests) && course.preTests.length > 0 && course.preTests[0] && (
             <TouchableOpacity
@@ -1020,7 +1068,6 @@ export default function OneCourseScreen() {
                 preTestDone && { borderColor: '#DC2626', backgroundColor: '#F0FDF4' }
               ]}
               activeOpacity={0.8}
-              disabled={Boolean(progress && !progress.preTestDone)}
               onPress={() => {
                 if (!courseId) {
                   Alert.alert('Error', 'Course id missing');
@@ -1296,31 +1343,34 @@ export default function OneCourseScreen() {
                           { backgroundColor: recStyle.bg, borderColor: recStyle.border },
                         ]}
                       >
-                        <View
+                         <View
                           style={[styles.recommendedSeverityDot, { backgroundColor: recStyle.border }]}
                         />
                         <RotateCcw size={10} color={recStyle.text} />
                         <Text style={[styles.recommendedBadgeText, { color: recStyle.text }]}>
-                          Subiramo
+                        Subiramo
                         </Text>
                       </View>
                     )}
                   </View>
                   <View style={styles.moduleRight}>
-                    {isCompleted && (
+                    {isCompleted ? (
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                         <View style={{ backgroundColor: '#10B981', borderRadius: 12, padding: 4 }}>
                           <CheckCircle size={16} color="#fff" />
                         </View>
                       </View>
-                    )}
+                    ) : module.id === nextChapterId ? (
+                      <AnimatedFingerPointer direction="left" />
+                    ) : null}
                   </View>
                 </View>
                 <EmojiBurst active={Boolean(isCompleted)} />
               </TouchableOpacity>
             );
           })}
-        </View>
+          </WalkthroughableView>
+        </CopilotStep>
       </ScrollView>
       <Footer
         activeTab="training"
@@ -1378,6 +1428,20 @@ export default function OneCourseScreen() {
         </View>
       </Modal>
     </SafeAreaView>
+  );
+}
+
+export default function OneCourseScreen() {
+  return (
+    <CopilotProvider
+      tooltipComponent={MascotTooltip}
+      overlay="svg"
+      backdropColor="rgba(0, 0, 0, 0.65)"
+      animationDuration={300}
+      stepNumberComponent={() => null}
+    >
+      <OneCourseScreenContent />
+    </CopilotProvider>
   );
 }
 
@@ -1740,6 +1804,11 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#6B7280',
   },
+  recommendedSeverityDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+  },
   recommendedBadge: {
     marginTop: 6,
     alignSelf: 'flex-start',
@@ -1750,11 +1819,6 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: 999,
     borderWidth: 1,
-  },
-  recommendedSeverityDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
   },
   recommendedBadgeText: {
     fontSize: 10,

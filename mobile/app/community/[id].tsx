@@ -6,12 +6,12 @@ import {
   FlatList,
   KeyboardAvoidingView,
   Platform,
-  ActivityIndicator,
   Keyboard,
   TouchableOpacity,
   Image,
   TextInput,
 } from 'react-native';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
@@ -182,10 +182,7 @@ export default function CommunityRoom() {
    if (isLoading || !conversation) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4D81D2" />
-          <Text style={styles.loadingText}>Gufungura amakuru...</Text>
-        </View>
+        <LoadingSpinner message="Gufungura amakuru..." />
       </SafeAreaView>
     );
   }
@@ -280,7 +277,7 @@ export default function CommunityRoom() {
               ListFooterComponent={
                 isFetchingNextPage ? (
                   <View style={styles.loadingMoreContainer}>
-                    <ActivityIndicator size="small" color="#4D81D2" />
+                  <LoadingSpinner variant="inline" message="" />
                   </View>
                 ) : null
               }

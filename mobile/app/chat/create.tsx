@@ -11,6 +11,7 @@ import {
   useWindowDimensions,
   ActivityIndicator,
 } from 'react-native';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
 import {
   SafeAreaView,
   useSafeAreaInsets,
@@ -132,7 +133,7 @@ export default function CreateChatScreen() {
       <View style={styles.content}>
         {isUsersLoading ? (
           <View style={styles.emptyState}>
-            <ActivityIndicator size="large" color="#4D81D2" />
+          <LoadingSpinner />
           </View>
         ) : isError ? (
           <View style={styles.emptyState}>

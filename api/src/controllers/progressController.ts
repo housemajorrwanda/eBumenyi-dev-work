@@ -3,6 +3,7 @@ import {
   Get,
   Middlewares,
   Post,
+  Query,
   Route,
   Tags,
   Security,
@@ -142,6 +143,18 @@ export class ProgressController {
   ) {
     const studentId = await this.getStudentId(req);
     return ProgressService.getPostCourseRecommendations(studentId, courseId);
+  }
+
+  @Get("/student/course/{courseId}/workspace")
+  @Security("jwt")
+  @Middlewares(loggerMiddleware)
+  public async getCourseWorkspace(
+    @Path() courseId: string,
+    @Request() req: ExpressRequest,
+    @Query() chapterId?: string,
+  ) {
+    const studentId = await this.getStudentId(req);
+    return ProgressService.getCourseWorkspace(studentId, courseId, chapterId);
   }
 
   @Get("/student/course/{courseId}")

@@ -71,7 +71,9 @@ model User {
   savedPosts              SavedCommunityPost[]
   meetingRecordings       MeetingRecording[]
   recordingInvites        MeetingRecordingInvite[]
+  meetingAttendance       MeetingAttendance[]
   settings                UserSettings?
+  onboardingProgress      OnboardingProgress[]
 }
 
 model UserSettings {
@@ -88,6 +90,17 @@ model UserSettings {
   categories   Json     @default("{\"courseUpdates\":true,\"assignmentReminders\":true,\"certificates\":true,\"systemUpdates\":false}")
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+}
+
+model OnboardingProgress {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tourKey     String
+  completedAt DateTime @default(now())
+
+  @@unique([userId, tourKey])
+  @@index([userId])
 }
 
 model Hospital {
@@ -271,6 +284,7 @@ model CalendarEvent {
   participants          CalendarEventParticipant[]
   externalParticipants  CalendarEventExternalParticipant[]
   recordings            MeetingRecording[]
+  attendance            MeetingAttendance[]
   createdAt             DateTime                   @default(now())
   updatedAt             DateTime                   @updatedAt
   
@@ -337,6 +351,8 @@ model Course {
   description      String?
   rating           Float        @default(0.0)
   isPublished      Boolean      @default(true)
+  pendingNotificationType String? // 'created' | 'updated' — set on save, cleared after manual notify
+  lastNotifiedAt   DateTime?
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
   certificateTemplateId String?
@@ -1167,6 +1183,25 @@ model MeetingRecordingInvite {
   @@map("meeting_recording_invites")
 }
 
+model MeetingAttendance {
+  id           String    @id @default(uuid())
+  eventId      String?
+  streamRoomId String?
+  userId       String?
+  guestName    String?
+  joinedAt     DateTime  @default(now())
+  leftAt       DateTime?
+  durationSec  Int?
+
+  event CalendarEvent? @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  user  User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([eventId])
+  @@index([streamRoomId])
+  @@index([userId])
+  @@map("meeting_attendance")
+}
+
 model CertificateTemplate {
   id         String   @id @default(uuid())
   name       String
@@ -1177,5 +1212,13 @@ model CertificateTemplate {
   courses    Course[]
 
   @@map("certificate_templates")
+}
+
+model BackgroundImage {
+  id        String   @id @default(uuid())
+  url       String
+  createdAt DateTime @default(now())
+
+  @@map("background_images")
 }
 

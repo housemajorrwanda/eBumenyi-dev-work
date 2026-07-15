@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import {
+  Body,
   Get,
   Middlewares,
   Post,
@@ -22,6 +23,42 @@ import { v4 } from "uuid";
 // Must match the base path that express.static uses in index.ts
 const UPLOADS_BASE =
   process.env.UPLOAD_PATH || path.join(process.cwd(), "uploads");
+
+const VIDEO_EXTENSIONS = new Set([
+  ".mp4",
+  ".mov",
+  ".avi",
+  ".mkv",
+  ".webm",
+  ".m4v",
+  ".3gp",
+  ".flv",
+  ".wmv",
+]);
+
+function isVideoUpload(file: Express.Multer.File): boolean {
+  if (file.mimetype.startsWith("video/")) return true;
+  const ext = path.extname(file.originalname).toLowerCase();
+  return VIDEO_EXTENSIONS.has(ext);
+}
+
+const CHUNK_DIR = ".chunks";
+const MAX_VIDEO_CHUNKS = 512; // 512 × 4MB ≈ 2GB
+
+function isValidUploadId(uploadId: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    uploadId,
+  );
+}
+
+function getChunkDir(uploadId: string): string {
+  return path.join(UPLOADS_BASE, "videos", CHUNK_DIR, uploadId);
+}
+
+function isAllowedVideoFileName(fileName: string): boolean {
+  const ext = path.extname(fileName).toLowerCase();
+  return VIDEO_EXTENSIONS.has(ext);
+}
 
 interface FileUploadResponse {
   statusCode: number;
@@ -77,12 +114,39 @@ const videoUpload = multer({
   storage: videoStorage,
   limits: { fileSize: 2 * 1024 * 1024 * 1024 }, // 2GB
   fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith("video/")) {
+    if (isVideoUpload(file)) {
       cb(null, true);
     } else {
       cb(new Error("Only video files are allowed for video upload"));
     }
   },
+});
+
+// Chunked video upload — each part ≤ 8MB so it passes through reverse proxies
+const chunkStorage = multer.diskStorage({
+  destination: (req, _file, cb) => {
+    const uploadId = req.body?.uploadId as string | undefined;
+    if (!uploadId || !isValidUploadId(uploadId)) {
+      cb(new Error("Valid uploadId (UUID) is required"), "");
+      return;
+    }
+    const dir = getChunkDir(uploadId);
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+      cb(null, dir);
+    } catch (error) {
+      cb(error as Error, "");
+    }
+  },
+  filename: (req, _file, cb) => {
+    const idx = String(req.body?.chunkIndex ?? "0");
+    cb(null, `part-${idx}`);
+  },
+});
+
+const chunkUpload = multer({
+  storage: chunkStorage,
+  limits: { fileSize: 8 * 1024 * 1024 },
 });
 
 // General file upload (non-video) middleware
@@ -279,6 +343,199 @@ export class FileUploadController {
       };
     } catch (error: any) {
       console.error("❌ Video upload error:", error);
+      return this.handleUploadError(error);
+    }
+  }
+
+  /**
+   * Upload one chunk of a large video (use with /video/complete).
+   * Send form fields uploadId, chunkIndex, totalChunks, fileName before the chunk file.
+   */
+  @Post("/video/chunk")
+  @Security("jwt")
+  @Middlewares(
+    chunkUpload.single("chunk"),
+    checkRole(
+      roles.STAFF,
+      roles.CHO,
+      roles.TRAINER,
+      roles.ADMIN,
+      roles.TRAINEE,
+    ),
+  )
+  public async uploadVideoChunk(
+    @Request() req: ExpressRequest,
+  ): Promise<{
+    statusCode: number;
+    message: string;
+    data: { uploadId: string; chunkIndex: number; totalChunks: number } | null;
+  }> {
+    try {
+      const uploadId = String(req.body?.uploadId ?? "");
+      const chunkIndex = Number(req.body?.chunkIndex);
+      const totalChunks = Number(req.body?.totalChunks);
+      const fileName = String(req.body?.fileName ?? "");
+
+      if (!isValidUploadId(uploadId)) {
+        return {
+          statusCode: 400,
+          message: "Invalid uploadId",
+          data: null,
+        };
+      }
+      if (
+        !Number.isInteger(chunkIndex) ||
+        !Number.isInteger(totalChunks) ||
+        chunkIndex < 0 ||
+        totalChunks < 1 ||
+        totalChunks > MAX_VIDEO_CHUNKS ||
+        chunkIndex >= totalChunks
+      ) {
+        return {
+          statusCode: 400,
+          message: "Invalid chunkIndex or totalChunks",
+          data: null,
+        };
+      }
+      if (!fileName || !isAllowedVideoFileName(fileName)) {
+        return {
+          statusCode: 400,
+          message: "Invalid video fileName",
+          data: null,
+        };
+      }
+      if (!req.file) {
+        return {
+          statusCode: 400,
+          message: "No chunk data provided",
+          data: null,
+        };
+      }
+
+      fs.writeFileSync(
+        path.join(getChunkDir(uploadId), "meta.json"),
+        JSON.stringify({ fileName, totalChunks }),
+      );
+
+      return {
+        statusCode: 200,
+        message: "Chunk uploaded",
+        data: { uploadId, chunkIndex, totalChunks },
+      };
+    } catch (error: any) {
+      console.error("❌ Video chunk upload error:", error);
+      return {
+        statusCode: 500,
+        message: error.message || "Chunk upload failed",
+        data: null,
+      };
+    }
+  }
+
+  /**
+   * Merge uploaded chunks into the final video file on disk.
+   */
+  @Post("/video/complete")
+  @Security("jwt")
+  @Middlewares(
+    checkRole(
+      roles.STAFF,
+      roles.CHO,
+      roles.TRAINER,
+      roles.ADMIN,
+      roles.TRAINEE,
+    ),
+  )
+  public async completeVideoUpload(
+    @Body()
+    body: {
+      uploadId: string;
+      totalChunks: number;
+      fileName: string;
+    },
+  ): Promise<FileUploadResponse> {
+    const { uploadId, totalChunks, fileName } = body;
+
+    if (!isValidUploadId(uploadId)) {
+      return { statusCode: 400, message: "Invalid uploadId", data: null };
+    }
+    if (
+      !Number.isInteger(totalChunks) ||
+      totalChunks < 1 ||
+      totalChunks > MAX_VIDEO_CHUNKS
+    ) {
+      return {
+        statusCode: 400,
+        message: "Invalid totalChunks",
+        data: null,
+      };
+    }
+    if (!fileName || !isAllowedVideoFileName(fileName)) {
+      return {
+        statusCode: 400,
+        message: "Invalid video fileName",
+        data: null,
+      };
+    }
+
+    const chunkDir = getChunkDir(uploadId);
+    if (!fs.existsSync(chunkDir)) {
+      return {
+        statusCode: 400,
+        message: "Upload session not found",
+        data: null,
+      };
+    }
+
+    try {
+      for (let i = 0; i < totalChunks; i++) {
+        const partPath = path.join(chunkDir, `part-${i}`);
+        if (!fs.existsSync(partPath)) {
+          return {
+            statusCode: 400,
+            message: `Missing chunk ${i} of ${totalChunks}`,
+            data: null,
+          };
+        }
+      }
+
+      const ext = path.extname(fileName).toLowerCase();
+      const finalName = `${v4()}${ext}`;
+      const finalPath = path.join(UPLOADS_BASE, "videos", finalName);
+
+      const fd = fs.openSync(finalPath, "w");
+      try {
+        for (let i = 0; i < totalChunks; i++) {
+          const partPath = path.join(chunkDir, `part-${i}`);
+          const data = fs.readFileSync(partPath);
+          fs.writeSync(fd, data);
+        }
+      } finally {
+        fs.closeSync(fd);
+      }
+
+      fs.rmSync(chunkDir, { recursive: true, force: true });
+
+      const stats = fs.statSync(finalPath);
+      console.log(`🎥 Video assembled from chunks:`, {
+        originalName: fileName,
+        filename: finalName,
+        size: (stats.size / (1024 * 1024)).toFixed(2) + "MB",
+      });
+
+      return {
+        statusCode: 200,
+        message: "Video uploaded successfully",
+        data: {
+          url: `/uploads/videos/${finalName}`,
+          publicId: `videos/${finalName}`,
+          originalName: fileName,
+          size: stats.size,
+          format: "video/mp4",
+        },
+      };
+    } catch (error: any) {
+      console.error("❌ Video complete error:", error);
       return this.handleUploadError(error);
     }
   }

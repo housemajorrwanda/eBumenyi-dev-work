@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   IHospital,
   IEnrollmentTrend,
@@ -9,9 +9,12 @@ import {
   ICourseAnalytics,
   ICourseDurationStats,
   IRecentActivityFeed,
+  IDashboardFilters,
 } from "@/types";
-import api from "@/services/api";
+import { listAllHospitals } from "@/services/hospitals.service";
 import {
+  getCourseAnalytics,
+  getStudentAnalytics,
   getTestScoreAnalytics,
   getCommunicationsAnalytics,
   getDemographicsAnalytics,
@@ -19,15 +22,11 @@ import {
   getCourseDurationStats,
   getRecentActivityFeed,
 } from "@/services/analytics.service";
+import { DEFAULT_DASHBOARD_FILTERS } from "@/utils/constants/dashboardFilters";
+import { buildDashboardFilterQuery, dashboardFilterKey } from "@/utils/dashboardFilterQuery";
+import { dashboardKeys } from "@/utils/constants/queryKeys";
 
-export interface AnalyticsFilters {
-  district?: string;
-  province?: string;
-  gender?: string;
-  role?: string;
-  year?: string;
-  month?: string;
-}
+export type AnalyticsFilters = IDashboardFilters;
 
 interface AdoptionStats {
   hospitals: IHospital[];
@@ -36,7 +35,7 @@ interface AdoptionStats {
   registrationRate: number;
   activeRate: number;
   enrollmentTrends: IEnrollmentTrend[];
-  avgStudyTime: number; // minutes, from studentAnalytics
+  avgStudyTime: number;
   byProvince: {
     province: string;
     totalChws: number;
@@ -56,50 +55,33 @@ interface AdoptionStats {
 }
 
 const TOTAL_CHWS_NATIONAL = 58567;
+const DASHBOARD_CACHE_MS = 1000 * 60 * 30;
 
-export const useAdoptionStats = (filters: AnalyticsFilters = {}): AdoptionStats => {
-  const [hospitals, setHospitals] = useState<IHospital[]>([]);
-  const [enrollmentTrends, setEnrollmentTrends] = useState<IEnrollmentTrend[]>([]);
-  const [avgStudyTime, setAvgStudyTime] = useState(0);
-  const [courseAnalytics, setCourseAnalytics] = useState<ICourseAnalytics | null>(
-    null,
-  );
-  const [testScores, setTestScores] = useState<ITestScoreAnalytics | null>(null);
-  const [communications, setCommunications] =
-    useState<ICommunicationsAnalytics | null>(null);
-  const [demographics, setDemographics] = useState<IDemographicsAnalytics | null>(
-    null,
-  );
-  const [chwStats, setChwStats] = useState<ICHWStats | null>(null);
-  const [courseDuration, setCourseDuration] = useState<ICourseDurationStats | null>(
-    null,
-  );
-  const [recentActivity, setRecentActivity] = useState<IRecentActivityFeed | null>(
-    null,
-  );
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+interface AdoptionQueryResult {
+  hospitals: IHospital[];
+  enrollmentTrends: IEnrollmentTrend[];
+  avgStudyTime: number;
+  courseAnalytics: ICourseAnalytics | null;
+  testScores: ITestScoreAnalytics | null;
+  communications: ICommunicationsAnalytics | null;
+  demographics: IDemographicsAnalytics | null;
+  chwStats: ICHWStats | null;
+  courseDuration: ICourseDurationStats | null;
+  recentActivity: IRecentActivityFeed | null;
+}
 
-  const fetchAll = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      // Build query string
-      const qsParams = new URLSearchParams();
-      if (filters.district) qsParams.append("district", filters.district);
-      if (filters.province) qsParams.append("province", filters.province);
-      if (filters.gender) qsParams.append("gender", filters.gender);
-      if (filters.role) qsParams.append("role", filters.role);
-      if (filters.year) qsParams.append("year", filters.year);
-      if (filters.month) qsParams.append("month", filters.month);
-      
-      const qs = qsParams.toString();
-      const qsPrefix = qs ? `?${qs}` : "";
+export const useAdoptionStats = (
+  filters: AnalyticsFilters = DEFAULT_DASHBOARD_FILTERS,
+): AdoptionStats => {
+  const qs = buildDashboardFilterQuery(filters);
 
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: dashboardKeys.adoption(dashboardFilterKey(filters)),
+    queryFn: async (): Promise<AdoptionQueryResult> => {
       const results = await Promise.allSettled([
-        api.get("/hospitals/"), // We can append it to hospitals if hospitals endpoint supports it, but probably it doesn't. Leaving as is.
-        api.get(`/export/dashboard/course/analytics${qsPrefix}`),
-        api.get(`/export/dashboard/student/analytics${qsPrefix}`),
+        listAllHospitals(),
+        getCourseAnalytics(qs),
+        getStudentAnalytics(qs),
         getTestScoreAnalytics(qs),
         getCommunicationsAnalytics(qs),
         getDemographicsAnalytics(qs),
@@ -111,71 +93,54 @@ export const useAdoptionStats = (filters: AnalyticsFilters = {}): AdoptionStats 
       let hospitalList: IHospital[] = [];
       const hospitalsRes = results[0];
       if (hospitalsRes.status === "fulfilled") {
-        const raw = hospitalsRes.value?.data;
-        hospitalList = raw?.data ?? raw ?? [];
-        setHospitals(hospitalList);
+        hospitalList = hospitalsRes.value?.data ?? [];
       }
 
+      let enrollmentTrends: IEnrollmentTrend[] = [];
+      let courseAnalytics: ICourseAnalytics | null = null;
       const analyticsRes = results[1];
       if (analyticsRes.status === "fulfilled") {
-        const d = analyticsRes.value?.data?.data;
-        setCourseAnalytics(d ?? null);
-        setEnrollmentTrends(d?.enrollmentTrends ?? []);
+        courseAnalytics = analyticsRes.value?.data ?? null;
+        enrollmentTrends = courseAnalytics?.enrollmentTrends ?? [];
       }
 
+      let avgStudyTime = 0;
       const studentRes = results[2];
       if (studentRes.status === "fulfilled") {
-        const d = studentRes.value?.data?.data;
-        setAvgStudyTime(d?.avgStudyTime ?? 0);
+        avgStudyTime = studentRes.value?.data?.avgStudyTime?.value ?? 0;
       }
 
-      const testRes = results[3];
-      if (testRes.status === "fulfilled") {
-        setTestScores(testRes.value?.data ?? null);
-      }
+      const testScores =
+        results[3].status === "fulfilled" ? results[3].value?.data ?? null : null;
+      const communications =
+        results[4].status === "fulfilled" ? results[4].value?.data ?? null : null;
+      const demographics =
+        results[5].status === "fulfilled" ? results[5].value?.data ?? null : null;
+      const chwStats =
+        results[6].status === "fulfilled" ? results[6].value?.data ?? null : null;
+      const courseDuration =
+        results[7].status === "fulfilled" ? results[7].value?.data ?? null : null;
+      const recentActivity =
+        results[8].status === "fulfilled" ? results[8].value?.data ?? null : null;
 
-      const commRes = results[4];
-      if (commRes.status === "fulfilled") {
-        setCommunications(commRes.value?.data ?? null);
-      }
+      return {
+        hospitals: hospitalList,
+        enrollmentTrends,
+        avgStudyTime,
+        courseAnalytics,
+        testScores,
+        communications,
+        demographics,
+        chwStats,
+        courseDuration,
+        recentActivity,
+      };
+    },
+    staleTime: DASHBOARD_CACHE_MS,
+    gcTime: DASHBOARD_CACHE_MS,
+  });
 
-      const demoRes = results[5];
-      if (demoRes.status === "fulfilled") {
-        setDemographics(demoRes.value?.data ?? null);
-      }
-
-      const chwRes = results[6]; // 7th item (index 6)
-      if (chwRes.status === "fulfilled") {
-        setChwStats(chwRes.value?.data ?? null);
-      }
-
-      const durationRes = results[7]; // 8th item (index 7)
-      if (durationRes.status === "fulfilled") {
-        setCourseDuration(durationRes.value?.data ?? null);
-      }
-
-      const activityRes = results[8]; // 9th item (index 8)
-      if (activityRes.status === "fulfilled") {
-        setRecentActivity(activityRes.value?.data ?? null);
-      }
-    } catch {
-      setError("Failed to fetch data. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [
-    filters.district,
-    filters.province,
-    filters.gender,
-    filters.role,
-    filters.year,
-    filters.month,
-  ]);
-
-  useEffect(() => {
-    fetchAll();
-  }, [fetchAll]);
-
+  const hospitals = data?.hospitals ?? [];
   const totalChws = hospitals.reduce((s, h) => s + (h.totalChws ?? 0), 0);
   const activeChws = hospitals.reduce((s, h) => s + (h.activeChws ?? 0), 0);
   const registrationRate = Math.round((totalChws / TOTAL_CHWS_NATIONAL) * 100);
@@ -200,7 +165,7 @@ export const useAdoptionStats = (filters: AnalyticsFilters = {}): AdoptionStats 
   }
 
   const byProvince = Array.from(provinceMap.entries())
-    .map(([province, data]) => ({ province, ...data }))
+    .map(([province, stats]) => ({ province, ...stats }))
     .sort((a, b) => b.totalChws - a.totalChws);
 
   return {
@@ -209,18 +174,20 @@ export const useAdoptionStats = (filters: AnalyticsFilters = {}): AdoptionStats 
     activeChws,
     registrationRate,
     activeRate,
-    enrollmentTrends,
-    avgStudyTime,
+    enrollmentTrends: data?.enrollmentTrends ?? [],
+    avgStudyTime: data?.avgStudyTime ?? 0,
     byProvince,
-    courseAnalytics,
-    testScores,
-    communications,
-    demographics,
-    chwStats,
-    courseDuration,
-    recentActivity,
+    courseAnalytics: data?.courseAnalytics ?? null,
+    testScores: data?.testScores ?? null,
+    communications: data?.communications ?? null,
+    demographics: data?.demographics ?? null,
+    chwStats: data?.chwStats ?? null,
+    courseDuration: data?.courseDuration ?? null,
+    recentActivity: data?.recentActivity ?? null,
     isLoading,
-    error,
-    refetch: fetchAll,
+    error: error ? "Failed to fetch data. Please try again." : null,
+    refetch: () => {
+      void refetch();
+    },
   };
 };

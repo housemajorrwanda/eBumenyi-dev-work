@@ -51,6 +51,9 @@ const PORT = process.env.PORT || 9000;
 // Skip body parsing for upload routes to allow multipart/form-data to pass through
 // Limits set to 10MB for JSON/form bodies (uploads handled separately via multipart)
 app.use((req, res, next) => {
+  if (req.path === "/api/upload/video/complete") {
+    return urlencoded({ extended: true, limit: "1mb" })(req, res, next);
+  }
   if (
     req.path.startsWith("/api/upload") ||
     req.path === "/api/hospitals/import"
@@ -61,6 +64,9 @@ app.use((req, res, next) => {
 });
 
 app.use((req, res, next) => {
+  if (req.path === "/api/upload/video/complete") {
+    return json({ limit: "1mb" })(req, res, next);
+  }
   if (
     req.path.startsWith("/api/upload") ||
     req.path === "/api/hospitals/import"
@@ -86,10 +92,17 @@ app.use(
       "https://chw-web.vercel.app",
       "https://www.ebumenyi.online",
       "https://dev.ebumenyi.online",
+      "https://apitest.ebumenyi.online",
       "http://localhost:4173",
+      "http://localhost:5173",
       "http://localhost:3000",
+      "http://localhost:8081",
+      "http://localhost:19006",
       "http://10.10.119.36",
       "http://10.10.119.36:3000",
+      "http://10.10.119.36:9000",
+      "http://10.104.251.146:3000",
+      "http://10.104.251.146:5173",
       "http://197.243.110.153",
       "http://197.243.110.153:3000",
       "https://irucare-micro-service-api-production.up.railway.app",
@@ -114,7 +127,8 @@ app.use((req: ExRequest, res: ExResponse, next: NextFunction) => {
     // Check if this is a signin response with a token
     if (
       (req.path === "/api/auth/signin/staff" ||
-        req.path === "/api/auth/signin/student") &&
+        req.path === "/api/auth/signin/student" ||
+        req.path === "/api/auth/signin/student/id-phone") &&
       body?.data?.token &&
       req.method === "POST"
     ) {
@@ -168,10 +182,17 @@ const io = new SocketIOServer(server, {
       "https://chw-web.vercel.app",
       "https://www.ebumenyi.online",
       "https://dev.ebumenyi.online",
+      "https://apitest.ebumenyi.online",
       "http://localhost:4173",
+      "http://localhost:5173",
       "http://localhost:3000",
+      "http://localhost:8081",
+      "http://localhost:19006",
       "http://10.10.119.36",
       "http://10.10.119.36:3000",
+      "http://10.10.119.36:9000",
+      "http://10.104.251.146:3000",
+      "http://10.104.251.146:5173",
       "http://197.243.110.153",
       "http://197.243.110.153:3000",
       "https://irucare-micro-service-api-production.up.railway.app",
@@ -531,8 +552,15 @@ app.get(
       if (!userId) return res.status(401).json({ message: "Unauthorized" });
       const { CHOGroupService } = await import("./services/choGroupService");
       const search = req.query.search as string | undefined;
-      const candidates = await CHOGroupService.searchCHWCandidates(userId, search);
-      return res.status(200).json({ statusCode: 200, message: "Candidates retrieved successfully", data: candidates });
+      const candidates = await CHOGroupService.searchCHWCandidates(
+        userId,
+        search,
+      );
+      return res.status(200).json({
+        statusCode: 200,
+        message: "Candidates retrieved successfully",
+        data: candidates,
+      });
     } catch (err) {
       next(err);
     }

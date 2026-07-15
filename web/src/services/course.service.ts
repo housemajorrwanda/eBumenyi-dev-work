@@ -1,13 +1,43 @@
-import { IChapter, ICourse, IPaged, IResponse, TDashboardStatisticsResponse } from "@/types";
+import { IChapter, ICourse, IPaged, IResponse, IDashboardStatsResponse } from "@/types";
 import api from "./api";
-import { getBackendURL } from "@/config/api.config";
+import { getBackendURL, getUploadApiBaseURL } from "@/config/api.config";
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+async function postWithRetry(
+  url: string,
+  init: RequestInit,
+  attempts = 5,
+): Promise<Response> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    try {
+      const res = await fetch(url, init);
+      if (res.ok || (res.status >= 400 && res.status < 500 && res.status !== 408)) {
+        return res;
+      }
+      if ([408, 502, 503, 504].includes(res.status) && attempt < attempts - 1) {
+        await sleep(1000 * (attempt + 1));
+        continue;
+      }
+      return res;
+    } catch (err) {
+      lastError = err;
+      if (attempt < attempts - 1) {
+        await sleep(1000 * (attempt + 1));
+        continue;
+      }
+    }
+  }
+  throw lastError ?? new Error("Upload request failed");
+}
 
 export const getAllCourses = async (params?: string): Promise<IPaged<ICourse[]>> => {
   const queryParams = params ? params : "";
   return (await api.get(`/courses${queryParams}`)).data;
 };
 
-export const getAllCoursesStats = async (): Promise<TDashboardStatisticsResponse> => {
+export const getAllCoursesStats = async (): Promise<IDashboardStatsResponse> => {
   return (await api.get('/courses/dashboard/statistics')).data;
 };
 
@@ -41,6 +71,13 @@ export const updateCourse = async (
   })).data;
 };
 
+export const notifyCourseUsers = async (
+  courseId: string,
+  roles?: Array<'TRAINEE' | 'TESTER' | 'CHO' | 'TRAINER' | 'STAFF' | 'ADMIN'>,
+): Promise<IResponse<{ course: ICourse; notifiedCount: number; eventType: string }>> => {
+  return (await api.post(`/courses/${courseId}/notify-users`, { roles })).data;
+};
+
 export const deleteCourse = async (id: string): Promise<number> => {
   return (await api.delete(`/courses/${id}`)).data;
 };
@@ -64,12 +101,87 @@ function detectSlideFileKind(file: File): "video" | "pdf" | "image" {
  *
  * Endpoint routing (each uses a dedicated multer parser so the stream
  * is only consumed once — chaining two parsers breaks on non-video files):
- *   video  → POST /upload/video    field: "video"   → local path, prefixed with backend base URL
+ *   video  → POST /upload/video/chunk + /upload/video/complete (large files)
+ *            or POST /upload/video (small files)  field: "video"
  *   pdf    → POST /upload/document field: "document" → Cloudinary secure_url
  *   image  → POST /upload/image    field: "image"   → Cloudinary secure_url
  */
+
+/** 1MB chunks + fresh fetch per chunk avoids proxy cumulative body limits. */
+const VIDEO_CHUNK_SIZE = 1024 * 1024;
+const VIDEO_CHUNK_THRESHOLD = VIDEO_CHUNK_SIZE;
+
+async function uploadVideoInChunks(file: File): Promise<string> {
+  const uploadId = crypto.randomUUID();
+  const totalChunks = Math.ceil(file.size / VIDEO_CHUNK_SIZE);
+  const uploadBase = getUploadApiBaseURL();
+  const token = localStorage.getItem("accessToken") ?? "";
+
+  for (let i = 0; i < totalChunks; i++) {
+    const start = i * VIDEO_CHUNK_SIZE;
+    const end = Math.min(start + VIDEO_CHUNK_SIZE, file.size);
+    const blob = file.slice(start, end);
+
+    const form = new FormData();
+    form.append("uploadId", uploadId);
+    form.append("chunkIndex", String(i));
+    form.append("totalChunks", String(totalChunks));
+    form.append("fileName", file.name);
+    form.append("chunk", blob, `part-${i}`);
+
+    const res = await postWithRetry(`${uploadBase}/upload/video/chunk`, {
+      method: "POST",
+      headers: {
+        Authorization: token,
+        Accept: "application/json",
+      },
+      body: form,
+      credentials: "include",
+      cache: "no-store",
+    });
+
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`Chunk ${i}/${totalChunks - 1} failed (HTTP ${res.status}): ${body}`);
+    }
+
+    // Brief pause so Traefik/socat can reset between chunks
+    if (i < totalChunks - 1) {
+      await sleep(150);
+    }
+  }
+
+  const completeRes = await postWithRetry(`${uploadBase}/upload/video/complete`, {
+    method: "POST",
+    headers: {
+      Authorization: token,
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    credentials: "include",
+    body: JSON.stringify({ uploadId, totalChunks, fileName: file.name }),
+  });
+
+  if (!completeRes.ok) {
+    const body = await completeRes.text();
+    throw new Error(`Complete failed (HTTP ${completeRes.status}): ${body}`);
+  }
+
+  const response = await completeRes.json();
+  let url: string = response?.data?.url;
+  if (!url) throw new Error("Upload succeeded but no URL was returned");
+  if (url.startsWith("/")) {
+    url = `${getBackendURL()}${url}`;
+  }
+  return url;
+}
+
 export const uploadSlideFile = async (file: File): Promise<string> => {
   const kind = detectSlideFileKind(file);
+
+  if (kind === "video" && file.size > VIDEO_CHUNK_THRESHOLD) {
+    return uploadVideoInChunks(file);
+  }
 
   let endpoint: string;
   let fieldName: string;
@@ -89,7 +201,8 @@ export const uploadSlideFile = async (file: File): Promise<string> => {
   form.append(fieldName, file);
 
   const response = await api.post(endpoint, form, {
-    headers: { "Content-Type": "multipart/form-data" },
+    // Video files can be large; allow up to 10 minutes (matches API timeout)
+    timeout: kind === "video" ? 600_000 : undefined,
   });
 
   let url: string = response.data?.data?.url;

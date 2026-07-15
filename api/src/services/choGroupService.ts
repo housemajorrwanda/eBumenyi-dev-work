@@ -22,6 +22,12 @@ export class CHOGroupService {
     if (existingGroup) throw new AppError("This student already leads a group", 409);
 
     return prisma.$transaction(async (tx) => {
+      await tx.userRole.deleteMany({
+        where: {
+          userId,
+          name: { in: [RoleType.TRAINEE, RoleType.TESTER] },
+        },
+      });
       await tx.userRole.create({ data: { userId, name: RoleType.CHO } });
       await tx.student.update({
         where: { id: user.student!.id },

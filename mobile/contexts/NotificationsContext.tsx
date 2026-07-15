@@ -21,14 +21,21 @@ const NotificationsContext = createContext<NotificationsContextType | undefined>
  * Navigate user to appropriate screen based on notification type and action URL
  */
 const navigateFromNotification = (router: any, notification: INotification) => {
-  const actionUrl = notification.actionUrl || '';
-  const entityType = notification.entityType || '';
+  const actionUrl = (notification.actionUrl || '').trim();
+  if (!actionUrl) return;
 
+  const entityType = notification.entityType || '';
   console.log(`[NotificationDeepLink] Navigating from notification: ${entityType} → ${actionUrl}`);
 
   try {
+    // /certificate has no ID segment — handle before the generic regex
+    if (actionUrl === '/certificate') {
+      router.push('/certificate');
+      return;
+    }
+
     // Extract ID from action URL (format: /calendar/123, /chat/456, etc.)
-    const match = actionUrl.match(/^\/([a-z]+)\/(.+?)(?:\?|$)/i);
+    const match = actionUrl.match(/^\/([a-z_]+)\/(.+?)(?:\?|$)/i);
     if (!match) {
       console.warn('[NotificationDeepLink] Could not parse action URL:', actionUrl);
       return;
@@ -39,39 +46,33 @@ const navigateFromNotification = (router: any, notification: INotification) => {
     switch (resourceType.toLowerCase()) {
       case 'calendar':
       case 'event':
-        // Navigate to calendar event details
-        console.log(`[NotificationDeepLink] Navigating to calendar event: ${resourceId}`);
         router.push(`/calendar/${resourceId}`);
         break;
 
       case 'chat':
       case 'conversation':
-        // Navigate to direct chat
-        console.log(`[NotificationDeepLink] Navigating to chat: ${resourceId}`);
         router.push(`/chat/${resourceId}`);
         break;
 
       case 'group':
-        // Navigate to group
-        console.log(`[NotificationDeepLink] Navigating to group: ${resourceId}`);
         router.push(`/group/${resourceId}`);
         break;
 
       case 'course':
-        // Navigate to course
-        console.log(`[NotificationDeepLink] Navigating to course: ${resourceId}`);
+      case 'courses':
+        router.push(`/courses/${resourceId}`);
+        break;
+
+      case 'chapter':
+      case 'attempt':
         router.push(`/courses/${resourceId}`);
         break;
 
       case 'community':
-        // Navigate to community
-        console.log(`[NotificationDeepLink] Navigating to community: ${resourceId}`);
         router.push(`/community/${resourceId}`);
         break;
 
       case 'announcement':
-        // Navigate to announcement detail screen
-        console.log(`[NotificationDeepLink] Navigating to announcement: ${resourceId}`);
         router.push(`/announcements/${resourceId}`);
         break;
 

@@ -37,8 +37,17 @@ export class UnifiedExportController {
     @Query() year?: string,
     @Query() month?: string,
     @Query() role?: string,
+    @Query() hospitalId?: string,
   ) {
-    return CourseService.getCourseAnalytics({ district, province, gender, year, month, role });
+    return CourseService.getCourseAnalytics({
+      district,
+      province,
+      gender,
+      year,
+      month,
+      role,
+      hospitalId,
+    });
   }
 
   @Get("/dashboard/student/analytics")
@@ -60,8 +69,17 @@ export class UnifiedExportController {
     @Query() year?: string,
     @Query() month?: string,
     @Query() role?: string,
+    @Query() hospitalId?: string,
   ) {
-    return CourseService.getStudentAnalytics({ district, province, gender, year, month, role });
+    return CourseService.getStudentAnalytics({
+      district,
+      province,
+      gender,
+      year,
+      month,
+      role,
+      hospitalId,
+    });
   }
 
   @Get("/dashboard/test-score/analytics")
@@ -83,8 +101,17 @@ export class UnifiedExportController {
     @Query() year?: string,
     @Query() month?: string,
     @Query() role?: string,
+    @Query() hospitalId?: string,
   ) {
-    return CourseService.getTestScoreAnalytics({ district, province, gender, year, month, role });
+    return CourseService.getTestScoreAnalytics({
+      district,
+      province,
+      gender,
+      year,
+      month,
+      role,
+      hospitalId,
+    });
   }
 
   @Get("/dashboard/communications/analytics")
@@ -106,8 +133,17 @@ export class UnifiedExportController {
     @Query() year?: string,
     @Query() month?: string,
     @Query() role?: string,
+    @Query() hospitalId?: string,
   ) {
-    return CourseService.getCommunicationsAnalytics({ district, province, gender, year, month, role });
+    return CourseService.getCommunicationsAnalytics({
+      district,
+      province,
+      gender,
+      year,
+      month,
+      role,
+      hospitalId,
+    });
   }
 
   @Get("/dashboard/demographics/analytics")
@@ -129,8 +165,17 @@ export class UnifiedExportController {
     @Query() year?: string,
     @Query() month?: string,
     @Query() role?: string,
+    @Query() hospitalId?: string,
   ) {
-    return CourseService.getDemographicsAnalytics({ district, province, gender, year, month, role });
+    return CourseService.getDemographicsAnalytics({
+      district,
+      province,
+      gender,
+      year,
+      month,
+      role,
+      hospitalId,
+    });
   }
 
   @Get("/dashboard/chw-stats")
@@ -152,8 +197,17 @@ export class UnifiedExportController {
     @Query() year?: string,
     @Query() month?: string,
     @Query() role?: string,
+    @Query() hospitalId?: string,
   ) {
-    return CourseService.getCHWDashboardStats({ district, province, gender, year, month, role });
+    return CourseService.getCHWDashboardStats({
+      district,
+      province,
+      gender,
+      year,
+      month,
+      role,
+      hospitalId,
+    });
   }
 
   @Get("/dashboard/course-duration")
@@ -175,8 +229,17 @@ export class UnifiedExportController {
     @Query() year?: string,
     @Query() month?: string,
     @Query() role?: string,
+    @Query() hospitalId?: string,
   ) {
-    return CourseService.getCourseDurationStats({ district, province, gender, year, month, role });
+    return CourseService.getCourseDurationStats({
+      district,
+      province,
+      gender,
+      year,
+      month,
+      role,
+      hospitalId,
+    });
   }
 
   @Get("/dashboard/recent-activity")
@@ -198,8 +261,17 @@ export class UnifiedExportController {
     @Query() year?: string,
     @Query() month?: string,
     @Query() role?: string,
+    @Query() hospitalId?: string,
   ) {
-    return CourseService.getRecentActivityFeed({ district, province, gender, year, month, role });
+    return CourseService.getRecentActivityFeed({
+      district,
+      province,
+      gender,
+      year,
+      month,
+      role,
+      hospitalId,
+    });
   }
 
   @Get("/reviews")

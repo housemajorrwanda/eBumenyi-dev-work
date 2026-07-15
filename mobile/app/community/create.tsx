@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
 import {
   SafeAreaView,
   useSafeAreaInsets,
@@ -239,7 +240,7 @@ export default function CreateCommunityScreen() {
         <View style={styles.selectionSection}>
           {isLoading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#4D81D2" />
+              <LoadingSpinner />
             </View>
           ) : isError ? (
             <Text style={styles.errorText}>kuzana abanyamuryango byanze</Text>

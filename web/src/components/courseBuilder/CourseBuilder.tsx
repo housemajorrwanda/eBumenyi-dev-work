@@ -17,6 +17,7 @@ import {
   AlertCircle,
   Pencil,
   ArrowLeft,
+  Bell,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import SlideUpload from "@/components/courseBuilder/SlideUpload";
@@ -136,11 +137,18 @@ type ViewMode = "slides" | "midTest" | "questionBank" | "tests";
 interface CourseBuilderProps {
   courseData: CourseBuilderData;
   onAutoSave: (data: CourseBuilderData) => Promise<CourseBuilderData | void>;
-  onPublish: (data: CourseBuilderData) => Promise<void>;
+  onPublish: (data: CourseBuilderData) => Promise<CourseBuilderData | void>;
+  onNotifyUsers: (courseId: string) => Promise<CourseBuilderData | void>;
   onBack: () => void;
 }
 
-export default function CourseBuilder({ courseData, onAutoSave, onPublish, onBack }: CourseBuilderProps) {
+export default function CourseBuilder({
+  courseData,
+  onAutoSave,
+  onPublish,
+  onNotifyUsers,
+  onBack,
+}: CourseBuilderProps) {
   const defaultSections =
     courseData.sections.length > 0
       ? courseData.sections
@@ -175,6 +183,11 @@ export default function CourseBuilder({ courseData, onAutoSave, onPublish, onBac
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(true);
   const [viewMode, setViewMode] = useState<ViewMode>("slides");
   const [isPublishing, setIsPublishing] = useState(false);
+  const [isNotifying, setIsNotifying] = useState(false);
+  const [isPublished, setIsPublished] = useState(courseData.isPublished);
+  const [pendingNotificationType, setPendingNotificationType] = useState<
+    CourseBuilderData["pendingNotificationType"]
+  >(courseData.pendingNotificationType ?? null);
   const [autoSaveStatus, setAutoSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [confirmDeleteSectionId, setConfirmDeleteSectionId] = useState<string>("");
@@ -211,6 +224,21 @@ export default function CourseBuilder({ courseData, onAutoSave, onPublish, onBac
   const skipNextAutoSave = useRef(false);
   useEffect(() => { onAutoSaveRef.current = onAutoSave; }, [onAutoSave]);
   useEffect(() => { courseDataRef.current = courseData; }, [courseData]);
+  useEffect(() => {
+    setIsPublished(courseData.isPublished);
+    setPendingNotificationType(courseData.pendingNotificationType ?? null);
+  }, [courseData.isPublished, courseData.pendingNotificationType, courseData.updatedAt]);
+
+  const applyCourseMeta = (fresh: CourseBuilderData) => {
+    setIsPublished(fresh.isPublished);
+    setPendingNotificationType(fresh.pendingNotificationType ?? null);
+  };
+
+  const showNotifyButton = isPublished && !!pendingNotificationType;
+  const notifyButtonLabel =
+    pendingNotificationType === "created"
+      ? "Notify users (new course)"
+      : "Notify users (updates)";
 
   // Debounced auto-save
   useEffect(() => {
@@ -244,6 +272,7 @@ export default function CourseBuilder({ courseData, onAutoSave, onPublish, onBac
         // Populate testIds from fresh API data and inject back into sections state
         // so the Questions panel is available immediately without waiting for remount
         if (freshData) {
+          applyCourseMeta(freshData);
           const newIds: Record<string, string> = {};
           const testIdByKey: Record<string, string> = {};
           freshData.sections.forEach((s) => {
@@ -775,9 +804,20 @@ export default function CourseBuilder({ courseData, onAutoSave, onPublish, onBac
     };
     setIsPublishing(true);
     try {
-      await onPublish(updated);
+      const freshData = await onPublish(updated);
+      if (freshData) applyCourseMeta(freshData);
     } finally {
       setIsPublishing(false);
+    }
+  };
+
+  const handleNotifyUsers = async () => {
+    setIsNotifying(true);
+    try {
+      const freshData = await onNotifyUsers(courseData.id);
+      if (freshData) applyCourseMeta(freshData);
+    } finally {
+      setIsNotifying(false);
     }
   };
 
@@ -1090,13 +1130,24 @@ export default function CourseBuilder({ courseData, onAutoSave, onPublish, onBac
                   Auto-save failed
                 </span>
               )}
+              {showNotifyButton && (
+                <button
+                  onClick={handleNotifyUsers}
+                  disabled={isNotifying || isPublishing}
+                  className="px-4 py-2 text-sm bg-amber-500 text-white font-semibold rounded-lg hover:bg-amber-600 transition flex items-center gap-2 disabled:opacity-60"
+                  title="Send push notification to CHWs, testers, and CHOs"
+                >
+                  <Bell className="w-4 h-4" />
+                  {isNotifying ? "Sending..." : notifyButtonLabel}
+                </button>
+              )}
               <button
                 onClick={handlePublish}
                 disabled={isPublishing}
                 className="px-4 py-2 text-sm bg-primary text-white font-semibold rounded-lg hover:bg-primary/90 transition flex items-center gap-2 disabled:opacity-60"
               >
                 <Globe className="w-4 h-4" />
-                {isPublishing ? "Publishing..." : "Publish"}
+                {isPublishing ? "Publishing..." : isPublished ? "Republish" : "Publish"}
               </button>
             </div>
           </div>

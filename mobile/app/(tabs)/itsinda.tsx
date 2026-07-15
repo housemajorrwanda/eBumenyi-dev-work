@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
 import {
   Users,
   Search,
@@ -134,8 +135,16 @@ export default function ItsindaScreen() {
   });
 
   const { mutate: updateGroup, isPending: isUpdating } = useMutation({
-    mutationFn: () =>
-      choUpdateMyGroup({ name: editName.trim() || undefined, sector: editSector.trim() || undefined }),
+    mutationFn: () => {
+      const sectors = editSector
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+      return choUpdateMyGroup({
+        name: editName.trim() || undefined,
+        sectors: sectors.length > 0 ? sectors : undefined,
+      });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cho-group-mine'] });
       Toast.show({ type: 'success', text1: 'Itsinda ryavuguruwe' });
@@ -151,7 +160,7 @@ export default function ItsindaScreen() {
 
   const openEdit = () => {
     setEditName(group?.name ?? '');
-    setEditSector(group?.sector ?? '');
+    setEditSector((group?.sectors ?? []).join(', '));
     setIsEditing(true);
   };
 
@@ -194,9 +203,7 @@ export default function ItsindaScreen() {
   if (isLoading) {
     return (
       <SafeAreaView style={[styles.flex, { backgroundColor: bg }]} edges={['top']}>
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color={themeColors.primary} />
-        </View>
+        <LoadingSpinner />
       </SafeAreaView>
     );
   }
@@ -225,12 +232,12 @@ export default function ItsindaScreen() {
           <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <View style={{ flex: 1 }}>
               <Text style={styles.groupName} numberOfLines={1}>{group.name}</Text>
-              {group.sector ? (
+              {(group.sectors?.length ?? 0) > 0 && (
                 <View style={styles.sectorRow}>
                   <MapPin size={12} color="rgba(255,255,255,0.8)" />
-                  <Text style={styles.sectorText}>{group.sector}</Text>
+                  <Text style={styles.sectorText}>{group.sectors!.join(', ')}</Text>
                 </View>
-              ) : null}
+              )}
             </View>
             <TouchableOpacity
               style={styles.headerIconBtn}
@@ -382,11 +389,7 @@ export default function ItsindaScreen() {
       )}
 
       {/* Empty state */}
-      {membersLoading && (
-        <View style={styles.centeredInList}>
-          <ActivityIndicator size="small" color={themeColors.primary} />
-        </View>
-      )}
+      {membersLoading && <LoadingSpinner variant="inline" message="" />}
     </View>
   );
 

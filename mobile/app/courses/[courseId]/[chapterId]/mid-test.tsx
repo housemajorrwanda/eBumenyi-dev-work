@@ -1,83 +1,73 @@
-import React, { useEffect, useState } from 'react';
+import React, { useMemo } from 'react';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useQueryClient } from '@tanstack/react-query';
 import Questionnaire from '@/components/Questionnaire';
-import { getCourseById, getMidTestById, getStudentCourseProgressByCourseId } from '@/services/course.api';
-import { ICourse, IChapter, ITest } from '@/types';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import StorageService from '@/services/storage.service';
+import {
+  COURSE_WORKSPACE_QUERY_KEY,
+  fetchCourseWorkspace,
+  normalizeCourseId,
+  useCourseWorkspace,
+} from '@/hooks/useCourseWorkspace';
+import { findChapterInCourse, midTestAsITest } from '@/utils/courseWorkspace';
 
 export default function MidTestScreen() {
-  const { courseId, chapterId, nextPage } = useLocalSearchParams<{ courseId: string; chapterId: string; nextPage?: string }>();
+  const { courseId, chapterId, nextPage } = useLocalSearchParams<{
+    courseId: string;
+    chapterId: string;
+    nextPage?: string;
+  }>();
+  const courseIdStr = normalizeCourseId(courseId);
+  const chapterIdStr = normalizeCourseId(chapterId);
   const router = useRouter();
-  const [course, setCourse] = useState<ICourse | null>(null);
-  const [chapter, setChapter] = useState<IChapter | null>(null);
-  const [midTest, setMidTest] = useState<ITest | null>(null);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { data: workspace, isLoading } = useCourseWorkspace(courseIdStr);
+  const course = workspace?.course ?? null;
+  const chapter = useMemo(
+    () => (course && chapterIdStr ? findChapterInCourse(course, chapterIdStr) : null),
+    [course, chapterIdStr],
+  );
+  const midTest = useMemo(
+    () => (chapter?.midTest && course ? midTestAsITest(chapter.midTest, course) : null),
+    [chapter, course],
+  );
 
-  useEffect(() => {
-    loadCourse();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const loadCourse = async () => {
+  const handleTestComplete = async () => {
     try {
-      if (courseId) {
-        const response = await getCourseById(courseId as string);
-        const fetchedCourse = response.data;
-        setCourse(fetchedCourse);
-        
-        const foundChapter = fetchedCourse.sections.flatMap((s: any) => s.chapters).find((c: any) => c.id === (chapterId ?? '')) ?? null;
-        setChapter(foundChapter);
-        
-        // If chapter has midTest, fetch it using getMidTestById
-        if (foundChapter && foundChapter.midTest && foundChapter.midTest.id) {
-          const midTestResponse = await getMidTestById(foundChapter.midTest.id);
-          setMidTest(midTestResponse.data);
-        }
-      }
-    } catch (error) {
-      console.log('Error loading course or midtest:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleTestComplete = async (testAnswers: Record<string, string[]>) => {
-    try {
-      // Sync latest chapter progress from server to local cache so chapters.tsx reflects
-      // mid-test completion immediately when the screen regains focus
-      if (courseId) {
+      if (courseIdStr) {
         try {
-          const response = await getStudentCourseProgressByCourseId(courseId);
-          const completed = (response.data?.chapterProgress ?? [])
-            .filter((ch: any) => ch.isCompleted)
-            .map((ch: any) => ch.chapterId);
+          const latest = await fetchCourseWorkspace(queryClient, courseIdStr, { force: true });
+          const completed = (latest.progress?.chapterProgress ?? [])
+            .filter((ch) => ch.isCompleted)
+            .map((ch) => ch.chapterId);
           for (const id of completed) {
             await StorageService.markChapterCompleted(id);
           }
+          queryClient.setQueryData([COURSE_WORKSPACE_QUERY_KEY, courseIdStr], latest);
         } catch (syncErr) {
           console.log('Mid-test progress sync error:', syncErr);
         }
       }
 
       const np = nextPage ? Number(nextPage) : undefined;
-      if (np && !Number.isNaN(np) && chapterId) {
-        router.push(`/courses/${courseId}/${chapterId}/course-content?page=${np}`);
+      if (np && !Number.isNaN(np) && chapterIdStr) {
+        router.push(`/courses/${courseIdStr}/${chapterIdStr}/course-content?page=${np}`);
       } else {
-        router.push(`/courses/${courseId}/chapters`);
+        router.push(`/courses/${courseIdStr}/chapters`);
       }
     } catch (error) {
       console.log('Error updating progress', error);
-      router.push(`/courses/${courseId}/chapters`);
+      router.push(`/courses/${courseIdStr}/chapters`);
     }
   };
 
-  if (loading) return <LoadingSpinner />;
+  if (isLoading) return <LoadingSpinner />;
   if (!course || !chapter || !midTest) return null;
 
   return (
     <Questionnaire
-      test={midTest ? [midTest] : []}
+      test={[midTest]}
       currentPage="midtest"
       firstHeaderSubtitle="Igeragezwa cyo hagati"
       lastHeaderSubtitle="Ikizamini cyo hagati"

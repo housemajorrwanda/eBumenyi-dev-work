@@ -9,6 +9,7 @@ import {
   TextInput,
   ActivityIndicator,
 } from 'react-native';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -152,9 +153,7 @@ export default function InviteScreen() {
         </View>
 
         {isLoading ? (
-          <View style={styles.centered}>
-            <ActivityIndicator size="large" color={themeColors.primary} />
-          </View>
+          <LoadingSpinner />
         ) : (
           <FlatList
             data={students}

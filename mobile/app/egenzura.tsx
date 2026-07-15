@@ -1,10 +1,10 @@
 import React from 'react';
 import {
   View,
-  ActivityIndicator,
   TouchableOpacity,
   Text,
 } from 'react-native';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
@@ -147,7 +147,7 @@ export default function EGenzuraScreen() {
             backgroundColor: 'rgba(255,255,255,0.35)',
           }}
         >
-          <ActivityIndicator size="large" color="#3363AD" />
+          <LoadingSpinner variant="inline" message="" />
         </View>
       )}
 

@@ -1,9 +1,12 @@
-import React, { useEffect } from 'react';
-import { View, TouchableOpacity, ActivityIndicator, Alert, Text } from 'react-native';
+import React from 'react';
+import { View, TouchableOpacity, Alert, Text } from 'react-native';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { WebView } from 'react-native-webview';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { isValidMeetingUrl } from '@/utils/deepLinking';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { extractMeetingId } from '@/utils/deepLinking';
+import { MEETING_BASE_URL } from '@/config/constants';
 
 export default function MeetingScreen() {
   const router = useRouter();
@@ -11,39 +14,83 @@ export default function MeetingScreen() {
   const insets = useSafeAreaInsets();
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  const [authInjection, setAuthInjection] = React.useState<string>('true;');
 
-  // Extract meeting URL from params
+  // Load token + user from AsyncStorage and build the JS to inject into the WebView
+  // so chw-meeting's AuthContext finds the session and skips the guest name form.
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const [token, userData] = await Promise.all([
+          AsyncStorage.getItem('accessToken'),
+          AsyncStorage.getItem('userData'),
+        ]);
+        if (token && userData) {
+          const user = JSON.parse(userData);
+          const authUser = JSON.stringify({
+            id: user.id,
+            email: user.email,
+            name: user.fullNames,
+            role: user.userRoles?.[0]?.name ?? 'USER',
+            avatar: user.photo ?? undefined,
+          });
+          const escapedToken = JSON.stringify(token);
+          const escapedUser = JSON.stringify(authUser);
+          setAuthInjection(`
+            try {
+              // Auth — localStorage read by AuthContext, cookie read by tokenProvider server action
+              localStorage.setItem('accessToken', ${escapedToken});
+              localStorage.setItem('auth_user', ${escapedUser});
+              var maxAge = 60 * 60 * 24;
+              document.cookie = 'accessToken=' + ${escapedToken} + '; path=/; max-age=' + maxAge + '; SameSite=Lax';
+
+              // navigator.mediaDevices is only available in secure contexts (HTTPS/localhost).
+              // On HTTP (local dev over IP), shim it so Stream SDK doesn't crash before
+              // showing a user-friendly error message.
+              if (!navigator.mediaDevices) {
+                try {
+                  Object.defineProperty(navigator, 'mediaDevices', {
+                    value: {
+                      addEventListener: function() {},
+                      removeEventListener: function() {},
+                      dispatchEvent: function() { return false; },
+                      getUserMedia: function() { return Promise.reject(new DOMException('NotSupportedError')); },
+                      enumerateDevices: function() { return Promise.resolve([]); },
+                      getSupportedConstraints: function() { return {}; },
+                      ondevicechange: null
+                    },
+                    configurable: true,
+                    writable: true
+                  });
+                } catch(shimErr) {}
+              }
+            } catch(e) {}
+            true;
+          `);
+        }
+      } catch (_) {}
+    })();
+  }, []);
+
+  // Always rebuild meeting URL from the meeting ID using the current env's base URL.
+  // This normalizes localhost / old IPs / production domains stored in the DB.
   const meetingUrl = React.useMemo(() => {
     const meetingId = typeof params.meetingId === 'string' ? params.meetingId : null;
     const fullUrl = typeof params.fullUrl === 'string' ? params.fullUrl : null;
 
-    if (fullUrl && isValidMeetingUrl(fullUrl)) {
-      return fullUrl;
+    // Prefer explicit meetingId param (set by calendar/[id].tsx router.push)
+    if (meetingId) {
+      return `${MEETING_BASE_URL}/meeting/${meetingId}`;
     }
 
-    if (meetingId) {
-      // Construct the full meeting URL
-      return `https://meeting.ebumenyi.online/meeting/${meetingId}`;
+    // Fallback: extract ID from any stored URL regardless of host
+    if (fullUrl) {
+      const id = extractMeetingId(fullUrl);
+      if (id) return `${MEETING_BASE_URL}/meeting/${id}`;
     }
 
     return null;
   }, [params.meetingId, params.fullUrl]);
-
-  // Validate meeting URL format
-  const isValidMeetingUrl_check = React.useMemo(() => {
-    if (!meetingUrl) return false;
-    return isValidMeetingUrl(meetingUrl);
-  }, [meetingUrl]);
-
-  // Handle when invalid URL is detected
-  useEffect(() => {
-    if ((!meetingUrl || !isValidMeetingUrl_check) && meetingUrl) {
-      setTimeout(() => {
-        handleCloseMeeting();
-      }, 0);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isValidMeetingUrl_check, meetingUrl]);
 
   const handleLoadStart = () => {
     setIsLoading(true);
@@ -77,7 +124,7 @@ export default function MeetingScreen() {
     );
   };
 
-  if (!meetingUrl || !isValidMeetingUrl_check) {
+  if (!meetingUrl) {
     return null;
   }
 
@@ -101,7 +148,7 @@ export default function MeetingScreen() {
 
       {/* WebView Container */}
     <View style={{ flex: 1, paddingBottom: insets.bottom }}>
-        {isValidMeetingUrl_check && meetingUrl && (
+        {meetingUrl && (
           <WebView
             source={{ uri: meetingUrl }}
             style={{ flex: 1 }}
@@ -109,6 +156,7 @@ export default function MeetingScreen() {
             onLoadEnd={handleLoadEnd}
             onError={handleError}
             startInLoadingState={true}
+            injectedJavaScriptBeforeContentLoaded={authInjection}
             renderLoading={() => (
               <View
                 style={{
@@ -118,7 +166,7 @@ export default function MeetingScreen() {
                   backgroundColor: '#f5f5f5',
                 }}
               >
-                <ActivityIndicator size="large" color="#3363AD" />
+                <LoadingSpinner variant="inline" message="" />
               </View>
             )}
             javaScriptEnabled={true}
@@ -147,7 +195,7 @@ export default function MeetingScreen() {
             backgroundColor: 'rgba(0,0,0,0.1)',
           }}
         >
-          <ActivityIndicator size="large" color="#3363AD" />
+          <LoadingSpinner variant="inline" message="" />
         </View>
       )}
 

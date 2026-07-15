@@ -383,6 +383,25 @@ export class CertificateService {
     return { r: 0, g: 0, b: 0 };
   }
 
+  static async previewTemplate(canvasJson: Record<string, unknown>): Promise<Buffer> {
+    const mockTokenValues: Record<string, string> = {
+      "{{studentName}}":     "John Doe",
+      "{{certificateCode}}": "CHW-2026-001234",
+      "{{currentDate}}":     this.formatDateToKinyarwanda(new Date()),
+      "{{courseName}}":      "Community Health Worker Training",
+      "{{courseDetails}}":   "Advanced Community Health Worker Program",
+      "{{progress}}":        "100%",
+      "{{courseDuration}}":  "12 Weeks",
+      "{{startDate}}":       "01 Mutarama 2026",
+      "{{endDate}}":         this.formatDateToKinyarwanda(new Date()),
+      "{{studentCode}}":     "STU-2026-001",
+      "{{instructorName}}":  "Dr. Jane Smith",
+    };
+    // Use a fixed placeholder UUID so the QR code encodes a consistent preview URL
+    const mockCertId = "00000000-preview-mock-cert-000000000000";
+    return this.generateCertificateFromTemplate(canvasJson, mockTokenValues, mockCertId);
+  }
+
   private static async generateCertificateFromTemplate(
     canvasJson: Record<string, unknown>,
     tokenValues: Record<string, string>,
@@ -410,8 +429,7 @@ export class CertificateService {
         (tokenKey ? tokenValues[this.TOKEN_KEY_MAP[tokenKey] ?? ""]            : undefined) ??
         (objText  ? tokenValues[this.TEXT_LABEL_MAP[objText] ?? ""]            : undefined);
       if (value !== undefined) {
-        obj.text      = value;
-        obj.fontStyle = "normal";
+        obj.text = value;
       }
     }
 
@@ -469,13 +487,30 @@ export class CertificateService {
 
     for (const obj of json.objects ?? []) {
       const type    = ((obj.type    as string) ?? "").toLowerCase();
-      // Scale canvas pixel coordinates → PDF points
-      const left    = ((obj.left    as number) ?? 0) * xRatio;
-      const top     = ((obj.top     as number) ?? 0) * yRatio;
       const scaleX  = (obj.scaleX  as number) ?? 1;
       const scaleY  = (obj.scaleY  as number) ?? 1;
       const opacity = (obj.opacity as number) ?? 1;
       const angle   = (obj.angle   as number) ?? 0;
+      const originX = (obj.originX as string) ?? "left";
+      const originY = (obj.originY as string) ?? "top";
+
+      const rawLeft = (obj.left   as number) ?? 0;
+      const rawTop  = (obj.top    as number) ?? 0;
+      const rawW    = (obj.width  as number) ?? 0;
+      const rawH    = (obj.height as number) ?? 0;
+
+      // Display dimensions in canvas units (before PDF scaling)
+      const displayW = rawW * scaleX;
+      const displayH = rawH * scaleY;
+
+      // Convert stored position → PDF left/top edge, accounting for Fabric's
+      // default originX/originY='center' (left/top store the center, not the corner).
+      const left = originX === "center"
+        ? (rawLeft - displayW / 2) * xRatio
+        : rawLeft * xRatio;
+      const top  = originY === "center"
+        ? (rawTop - displayH / 2) * yRatio
+        : rawTop * yRatio;
 
       // Skip rotated objects — coordinate maths become complex
       if (Math.abs(angle) > 1) continue;
@@ -484,8 +519,8 @@ export class CertificateService {
       const objTokenKey = obj.tokenKey as string | undefined;
       if (objTokenKey === "qr") {
         const verifyUrl = `${process.env.WEB_APP_URL ?? "http://localhost:4173"}/verify/${certId}`;
-        const w = ((obj.width  as number) ?? 120) * scaleX * xRatio;
-        const h = ((obj.height as number) ?? 120) * scaleY * yRatio;
+        const w = displayW > 0 ? displayW * xRatio : 90;
+        const h = displayH > 0 ? displayH * yRatio : 90;
         try {
           const qrPng = await QRCode.toBuffer(verifyUrl, {
             type: "png",
@@ -503,8 +538,8 @@ export class CertificateService {
       }
 
       if (type === "rect") {
-        const w   = ((obj.width  as number) ?? 100) * scaleX * xRatio;
-        const h   = ((obj.height as number) ?? 100) * scaleY * yRatio;
+        const w = displayW * xRatio;
+        const h = displayH * yRatio;
         const { r, g, b } = this.parseColor(obj.fill);
         page.drawRectangle({
           x: left, y: H - top - h,
@@ -536,21 +571,28 @@ export class CertificateService {
         if (!text) continue;
 
         const font = await this.getPdfFont(pdfDoc, fontFamily, fontWeight, fontStyle);
-        const objW = ((obj.width as number) ?? 0) * scaleX * xRatio;
+        const objW = displayW * xRatio;
 
-        // Center point of the stored bounding box
-        const boxCenterX = left + objW / 2;
+        // When originX='center', rawLeft IS the center x in canvas units → PDF center x
+        const boxCenterX = originX === "center"
+          ? rawLeft * xRatio
+          : left + objW / 2;
 
         let tw = font.widthOfTextAtSize(text, fontSize);
         let finalFontSize = fontSize;
 
-        // Scale font down if text overflows page bounds
+        // Scale font down only if text overflows its bounding box
         const pageMargin = 8;
         if (textAlign === "center") {
           const half = tw / 2;
           const maxHalf = Math.min(boxCenterX - pageMargin, W - boxCenterX - pageMargin);
           if (half > maxHalf && maxHalf > 0) {
             finalFontSize = fontSize * (maxHalf / half) * 0.95;
+            tw = font.widthOfTextAtSize(text, finalFontSize);
+          }
+        } else if (objW > 0) {
+          if (tw > objW) {
+            finalFontSize = fontSize * (objW / tw) * 0.95;
             tw = font.widthOfTextAtSize(text, finalFontSize);
           }
         } else {
@@ -570,9 +612,10 @@ export class CertificateService {
         } else {
           drawX = left;
         }
-        drawX = Math.max(pageMargin, drawX);
+        drawX = Math.max(pageMargin, Math.min(drawX, W - tw - pageMargin));
 
-        const drawY = H - top - finalFontSize * 0.85;
+        // top is the TOP edge of the bounding box (origin-corrected); baseline sits ~0.72em below it
+        const drawY = H - top - finalFontSize * 0.72;
 
         page.drawText(text, {
           x: drawX, y: drawY,
@@ -584,8 +627,8 @@ export class CertificateService {
         const src = (obj.src as string) ?? "";
         if (!src) continue;
         try {
-          const w = ((obj.width  as number) ?? 100) * scaleX * xRatio;
-          const h = ((obj.height as number) ?? 100) * scaleY * yRatio;
+          const w = displayW * xRatio;
+          const h = displayH * yRatio;
           let imgBytes: Buffer;
           if (src.startsWith("data:")) {
             const base64 = src.split(",")[1];
@@ -637,6 +680,118 @@ export class CertificateService {
     }
 
     return Buffer.from(await pdfDoc.save());
+  }
+
+  public static async prepareCertificate(studentId: string, courseId: string) {
+    const student = await prisma.student.findUnique({
+      where: { id: studentId },
+      include: { user: { select: { id: true, fullNames: true } } },
+    });
+    if (!student) throw new AppError("Student not found", 404);
+
+    const course = await prisma.course.findUnique({
+      where: { id: courseId },
+      select: {
+        title: true,
+        description: true,
+        certificateTemplate: { select: { canvasJson: true } },
+        staff: { select: { user: { select: { fullNames: true } } } },
+      },
+    });
+    if (!course) throw new AppError("Course not found", 404);
+
+    const existing = await prisma.certificate.findUnique({
+      where: { studentId_courseId: { studentId, courseId } },
+    });
+    if (existing) throw new AppError("Certificate already exists for this student and course", 400);
+
+    const completionDate = await this.getFirstFinalExamPassDate(studentId, courseId);
+
+    const courseProgress = await prisma.courseProgress.findFirst({
+      where: { studentId, courseId },
+      select: { createdAt: true, progress: true },
+    });
+
+    const certId = uuidv4();
+    const certYear = new Date().getFullYear();
+    const certShort = certId.replace(/-/g, "").substring(0, 6).toUpperCase();
+    const certDisplayCode = `CHW-${certYear}-${certShort}`;
+
+    const tokenValues: Record<string, string> = {
+      "{{studentName}}":     student.user.fullNames,
+      "{{certificateCode}}": certDisplayCode,
+      "{{currentDate}}":     this.formatDateToKinyarwanda(new Date()),
+      "{{courseName}}":      course.title,
+      "{{courseDetails}}":   course.description ?? "",
+      "{{progress}}":        `${Math.round(courseProgress?.progress ?? 100)}%`,
+      "{{startDate}}":       courseProgress ? this.formatDateToKinyarwanda(courseProgress.createdAt) : "",
+      "{{endDate}}":         this.formatDateToKinyarwanda(completionDate),
+      "{{studentCode}}":     studentId.slice(0, 8).toUpperCase(),
+      "{{instructorName}}":  course.staff?.user?.fullNames ?? "",
+      "{{courseDuration}}":  "",
+    };
+
+    return {
+      statusCode: 200,
+      message: "Certificate data prepared",
+      data: {
+        certId,
+        tokenValues,
+        canvasJson: course.certificateTemplate?.canvasJson
+          ? JSON.stringify(course.certificateTemplate.canvasJson)
+          : null,
+        studentUserId: student.user.id,
+      },
+    };
+  }
+
+  public static async storeFrontendCertificate(
+    certId: string,
+    studentId: string,
+    courseId: string,
+    base64Pdf: string,
+    io?: any,
+  ) {
+    const existing = await prisma.certificate.findUnique({ where: { id: certId } });
+    if (existing) return { statusCode: 200, message: "Certificate already stored", data: existing };
+
+    const student = await prisma.student.findUnique({
+      where: { id: studentId },
+      include: { user: { select: { id: true } } },
+    });
+    if (!student) throw new AppError("Student not found", 404);
+
+    const course = await prisma.course.findUnique({
+      where: { id: courseId },
+      select: { title: true },
+    });
+    if (!course) throw new AppError("Course not found", 404);
+
+    const base64Data = base64Pdf.includes(",") ? base64Pdf.split(",")[1] : base64Pdf;
+    const pdfBuffer = Buffer.from(base64Data, "base64");
+
+    const fileName = `certificate_${studentId}_${courseId}_${Date.now()}`;
+    const pdfUrl = await this.uploadPdfToCloudinary(pdfBuffer, fileName);
+
+    const certificate = await prisma.certificate.create({
+      data: { id: certId, studentId, courseId, pdf: pdfUrl },
+    });
+
+    if (io && student.user.id) {
+      try {
+        await NotificationHelper.sendToUser(
+          io, student.user.id,
+          `Icyemezo cyawe cyatanzwe: "${course.title}"`,
+          `Icyemezo cyawe kirateguwe. Basura ahabigenewe urebe PDF yawe.`,
+          "success", `/certificate`, "certificate", certificate.id,
+          { courseTitle: course.title, courseId }, 0,
+        );
+      } catch (notifErr) {
+        console.warn("[CertificateService] Certificate notification failed:", notifErr);
+      }
+    }
+
+    return { message: "Certificate stored successfully", statusCode: 201, data: certificate };
   }
 
   public static async generateCertificate(studentId: string, courseId: string, io?: any) {
@@ -763,8 +918,35 @@ export class CertificateService {
     searchq?: string,
     limit?: number,
     currentPage?: number,
+    templateId?: string,
+    courseId?: string,
+    dateFrom?: string,
+    dateTo?: string,
   ) {
     const where: Prisma.CertificateWhereInput = {};
+
+    if (templateId) {
+      const linkedCourses = await prisma.course.findMany({
+        where: { certificateTemplateId: templateId },
+        select: { id: true },
+      });
+      where.courseId = { in: linkedCourses.map((c) => c.id) };
+    }
+
+    if (courseId) {
+      where.courseId = courseId;
+    }
+
+    if (dateFrom || dateTo) {
+      const createdAtFilter: Prisma.DateTimeFilter = {};
+      if (dateFrom) {
+        createdAtFilter.gte = new Date(`${dateFrom}T00:00:00.000Z`);
+      }
+      if (dateTo) {
+        createdAtFilter.lte = new Date(`${dateTo}T23:59:59.999Z`);
+      }
+      where.createdAt = createdAtFilter;
+    }
 
     if (searchq) {
       where.OR = [
@@ -810,6 +992,9 @@ export class CertificateService {
             id: true,
             title: true,
             coverIcon: true,
+            certificateTemplate: {
+              select: { id: true, name: true },
+            },
           },
         },
       },
@@ -1039,59 +1224,80 @@ export class CertificateService {
   }
 
   public static async regenerateCertificate(certificateId: string) {
-    // Step 1: Find existing certificate
     const existingCertificate = await prisma.certificate.findUnique({
       where: { id: certificateId },
     });
-
-    if (!existingCertificate) {
-      throw new AppError("Certificate not found", 404);
-    }
+    if (!existingCertificate) throw new AppError("Certificate not found", 404);
 
     const { studentId, courseId } = existingCertificate;
 
-    // Step 2: Fetch student and course
     const student = await prisma.student.findUnique({
       where: { id: studentId },
-      include: {
-        user: {
-          select: { fullNames: true },
-        },
-      },
+      include: { user: { select: { fullNames: true } } },
     });
+    if (!student) throw new AppError("Student not found", 404);
 
-    if (!student) {
-      throw new AppError("Student not found", 404);
-    }
-
+    // Include linked template so we use the same path as generateCertificate
     const course = await prisma.course.findUnique({
       where: { id: courseId },
-      select: { title: true },
+      select: {
+        title: true,
+        description: true,
+        certificateTemplate: { select: { canvasJson: true } },
+        staff: { select: { user: { select: { fullNames: true } } } },
+      },
     });
+    if (!course) throw new AppError("Course not found", 404);
 
-    if (!course) {
-      throw new AppError("Course not found", 404);
-    }
-
-    // Step 3: Re-fetch original completion date
     const completionDate = await this.getFirstFinalExamPassDate(studentId, courseId);
 
-    // Step 4: Generate new PDF with current template
-    const pdfBuffer = await this.generateCertificatePDF(
-      student.user.fullNames,
-      course.title,
-      this.formatDateToKinyarwanda(completionDate),
-    );
+    const courseProgress = await prisma.courseProgress.findFirst({
+      where: { studentId, courseId },
+      select: { createdAt: true, progress: true },
+    });
 
-    // Step 5: Delete old Cloudinary file
+    // Keep the same certificate ID so the QR code URL is unchanged
+    const certId = certificateId;
+    let pdfBuffer: Buffer;
+
+    if (course.certificateTemplate?.canvasJson) {
+      const certYear        = new Date(existingCertificate.createdAt).getFullYear();
+      const certShort       = certId.replace(/-/g, "").substring(0, 6).toUpperCase();
+      const certDisplayCode = `CHW-${certYear}-${certShort}`;
+
+      const tokenValues: Record<string, string> = {
+        "{{studentName}}":     student.user.fullNames,
+        "{{certificateCode}}": certDisplayCode,
+        "{{currentDate}}":     this.formatDateToKinyarwanda(new Date()),
+        "{{courseName}}":      course.title,
+        "{{courseDetails}}":   course.description ?? "",
+        "{{progress}}":        `${Math.round(courseProgress?.progress ?? 100)}%`,
+        "{{startDate}}":       courseProgress ? this.formatDateToKinyarwanda(courseProgress.createdAt) : "",
+        "{{endDate}}":         this.formatDateToKinyarwanda(completionDate),
+        "{{studentCode}}":     studentId.slice(0, 8).toUpperCase(),
+        "{{instructorName}}":  course.staff?.user?.fullNames ?? "",
+        "{{courseDuration}}":  "",
+      };
+      pdfBuffer = await this.generateCertificateFromTemplate(
+        course.certificateTemplate.canvasJson as Record<string, unknown>,
+        tokenValues,
+        certId,
+      );
+    } else {
+      pdfBuffer = await this.generateCertificatePDF(
+        student.user.fullNames,
+        course.title,
+        this.formatDateToKinyarwanda(completionDate),
+      );
+    }
+
+    // Delete old Cloudinary file then upload the new one
     const oldPublicId = this.extractCloudinaryPublicId(existingCertificate.pdf);
     await cloudinary.uploader.destroy(oldPublicId, { resource_type: "raw" });
 
-    // Step 6: Upload new PDF
-    const fileName = `certificate_${studentId}_${courseId}_${Date.now()}`;
-    const pdfUrl = await this.uploadPdfToCloudinary(pdfBuffer, fileName);
+    const fileName    = `certificate_${studentId}_${courseId}_${Date.now()}`;
+    const pdfUrl      = await this.uploadPdfToCloudinary(pdfBuffer, fileName);
 
-    // Step 7: Update DB record
     const certificate = await prisma.certificate.update({
       where: { id: certificateId },
       data: { pdf: pdfUrl },

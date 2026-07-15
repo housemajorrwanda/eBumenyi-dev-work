@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import api from "@/services/api";
 import {
@@ -7,6 +7,11 @@ import {
   IStudentAnalytics,
   IDashboardFilters,
 } from "@/types";
+import { DEFAULT_DASHBOARD_FILTERS } from "@/utils/constants/dashboardFilters";
+import { dashboardFilterKey, withDashboardFilterQuery } from "@/utils/dashboardFilterQuery";
+import { dashboardKeys } from "@/utils/constants/queryKeys";
+
+const DASHBOARD_CACHE_MS = 1000 * 60 * 30;
 
 interface DashboardData {
   dashboardStats: IDashboardStats | null;
@@ -17,6 +22,12 @@ interface DashboardData {
   refetch: () => void;
 }
 
+interface DashboardStatsResult {
+  dashboardStats: IDashboardStats | null;
+  courseAnalytics: ICourseAnalytics | null;
+  studentAnalytics: IStudentAnalytics | null;
+}
+
 export const useDashboardStats = ({
   enabled,
   filters,
@@ -25,60 +36,54 @@ export const useDashboardStats = ({
   filters?: IDashboardFilters;
 }): DashboardData => {
   const { user } = useAuth();
-  const [dashboardStats, setDashboardStats] = useState<IDashboardStats | null>(null);
-  const [courseAnalytics, setCourseAnalytics] = useState<ICourseAnalytics | null>(null);
-  const [studentAnalytics, setStudentAnalytics] = useState<IStudentAnalytics | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   const userRoles = user?.roles
-    ? Array.isArray(user.roles) ? user.roles : [user.roles]
+    ? Array.isArray(user.roles)
+      ? user.roles
+      : [user.roles]
     : [];
 
-  const isContentManager =
-    userRoles.some(r => ["ADMIN", "TRAINER", "STAFF"].includes(r));
+  const isContentManager = userRoles.some((r) =>
+    ["ADMIN", "TRAINER", "STAFF"].includes(r),
+  );
 
-  const fetchAll = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
+  const activeFilters = filters ?? DEFAULT_DASHBOARD_FILTERS;
 
-    const qsParams = new URLSearchParams();
-    if (filters?.district) qsParams.append("district", filters.district);
-    if (filters?.province) qsParams.append("province", filters.province);
-    if (filters?.gender)   qsParams.append("gender",   filters.gender);
-    if (filters?.role)     qsParams.append("role",     filters.role);
-    if (filters?.year)     qsParams.append("year",     filters.year);
-    if (filters?.month)    qsParams.append("month",    filters.month);
-    const qs = qsParams.toString() ? `?${qsParams.toString()}` : "";
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: dashboardKeys.stats(dashboardFilterKey(activeFilters)),
+    queryFn: async (): Promise<DashboardStatsResult> => {
+      const statsPath = withDashboardFilterQuery("/courses/dashboard/statistics", activeFilters);
+      const coursePath = withDashboardFilterQuery("/export/dashboard/course/analytics", activeFilters);
+      const studentPath = withDashboardFilterQuery("/export/dashboard/student/analytics", activeFilters);
 
-    try {
       const [dashRes, courseRes, studentRes] = await Promise.allSettled([
-        api.get(`/courses/dashboard/statistics${qs}`),
-        isContentManager ? api.get(`/export/dashboard/course/analytics${qs}`) : Promise.resolve(null),
-        isContentManager ? api.get(`/export/dashboard/student/analytics${qs}`) : Promise.resolve(null),
+        api.get(statsPath),
+        isContentManager ? api.get(coursePath) : Promise.resolve(null),
+        isContentManager ? api.get(studentPath) : Promise.resolve(null),
       ]);
 
-      if (dashRes.status === "fulfilled" && dashRes.value?.data?.data) {
-        setDashboardStats(dashRes.value.data.data);
-      }
+      return {
+        dashboardStats:
+          dashRes.status === "fulfilled" ? dashRes.value?.data?.data ?? null : null,
+        courseAnalytics:
+          courseRes.status === "fulfilled" ? courseRes.value?.data?.data ?? null : null,
+        studentAnalytics:
+          studentRes.status === "fulfilled" ? studentRes.value?.data?.data ?? null : null,
+      };
+    },
+    enabled,
+    staleTime: DASHBOARD_CACHE_MS,
+    gcTime: DASHBOARD_CACHE_MS,
+  });
 
-      if (courseRes.status === "fulfilled" && courseRes.value?.data?.data) {
-        setCourseAnalytics(courseRes.value.data.data);
-      }
-
-      if (studentRes.status === "fulfilled" && studentRes.value?.data?.data) {
-        setStudentAnalytics(studentRes.value.data.data);
-      }
-    } catch {
-      setError("Failed to fetch data. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [isContentManager, filters?.district, filters?.province, filters?.gender, filters?.role, filters?.year, filters?.month]);
-
-  useEffect(() => {
-    if (enabled) fetchAll();
-  }, [fetchAll, enabled]);
-
-  return { dashboardStats, courseAnalytics, studentAnalytics, isLoading, error, refetch: fetchAll };
+  return {
+    dashboardStats: data?.dashboardStats ?? null,
+    courseAnalytics: data?.courseAnalytics ?? null,
+    studentAnalytics: data?.studentAnalytics ?? null,
+    isLoading,
+    error: error ? "Failed to fetch data. Please try again." : null,
+    refetch: () => {
+      void refetch();
+    },
+  };
 };

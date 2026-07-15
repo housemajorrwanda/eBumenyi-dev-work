@@ -1,16 +1,18 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, useWindowDimensions, Alert, Modal, ActivityIndicator, TouchableOpacity } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { View, Text, StyleSheet, useWindowDimensions, Alert, Modal, TouchableOpacity } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Header from '@/components/Header';
 import DocumentViewer from '@/components/DocumentViewer';
 import LastSlide from '@/components/LastSlide';
 import ChapterReviewCard from '@/components/ChapterReviewCard';
-import { ICourse, IChapter } from '@/types';
-import { getCourseById, getChapterById, createSlideProgressById, getMidTestById, getStudentCourseProgressByCourseId, addChapterreview, getMyChapterReviews } from '@/services/course.api';
+import { createSlideProgressById, addChapterreview, getMyChapterReviews } from '@/services/course.api';
+import { useCourseWorkspace, normalizeCourseId, invalidateCourseProgressQueries } from '@/hooks/useCourseWorkspace';
+import { findChapterInCourse } from '@/utils/courseWorkspace';
+import { useQueryClient } from '@tanstack/react-query';
 import Footer from '@/components/Footer';
-import PagerView from 'react-native-pager-view';
+import CoursePagerView, { CoursePagerViewRef } from '@/components/common/CoursePagerView';
 import TopToolbar from '@/components/common/TopToolbar';
 import BottomToolBar from '@/components/common/BottomToolBar';
 import * as ScreenOrientation from 'expo-screen-orientation';
@@ -37,17 +39,24 @@ interface QuestionnaireAnswer {
 
 export default function CourseContentScreen() {
   const { courseId, chapterId, slideId } = useLocalSearchParams<{ courseId: string, chapterId: string, slideId?: string }>();
+  const courseIdStr = normalizeCourseId(courseId);
+  const chapterIdStr = normalizeCourseId(chapterId);
   const router = useRouter();
+  const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
   const [currentPage, setCurrentPage] = useState<number>(0);
 
-  const [course, setCourse] = useState<ICourse | null>(null);
-  const [chapter, setChapter] = useState<IChapter | null>(null);
+  const { data: workspace, isLoading: workspaceLoading } = useCourseWorkspace(courseIdStr);
+  const course = workspace?.course ?? null;
+  const chapter = useMemo(
+    () => (course && chapterIdStr ? findChapterInCourse(course, chapterIdStr) : null),
+    [course, chapterIdStr],
+  );
   const [loading, setLoading] = useState(true);
   const [transformedData, setTransformedData] = useState<any[]>([]);
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
-  const pagerRef = useRef<PagerView>(null);
+  const pagerRef = useRef<CoursePagerViewRef>(null);
   const [hasNavigatedToSlideId, setHasNavigatedToSlideId] = useState<boolean>(false);
 
   // State to track questionnaire answers
@@ -231,59 +240,35 @@ export default function CourseContentScreen() {
   };
 
   useEffect(() => {
-    const load = async () => {
-      if (!courseId || !chapterId) return setLoading(false);
-      try {
-        const [courseResponse, chapterResponse] = await Promise.all([
-          getCourseById(courseId as string),
-          getChapterById(chapterId as string)
-        ]);
-        setCourse(courseResponse.data);
-        setChapter(chapterResponse.data);
-        
-        let midTestData = null;
-        if (chapterResponse.data?.midTest?.id) {
-          try {
-            const midTestResponse = await getMidTestById(chapterResponse.data.midTest.id);
-            midTestData = midTestResponse.data;
-          } catch (e) {
-            console.log('Failed to load mid test',e);
-          }
-        }
+    if (workspaceLoading) return;
 
-        // Transform the data
-        const transformed = transformCourseData(chapterResponse.data, midTestData);
-        setTransformedData(transformed);
-        
-      } catch (e) {
-        console.log('Failed to load course/chapter for content', e);
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
-  }, [courseId, chapterId]);
+    if (!chapter) {
+      setTransformedData([]);
+      setLoading(false);
+      return;
+    }
 
-  // Sync completed chapters + slide IDs from server on mount (same pattern as web's getCourseProgress call)
+    const midTestData = chapter.midTest ?? null;
+    setTransformedData(transformCourseData(chapter, midTestData));
+    setLoading(false);
+  }, [workspaceLoading, chapter]);
+
   useEffect(() => {
-    const syncCompletedChaptersFromServer = async () => {
-      if (!courseId) return;
-      try {
-        const response = await getStudentCourseProgressByCourseId(courseId as string);
-        const completedChapters = response.data.chapterProgress.filter(ch => ch.isCompleted);
-        for (const ch of completedChapters) {
-          await StorageService.markChapterCompleted(ch.chapterId);
-        }
-        // Populate the in-memory Set with already-completed slide IDs so we don't re-submit them
-        if (Array.isArray(response.data.completedSlideIds)) {
-          setCompletedSlideIds(new Set(response.data.completedSlideIds));
-        }
-      } catch (error) {
-        console.log('Error syncing completed chapters:', error);
+    const syncProgressFromWorkspace = async () => {
+      if (!workspace?.progress) return;
+
+      const completedChapters = workspace.progress.chapterProgress.filter((ch) => ch.isCompleted);
+      for (const ch of completedChapters) {
+        await StorageService.markChapterCompleted(ch.chapterId);
+      }
+
+      if (Array.isArray(workspace.progress.completedSlideIds)) {
+        setCompletedSlideIds(new Set(workspace.progress.completedSlideIds));
       }
     };
-    syncCompletedChaptersFromServer();
-  }, [courseId]);
+
+    syncProgressFromWorkspace();
+  }, [workspace]);
 
   // Update transformed data when answers change to include result slides
   useEffect(() => {
@@ -352,6 +337,9 @@ export default function CourseContentScreen() {
     markingRef.current = true;
     try {
       await createSlideProgressById({ slideId, isCompleted: true });
+      if (courseIdStr) {
+        invalidateCourseProgressQueries(queryClient, courseIdStr);
+      }
       setCompletedSlideIds(prev => {
         const next = new Set(prev).add(slideId);
         // Auto-mark chapter complete in local cache when all content slides are done
@@ -368,7 +356,7 @@ export default function CourseContentScreen() {
     } finally {
       markingRef.current = false;
     }
-  }, [completedSlideIds, transformedData, chapterId]);
+  }, [completedSlideIds, transformedData, chapterId, courseIdStr, queryClient]);
 
   // Navigation handlers with feedback modal blocking
   const handleNext = async () => {
@@ -806,7 +794,7 @@ export default function CourseContentScreen() {
     }
   };
 
-  if (loading) return <View style={{flex:1, justifyContent:'center', alignItems:'center'}}><Text>tegereza...</Text></View>;
+  if (loading) return <LoadingSpinner />;
   if (!chapter) return <View style={{flex:1, justifyContent:'center', alignItems:'center'}}><Text>Chapter ntabwo ibonetse</Text></View>;
   if (transformedData.length === 0) return <View style={{flex:1, justifyContent:'center', alignItems:'center'}}><Text>Nta byatangajwe</Text></View>;
 
@@ -946,7 +934,7 @@ export default function CourseContentScreen() {
       />
       <View style={styles.contentArea}>
           <View style={{ flex: 1 }}>
-            <PagerView
+            <CoursePagerView
               ref={pagerRef}
               style={{ flex: 1}}
               initialPage={currentPage}
@@ -1007,10 +995,10 @@ export default function CourseContentScreen() {
                   )}
                 </View>
               ))}
-            </PagerView>
+            </CoursePagerView>
           </View>
       </View>
-      <View style={{ position: 'relative', zIndex: 20, elevation: 20, marginBottom: !isLandscape ? insets.bottom : 0 }}>
+      <View style={{ position: 'relative', zIndex: 20, elevation: 0, marginBottom: !isLandscape ? insets.bottom : 0 }}>
         <BottomToolBar 
           currentPage={currentPage + 1}
           totalPages={transformedData.length}
@@ -1058,10 +1046,7 @@ export default function CourseContentScreen() {
       )}
       { checkingChapterReview && (
         <Modal visible={checkingChapterReview} animationType="none" transparent={false}>
-          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
-            <ActivityIndicator size="large" color="#3363AD" />
-            <Text style={{ marginTop: 12, textAlign: 'center', color: '#374151' }}>Genzura niba waratanze igitekerezo...</Text>
-          </View>
+          <LoadingSpinner message="Genzura niba waratanze igitekerezo..." />
         </Modal>
       )}
 

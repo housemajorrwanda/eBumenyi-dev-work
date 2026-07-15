@@ -2,48 +2,62 @@ import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Questionnaire from '@/components/Questionnaire';
-import { getCourseById, getFinalExamById } from '@/services/course.api';
-import { ICourse, ITest } from '@/types';
+import { getFinalExamById } from '@/services/course.api';
+import { ITest } from '@/types';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { normalizeCourseId, useCourseWorkspace } from '@/hooks/useCourseWorkspace';
 
 export default function FinalExamScreen() {
   const { courseId } = useLocalSearchParams<{ courseId: string }>();
+  const courseIdStr = normalizeCourseId(courseId);
   const router = useRouter();
-  const [course, setCourse] = useState<ICourse | null>(null);
+  const { data: workspace, isLoading: workspaceLoading } = useCourseWorkspace(courseIdStr);
+  const course = workspace?.course ?? null;
   const [finalTest, setFinalTest] = useState<ITest | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [testLoading, setTestLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
-    loadCourse();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    let cancelled = false;
 
-  const loadCourse = async () => {
-    setLoadError(null);
-    try {
-      if (courseId) {
-        const response = await getCourseById(courseId as string);
-        const fetchedCourse = response.data;
-        setCourse(fetchedCourse);
-        const examMeta = fetchedCourse.finalExam?.[0];
-        if (!examMeta?.id) {
+    const loadFinalExam = async () => {
+      setLoadError(null);
+
+      const examMeta = course?.finalExam?.[0];
+      if (!examMeta?.id) {
+        if (!cancelled) {
           setLoadError(
             'Iri somo ntabwo rifite ikizamini gisoza cyashyizweho. Subira inyuma cyangwa uvugane n’ubuyobozi.',
           );
-          return;
+          setTestLoading(false);
         }
-        const finalTestResponse = await getFinalExamById(examMeta.id);
-        setFinalTest(finalTestResponse.data);
+        return;
       }
-    } catch (error) {
-      console.log('Error loading course or final exam:', error);
-      setLoadError('Ntibyashobotse gufungura ikizamini gisoza. Ongera ugerageze.');
-    } finally {
-      setLoading(false);
-    }
-  };
 
+      try {
+        const finalTestResponse = await getFinalExamById(examMeta.id);
+        if (!cancelled) setFinalTest(finalTestResponse.data);
+      } catch (error) {
+        console.log('Error loading final exam:', error);
+        if (!cancelled) {
+          setLoadError('Ntibyashobotse gufungura ikizamini gisoza. Ongera ugerageze.');
+        }
+      } finally {
+        if (!cancelled) setTestLoading(false);
+      }
+    };
+
+    if (!workspaceLoading && course) {
+      setTestLoading(true);
+      void loadFinalExam();
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [workspaceLoading, course]);
+
+  const loading = workspaceLoading || testLoading;
   if (loading) return <LoadingSpinner />;
   if (loadError) {
     return (

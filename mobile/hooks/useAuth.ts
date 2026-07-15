@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
+import { DeviceEventEmitter, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { IUserData } from '@/types';
-import { DeviceEventEmitter } from 'react-native';
 
 export const AUTH_CHANGED_EVENT = 'AUTH_CHANGED';
 
@@ -33,14 +33,25 @@ export const useAuth = () => {
   }, []);
 
   useEffect(() => {
-    // Load user on mount
     loadUser();
 
-    // Re-load whenever login or logout happens
     const subscription = DeviceEventEmitter.addListener(AUTH_CHANGED_EVENT, loadUser);
+
+    const handleWebAuthChange = () => {
+      loadUser();
+    };
+
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.addEventListener('auth-changed', handleWebAuthChange);
+      window.addEventListener('storage', handleWebAuthChange);
+    }
 
     return () => {
       subscription.remove();
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        window.removeEventListener('auth-changed', handleWebAuthChange);
+        window.removeEventListener('storage', handleWebAuthChange);
+      }
     };
   }, [loadUser]);
 

@@ -2035,20 +2035,24 @@ export class CalendarEventService {
     }
 
     if (payload.location !== undefined) {
-      data.location = payload.location ?? null;
-      if (
-        payload.streamRoomId === undefined &&
-        payload.location &&
-        /\/meeting\//i.test(payload.location)
-      ) {
-        const match = payload.location.match(/\/meeting\/([^/?#]+)/i);
-        if (match?.[1]) {
-          data.streamRoomId = match[1];
+      // Never overwrite an existing meeting location — the link is permanent once set.
+      if (!existing.location) {
+        data.location = payload.location ?? null;
+        if (
+          payload.streamRoomId === undefined &&
+          payload.location &&
+          /\/meeting\//i.test(payload.location)
+        ) {
+          const match = payload.location.match(/\/meeting\/([^/?#]+)/i);
+          if (match?.[1]) {
+            data.streamRoomId = match[1];
+          }
         }
       }
     }
 
-    if (payload.streamRoomId !== undefined) {
+    // Never overwrite an existing streamRoomId — the short room ID is permanent once set.
+    if (payload.streamRoomId !== undefined && !existing.streamRoomId) {
       data.streamRoomId = payload.streamRoomId ?? null;
     }
 

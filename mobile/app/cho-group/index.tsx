@@ -6,8 +6,8 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
-  ActivityIndicator,
 } from 'react-native';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
@@ -42,10 +42,7 @@ export default function CHOGroupScreen() {
         </View>
 
         {isLoading ? (
-          <View style={styles.centered}>
-            <ActivityIndicator size="large" color={themeColors.primary} />
-            <Text style={[styles.loadingText, { color: textMuted }]}>Gufungura amakuru...</Text>
-          </View>
+          <LoadingSpinner message="Gufungura amakuru..." />
         ) : isError ? (
           <View style={styles.centered}>
             <Info size={48} color="#ef4444" />
@@ -73,10 +70,10 @@ export default function CHOGroupScreen() {
                 <Users size={36} color="#ffffff" />
               </View>
               <Text style={styles.groupName}>{group?.name}</Text>
-              {group?.sector && (
+              {(group?.sectors?.length ?? 0) > 0 && (
                 <View style={styles.groupMeta}>
                   <MapPin size={14} color="rgba(255,255,255,0.8)" />
-                  <Text style={styles.groupMetaText}>{group.sector}</Text>
+                  <Text style={styles.groupMetaText}>{group!.sectors!.join(', ')}</Text>
                 </View>
               )}
               {group?.description && (

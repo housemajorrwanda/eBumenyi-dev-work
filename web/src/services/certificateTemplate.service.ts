@@ -4,6 +4,7 @@ export interface CertificateTemplateSummary {
   id: string;
   name: string;
   thumbnail?: string | null;
+  issuedCount: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -58,4 +59,42 @@ export const linkTemplateToCourse = async (templateId: string, courseId: string)
 
 export const unlinkTemplateFromCourse = async (templateId: string, courseId: string): Promise<void> => {
   await api.delete(`/certificate-templates/${templateId}/link/${courseId}`);
+};
+
+export interface MockTokenData {
+  certId: string;
+  tokenValues: Record<string, string>;
+}
+
+export const getMockTokenValues = async (): Promise<MockTokenData> => {
+  const res = await api.get("/certificate-templates/mock-tokens");
+  return res.data?.data as MockTokenData;
+};
+
+export const previewCertificateTemplate = async (
+  templateId: string,
+  canvasJson: Record<string, unknown>,
+): Promise<string> => {
+  const res = await api.post(`/certificate-templates/${templateId}/preview`, { canvasJson });
+  return res.data?.data?.pdf as string; // base64-encoded PDF
+};
+
+export interface BgImage {
+  id: string;
+  url: string;
+  createdAt: string;
+}
+
+export const listBgImages = async (): Promise<BgImage[]> => {
+  const res = await api.get("/certificate-templates/backgrounds");
+  return (res.data?.data as BgImage[]) ?? [];
+};
+
+export const uploadBgImage = async (dataUrl: string): Promise<BgImage> => {
+  const res = await api.post("/certificate-templates/backgrounds", { dataUrl });
+  return res.data?.data as BgImage;
+};
+
+export const deleteBgImage = async (id: string): Promise<void> => {
+  await api.delete(`/certificate-templates/backgrounds/${id}`);
 };

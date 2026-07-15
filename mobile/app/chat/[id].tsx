@@ -7,9 +7,9 @@ import {
   FlatList,
   KeyboardAvoidingView,
   Platform,
-  ActivityIndicator,
   Keyboard,
 } from 'react-native';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { IMessage, IConversation } from '@/types';
@@ -69,7 +69,6 @@ export default function ChatRoom() {
   const [editText, setEditText] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
 
   // Extract conversation from API response { chat, messages }
   // Inject type:'direct' because the directChat DB model has no type column
@@ -139,21 +138,26 @@ export default function ChatRoom() {
     }
   }, [id, setActiveConversation, clearActiveConversation]);
 
-  // Handle keyboard hide
+  // Track keyboard height on Android so only the input bar lifts — not the whole screen.
+  // (edgeToEdgeEnabled causes adjustPan which scrolls the whole window; we counter that by
+  // manually padding only the input bar up by the keyboard height.)
+  const [androidKeyboardHeight, setAndroidKeyboardHeight] = useState(0);
   useEffect(() => {
-    const keyboardHide = Keyboard.addListener('keyboardDidHide', () => {
-      setRefreshKey(prev => prev + 1);
+    if (Platform.OS !== 'android') return;
+    const show = Keyboard.addListener('keyboardDidShow', (e) => {
+      setAndroidKeyboardHeight(e.endCoordinates.height);
     });
-    return () => keyboardHide.remove();
+    const hide = Keyboard.addListener('keyboardDidHide', () => {
+      setAndroidKeyboardHeight(0);
+    });
+    return () => { show.remove(); hide.remove(); };
   }, []);
+
 
   if (isLoading || !conversation) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4D81D2" />
-          <Text style={styles.loadingText}>Gufungura ubutumwa...</Text>
-        </View>
+        <LoadingSpinner message="Gufungura ubutumwa..." />
       </SafeAreaView>
     );
   }
@@ -167,10 +171,13 @@ export default function ChatRoom() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']} key={refreshKey}>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      {/* iOS: KeyboardAvoidingView handles it cleanly.
+          Android: edgeToEdgeEnabled causes adjustPan (whole screen scrolls).
+          Instead we track keyboard height manually and only lift the input bar. */}
       <KeyboardAvoidingView
         style={styles.keyboardAvoid}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
         <ChatHeader chat={conversation} router={router} />
@@ -200,7 +207,6 @@ export default function ChatRoom() {
               contentContainerStyle={styles.messagesList}
               inverted={true}
               showsVerticalScrollIndicator={true}
-              // 📜 INFINITE SCROLL - Load more when user scrolls near top
               onEndReached={() => {
                 if (hasNextPage && !isFetchingNextPage) {
                   fetchNextPage();
@@ -214,26 +220,26 @@ export default function ChatRoom() {
               }
               ListFooterComponent={
                 isFetchingNextPage ? (
-                  <View style={styles.loadingMoreContainer}>
-                    <ActivityIndicator size="small" color="#4D81D2" />
-                  </View>
+                  <LoadingSpinner variant="inline" message="" />
                 ) : null
               }
             />
           )}
         </View>
 
-        <ChatInput
-          onSendMessage={handleSendMessage}
-          onSendAttachment={handleSendAttachment}
-          disabled={isSending}
-          initialMessage={editText}
-          isEditing={!!editingMessage}
-          onEditCancel={handleCancelEdit}
-          onStartTyping={startTyping}
-          onStopTyping={stopTyping}
-          onEmojiPickerToggle={setEmojiPickerOpen}
-        />
+        <View style={Platform.OS === 'android' ? { paddingBottom: androidKeyboardHeight } : undefined}>
+          <ChatInput
+            onSendMessage={handleSendMessage}
+            onSendAttachment={handleSendAttachment}
+            disabled={isSending}
+            initialMessage={editText}
+            isEditing={!!editingMessage}
+            onEditCancel={handleCancelEdit}
+            onStartTyping={startTyping}
+            onStopTyping={stopTyping}
+            onEmojiPickerToggle={setEmojiPickerOpen}
+          />
+        </View>
       </KeyboardAvoidingView>
 
       <MessageSearch

@@ -167,9 +167,9 @@ export const CHOSection: React.FC = () => {
             <h2 className="text-sm font-semibold text-gray-800">
               {group ? group.name : "My CHW Group"}
             </h2>
-            {group?.sector && (
+            {(group?.sectors?.length ?? 0) > 0 && (
               <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
-                <MapPin size={10} /> {group.sector}
+                <MapPin size={10} /> {group!.sectors!.join(", ")}
               </p>
             )}
           </div>

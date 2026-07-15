@@ -294,7 +294,7 @@ export default function CreateCourseModal({
                 </div>
                 {mode === "create" && (
                   <div className="rounded-2xl bg-blue-50 px-4 py-3 text-slate-700">
-                    We will connect this form to the backend in the next step.
+                    We will connect this form to the next step.
                   </div>
                 )}
               </div>
