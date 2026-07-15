@@ -122,8 +122,37 @@ function parseToolCall(
 const MAX_RETRIES = 3;
 const RETRY_BASE_MS = 2000;
 
+/**
+ * Hard cap on how long we wait for the LLM before giving up. Without this a
+ * slow/unresponsive endpoint keeps the fetch open indefinitely, which leaves
+ * callers (e.g. post-course recommendations) hanging forever. On timeout we
+ * throw so callers fall back to their template responses.
+ */
+const REQUEST_TIMEOUT_MS = Number(process.env.LLM_TIMEOUT_MS) || 20000;
+
 async function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit,
+  timeoutMs: number,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      throw new Error(
+        `LLM request timed out after ${timeoutMs}ms`,
+      );
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export async function chat(
@@ -165,11 +194,15 @@ export async function chat(
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     body.messages = messagesForRequest;
 
-    const res = await fetch(`${BASE_URL}/chat/completions`, {
-      method: "POST",
-      headers: llmHeaders(),
-      body: JSON.stringify(body),
-    });
+    const res = await fetchWithTimeout(
+      `${BASE_URL}/chat/completions`,
+      {
+        method: "POST",
+        headers: llmHeaders(),
+        body: JSON.stringify(body),
+      },
+      REQUEST_TIMEOUT_MS,
+    );
 
     if (res.status === 429) {
       const err = await res.text();
