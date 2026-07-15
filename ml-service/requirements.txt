@@ -13,4 +13,4 @@ huggingface_hub>=0.24.0
 librosa>=0.10.0
 scipy>=1.11.0
 typed-argument-parser>=1.10.0
-deepkin @ git+https://github.com/c4ir-rw/ac-ai-models.git#subdirectory=DeepKIN-AgAI
+deepkin @ https://github.com/c4ir-rw/ac-ai-models/archive/refs/heads/main.tar.gz#subdirectory=DeepKIN-AgAI
