@@ -11,4 +11,6 @@ ENV OLLAMA_MODEL=llama3.2
 
 EXPOSE 11434
 
+
+ENTRYPOINT []
 CMD ["/start.sh"]
