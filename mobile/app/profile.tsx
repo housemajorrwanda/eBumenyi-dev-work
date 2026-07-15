@@ -8,8 +8,14 @@ import {
 import {
   ChevronLeft, Camera, User, CreditCard, Phone, Mail, LogOutIcon, Trash2,
   Bell, Shield, Palette, Globe, Database, Sun, Moon, Monitor, Lock, RefreshCw,
-  Heart, MessageCircle, Hospital, Settings2, Calendar,
+  Heart, MessageCircle, Hospital, Settings2, Calendar, Volume2,
 } from 'lucide-react-native';
+import {
+  DEFAULT_NARRATION_VOICE,
+  loadNarrationVoice,
+  NarrationVoice,
+  saveNarrationVoice,
+} from '@/services/narrationVoice';
 import Dropdown from '@/components/Dropdown';
 import TextField from '@/components/TextField';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -81,6 +87,9 @@ export default function ProfileEditScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [birthDateObj, setBirthDateObj] = useState<Date | undefined>(undefined);
   const [timezone, setTimezone] = useState('Africa/Kigali');
+  const [narrationVoice, setNarrationVoice] = useState<NarrationVoice>(
+    DEFAULT_NARRATION_VOICE,
+  );
   const [dateFormat, setDateFormat] = useState('DD/MM/YYYY');
   const [hospitalOptions, setHospitalOptions] = useState<{ id: string; label: string; extra?: any }[]>([]);
 
@@ -133,6 +142,8 @@ export default function ProfileEditScreen() {
       if (cats !== null) setCategories(JSON.parse(cats));
       if (tz !== null) setTimezone(tz);
       if (df !== null) setDateFormat(df);
+      const voice = await loadNarrationVoice();
+      setNarrationVoice(voice);
     };
     loadPrefs();
   }, []);
@@ -893,6 +904,78 @@ export default function ProfileEditScreen() {
                       <Text style={styles.langFlag}>{flag}</Text>
                       <Text style={[styles.langLabel, ds.langLabel, language === value && styles.langLabelActive]}>{label}</Text>
                       {language === value && (
+                        <View style={styles.themeCheck}>
+                          <Text style={styles.themeCheckText}>✓</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  ))}
+
+                  {/* ── Read-aloud voice section ── */}
+                  <Text style={[styles.sectionTitle, ds.sectionTitle, { marginTop: 24 }]}>
+                    {t('profile.narrationVoice')}
+                  </Text>
+                  <Text style={[styles.settingDesc, ds.settingDesc, { marginBottom: 10 }]}>
+                    {t('profile.narrationVoiceDesc')}
+                  </Text>
+
+                  {([
+                    {
+                      value: 'female1' as NarrationVoice,
+                      labelKey: 'profile.voiceFemale1',
+                      descKey: 'profile.voiceFemale1Desc',
+                      color: '#ec4899',
+                    },
+                    {
+                      value: 'female2' as NarrationVoice,
+                      labelKey: 'profile.voiceFemale2',
+                      descKey: 'profile.voiceFemale2Desc',
+                      color: '#a855f7',
+                    },
+                    {
+                      value: 'male' as NarrationVoice,
+                      labelKey: 'profile.voiceMale',
+                      descKey: 'profile.voiceMaleDesc',
+                      color: '#3363AD',
+                    },
+                  ]).map(({ value, labelKey, descKey, color }) => (
+                    <TouchableOpacity
+                      key={value}
+                      style={[
+                        styles.themeCard,
+                        ds.themeCard,
+                        narrationVoice === value && {
+                          ...styles.themeCardActive,
+                          ...ds.themeCardActive,
+                        },
+                      ]}
+                      onPress={async () => {
+                        setNarrationVoice(value);
+                        await saveNarrationVoice(value);
+                        Toast.show({
+                          type: 'success',
+                          text1: t(labelKey),
+                          text2: t('profile.narrationVoiceChanged'),
+                        });
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <View style={[styles.themeIconBox, { backgroundColor: `${color}20` }]}>
+                        <Volume2 size={22} color={color} />
+                      </View>
+                      <View style={styles.themeInfo}>
+                        <Text
+                          style={[
+                            styles.themeLabel,
+                            ds.themeLabel,
+                            narrationVoice === value && styles.themeLabelActive,
+                          ]}
+                        >
+                          {t(labelKey)}
+                        </Text>
+                        <Text style={[styles.themeDesc, ds.settingDesc]}>{t(descKey)}</Text>
+                      </View>
+                      {narrationVoice === value && (
                         <View style={styles.themeCheck}>
                           <Text style={styles.themeCheckText}>✓</Text>
                         </View>

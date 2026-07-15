@@ -4,4 +4,5 @@ export const appEnv = {
   cloudinaryApiKey: process.env.CLOUDINARY_API_KEY,
   cloudinaryApiSecret: process.env.CLOUDINARY_API_SECRET,
   cloudName: process.env.CLOUD_NAME,
+  mlServiceUrl: process.env.ML_SERVICE_URL,
 };

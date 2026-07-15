@@ -17,7 +17,13 @@ import * as ScreenOrientation from 'expo-screen-orientation';
 import StorageService from '@/services/storage.service';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
-import { Pin, PinOff } from 'lucide-react-native';
+import { Pin, PinOff, Volume2 } from 'lucide-react-native';
+import { SlideNarratorHost, SlideNarratorUiState } from '@/components/course/SlideNarratorHost';
+import {
+  DEFAULT_NARRATION_VOICE,
+  loadNarrationVoice,
+  NarrationVoice,
+} from '@/services/narrationVoice';
 
 interface QuestionnaireAnswer {
   selectedOption?: number;
@@ -66,6 +72,45 @@ export default function CourseContentScreen() {
   // State to track current page within documents (PDFs, slides)
   const [documentPages, setDocumentPages] = useState<{ [slideId: string]: number }>({});
   const [documentTotalPages, setDocumentTotalPages] = useState<{ [slideId: string]: number }>({});
+
+  const [narrationSession, setNarrationSession] = useState<{
+    slideId: string;
+    page: number;
+    voice: NarrationVoice;
+    playRequestId: number;
+    file?: string | null;
+    note?: string | null;
+    description?: string | null;
+  } | null>(null);
+  const [narrationVoice, setNarrationVoice] = useState<NarrationVoice>(
+    DEFAULT_NARRATION_VOICE,
+  );
+  const narrationPlayRequestRef = useRef(0);
+  const [narrationUi, setNarrationUi] = useState<SlideNarratorUiState>({
+    loading: false,
+    playing: false,
+    error: null,
+  });
+
+  useEffect(() => {
+    loadNarrationVoice().then(setNarrationVoice).catch(() => undefined);
+  }, []);
+
+  const handleNarrationStateChange = useCallback((state: SlideNarratorUiState) => {
+    setNarrationUi(state);
+  }, []);
+
+  const stopNarration = useCallback(() => {
+    setNarrationSession(null);
+    setNarrationUi({ loading: false, playing: false, error: null });
+  }, []);
+
+  useEffect(() => {
+    if (narrationUi.error) {
+      Alert.alert('Soma', narrationUi.error);
+      setNarrationUi((prev) => ({ ...prev, error: null }));
+    }
+  }, [narrationUi.error]);
 
   const getFileNameFromUrl = (url: string) => {
     try {
@@ -768,6 +813,7 @@ export default function CourseContentScreen() {
   // PagerView onPageSelected handler — fires on swipe between slides
   const onPageSelected = (e: any) => {
     const page = e.nativeEvent.position;
+    stopNarration();
     // Mark the slide being LEFT as complete before moving (mirrors web's goToSlide)
     const prevItem = transformedData[currentPage];
     if (prevItem && (prevItem.type === 'content' || prevItem.type === 'image' || prevItem.type === 'video')) {
@@ -814,6 +860,34 @@ export default function CourseContentScreen() {
   };
 
   const buttonConfig = getButtonConfig();
+
+  const startNarration = async (voice: NarrationVoice = narrationVoice) => {
+    if (!currentItem || isTestQuestion || isResultSlide) return;
+    const preferredVoice = await loadNarrationVoice().catch(() => voice);
+    if (preferredVoice !== narrationVoice) {
+      setNarrationVoice(preferredVoice);
+    }
+    const docPage = documentPages[currentItem.id] ?? 1;
+    narrationPlayRequestRef.current += 1;
+    setNarrationSession({
+      slideId: currentItem.id,
+      page: docPage,
+      voice: preferredVoice,
+      playRequestId: narrationPlayRequestRef.current,
+      file: currentItem.file,
+      note: currentItem.note,
+      description: currentItem.description,
+    });
+  };
+
+  const handleReadAloud = async () => {
+    if (!currentItem || isTestQuestion || isResultSlide) return;
+    if (narrationUi.playing || narrationUi.loading) {
+      stopNarration();
+      return;
+    }
+    await startNarration();
+  };
 
   return (
     <View style={[styles.container, { paddingBottom: !isLandscape ? Math.max(insets.bottom + 10 , 86) : 0 }]}> 
@@ -902,16 +976,34 @@ export default function CourseContentScreen() {
                     />
                   )}
                   {item.type !== 'test-question' && item.type !== 'result-slide' && (
-                    <TouchableOpacity
-                      style={styles.pinButton}
-                      onPress={() => handlePinSlide(item.id)}
-                    >
-                      {slidesPinStatus[item.id] ? (
-                        <PinOff color="#F59E0B" size={16} />
-                      ) : (
-                        <Pin color="#333" size={16} />
-                      )}
-                    </TouchableOpacity>
+                    <>
+                      <TouchableOpacity
+                        style={styles.pinButton}
+                        onPress={() => handlePinSlide(item.id)}
+                      >
+                        {slidesPinStatus[item.id] ? (
+                          <PinOff color="#F59E0B" size={16} />
+                        ) : (
+                          <Pin color="#333" size={16} />
+                        )}
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.readAloudButton}
+                        onPress={handleReadAloud}
+                        disabled={idx === currentPage && narrationUi.loading}
+                      >
+                        <Volume2
+                          color={
+                            idx === currentPage && narrationUi.playing
+                              ? '#F59E0B'
+                              : idx === currentPage && narrationUi.loading
+                                ? '#94A3B8'
+                                : '#3363AD'
+                          }
+                          size={16}
+                        />
+                      </TouchableOpacity>
+                    </>
                   )}
                 </View>
               ))}
@@ -940,6 +1032,18 @@ export default function CourseContentScreen() {
           feedbackModalOpen={feedbackModalOpen}
         />
       </View>
+      {narrationSession && (
+        <SlideNarratorHost
+          slideId={narrationSession.slideId}
+          page={narrationSession.page}
+          voice={narrationSession.voice}
+          playRequestId={narrationSession.playRequestId}
+          file={narrationSession.file}
+          note={narrationSession.note}
+          description={narrationSession.description}
+          onStateChange={handleNarrationStateChange}
+        />
+      )}
       { !isLandscape && (
         <Footer
           activeTab="training"
@@ -992,6 +1096,19 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 6,
     left: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 18,
+    padding: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  readAloudButton: {
+    position: 'absolute',
+    top: 6,
+    right: 4,
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
     borderRadius: 18,
     padding: 10,

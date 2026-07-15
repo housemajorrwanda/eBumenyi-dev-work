@@ -9,6 +9,7 @@ import Constants from 'expo-constants';
 type AppExtra = {
   backendBaseUrl?: string;
   apiBaseUrl?: string;
+  narrationApiBaseUrl?: string;
   assetsBaseUrl?: string;
   weltelWebUrl?: string;
   uploadsVideosPath?: string;
@@ -45,6 +46,24 @@ function resolveApiBaseUrl(backendUrl: string): string {
 
 export const BACKEND_BASE_URL = resolveBackendUrl();
 export const API_BASE_URL = resolveApiBaseUrl(BACKEND_BASE_URL);
+
+function resolveNarrationApiBaseUrl(apiBaseUrl: string): string {
+  const explicit = readEnv(
+    'EXPO_PUBLIC_NARRATION_API_BASE_URL',
+    'narrationApiBaseUrl',
+  );
+  if (explicit) return explicit.replace(/\/$/, '');
+
+  // Hybrid dev: courses from apitest, read-aloud from local API + ml-service.
+  if (/apitest\.ebumenyi\.online|ebumenyi\.online/i.test(apiBaseUrl)) {
+    return 'http://localhost:9000/api';
+  }
+
+  return apiBaseUrl;
+}
+
+/** Read-aloud runs on local API while courses may load from apitest. */
+export const NARRATION_API_BASE_URL = resolveNarrationApiBaseUrl(API_BASE_URL);
 
 export const ASSETS_BASE_URL =
   readEnv('EXPO_PUBLIC_ASSETS_BASE_URL', 'assetsBaseUrl') || BACKEND_BASE_URL;
