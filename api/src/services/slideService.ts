@@ -2,6 +2,7 @@ import { prisma } from "../utils/client";
 import AppError from "../utils/error";
 import { CreateSlideDto, TSlideResponse } from "../utils/interfaces/common";
 import { Prisma } from "@prisma/client";
+import { SlideReadAloudService } from "./slideReadAloudService";
 
 export class SlideService {
   public static async createSlide(data: CreateSlideDto) {
@@ -33,6 +34,15 @@ export class SlideService {
       data: { totalSlide: chapter.totalSlide + 1 },
     });
 
+    if (slide.file) {
+      SlideReadAloudService.queueTextExtraction(slide.id);
+    } else {
+      await prisma.slide.update({
+        where: { id: slide.id },
+        data: { ocrStatus: "skipped" },
+      });
+    }
+
     return {
       message: "Slide created successfully",
       statusCode: 201,
@@ -63,6 +73,8 @@ export class SlideService {
       if (!chapter) throw new AppError("Chapter not found", 404);
     }
 
+    const fileChanged = data.file !== undefined && data.file !== existing.file;
+
     const updated = await prisma.slide.update({
       where: { id },
       data: {
@@ -74,6 +86,21 @@ export class SlideService {
         isPublished: data.isPublished ?? existing.isPublished,
       },
     });
+
+    if (fileChanged) {
+      if (updated.file) {
+        SlideReadAloudService.queueTextExtraction(updated.id);
+      } else {
+        await prisma.slide.update({
+          where: { id: updated.id },
+          data: {
+            pageTexts: null,
+            narrationPages: null,
+            ocrStatus: "skipped",
+          },
+        });
+      }
+    }
 
     return {
       message: "Slide updated successfully",

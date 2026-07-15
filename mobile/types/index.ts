@@ -222,6 +222,9 @@ export interface ISlide {
   description: string;
   slideNumber: number;
   file: string;
+  pageTexts?: string | null;
+  narrationPages?: string | null;
+  ocrStatus?: string | null;
   isPublished: boolean;
   createdAt: string;
   updatedAt: string;

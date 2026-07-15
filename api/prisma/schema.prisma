@@ -410,6 +410,9 @@ model Slide {
   description      String?
   slideNumber      Int
   file             String?      
+  pageTexts        String?
+  narrationPages   String?
+  ocrStatus        String?
   isPublished      Boolean     @default(true)
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt

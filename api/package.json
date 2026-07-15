@@ -90,6 +90,7 @@
     "nodemailer": "^6.9.15",
     "paypack-js": "^0.2.1",
     "pdf-lib": "^1.17.1",
+    "pdf-parse": "^1.1.1",
     "pg": "^8.20.0",
     "prisma": "^5.14.0",
     "qrcode": "^1.5.4",

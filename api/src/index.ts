@@ -32,6 +32,7 @@ import cron from "node-cron";
 import axios from "axios";
 import DbdictionaryController from "./controllers/DbdictionaryController";
 import monitoringRouter from "./controllers/monitoringController";
+import slideNarrationRouter from "./routes/slideNarration.routes";
 import {
   generateDatabaseDictionary,
   generateHTMLDictionary,
@@ -567,6 +568,7 @@ app.get(
 );
 
 // Register main API routes
+app.use("/api/slides", slideNarrationRouter);
 RegisterRoutes(app);
 app.use("/api", DbdictionaryController);
 app.use("/api/monitoring", monitoringRouter);
