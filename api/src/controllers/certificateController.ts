@@ -22,7 +22,10 @@ import { prisma } from "../utils/db";
 export class CertificateController {
   @Post("/generate")
   @Security("jwt")
-  @Middlewares(loggerMiddleware, checkRole(roles.TRAINEE, roles.TESTER, roles.CHO))
+  @Middlewares(
+    loggerMiddleware,
+    checkRole(roles.TRAINEE, roles.TESTER, roles.CHO),
+  )
   public async generateCertificate(
     @Body() body: { courseId: string },
     @Request() req: ExpressRequest,
@@ -56,7 +59,10 @@ export class CertificateController {
 
   @Post("/my-certificate/regenerate/{courseId}")
   @Security("jwt")
-  @Middlewares(loggerMiddleware, checkRole(roles.TRAINEE, roles.TESTER, roles.CHO))
+  @Middlewares(
+    loggerMiddleware,
+    checkRole(roles.TRAINEE, roles.TESTER, roles.CHO),
+  )
   public async regenerateMyCertificate(
     @Path() courseId: string,
     @Request() req: ExpressRequest,
@@ -113,8 +119,30 @@ export class CertificateController {
     @Query() courseId?: string,
     @Query() dateFrom?: string,
     @Query() dateTo?: string,
+    @Query() district?: string,
+    @Query() province?: string,
+    @Query() gender?: string,
+    @Query() role?: string,
+    @Query() year?: string,
+    @Query() month?: string,
+    @Query() hospitalId?: string,
   ) {
-    return CertificateService.getAllCertificates(searchq, limit, page, templateId, courseId, dateFrom, dateTo);
+    return CertificateService.getAllCertificates(
+      searchq,
+      limit,
+      page,
+      templateId,
+      courseId,
+      dateFrom,
+      dateTo,
+      district,
+      province,
+      gender,
+      role,
+      year,
+      month,
+      hospitalId,
+    );
   }
 
   @Post("/test/generate")
@@ -131,7 +159,10 @@ export class CertificateController {
 
   @Get("/my-certificates")
   @Security("jwt")
-  @Middlewares(loggerMiddleware, checkRole(roles.TRAINEE, roles.TESTER, roles.CHO))
+  @Middlewares(
+    loggerMiddleware,
+    checkRole(roles.TRAINEE, roles.TESTER, roles.CHO),
+  )
   public async getMyCertificates(@Request() req: ExpressRequest) {
     const userId = req.user?.id as string;
 
@@ -150,7 +181,10 @@ export class CertificateController {
 
   @Get("/my-certificate/course/{courseId}")
   @Security("jwt")
-  @Middlewares(loggerMiddleware, checkRole(roles.TRAINEE, roles.TESTER, roles.CHO))
+  @Middlewares(
+    loggerMiddleware,
+    checkRole(roles.TRAINEE, roles.TESTER, roles.CHO),
+  )
   public async getMyCertificateByCourseId(
     @Path() courseId: string,
     @Request() req: ExpressRequest,
@@ -172,30 +206,46 @@ export class CertificateController {
 
   @Post("/prepare")
   @Security("jwt")
-  @Middlewares(loggerMiddleware, checkRole(roles.TRAINEE, roles.TESTER, roles.CHO))
+  @Middlewares(
+    loggerMiddleware,
+    checkRole(roles.TRAINEE, roles.TESTER, roles.CHO),
+  )
   public async prepareCertificate(
     @Body() body: { courseId: string },
     @Request() req: ExpressRequest,
   ) {
     const userId = req.user?.id as string;
-    const student = await prisma.student.findUnique({ where: { userId }, select: { id: true } });
+    const student = await prisma.student.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
     if (!student) throw new Error("Student not found");
     return CertificateService.prepareCertificate(student.id, body.courseId);
   }
 
   @Post("/store-pdf")
   @Security("jwt")
-  @Middlewares(loggerMiddleware, checkRole(roles.TRAINEE, roles.TESTER, roles.CHO))
+  @Middlewares(
+    loggerMiddleware,
+    checkRole(roles.TRAINEE, roles.TESTER, roles.CHO),
+  )
   public async storeFrontendCertificate(
     @Body() body: { certId: string; courseId: string; base64Pdf: string },
     @Request() req: ExpressRequest,
   ) {
     const userId = req.user?.id as string;
-    const student = await prisma.student.findUnique({ where: { userId }, select: { id: true } });
+    const student = await prisma.student.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
     if (!student) throw new Error("Student not found");
     const io = req.app.get("io");
     return CertificateService.storeFrontendCertificate(
-      body.certId, student.id, body.courseId, body.base64Pdf, io,
+      body.certId,
+      student.id,
+      body.courseId,
+      body.base64Pdf,
+      io,
     );
   }
 

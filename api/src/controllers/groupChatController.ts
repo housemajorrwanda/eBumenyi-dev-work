@@ -14,6 +14,7 @@ import {
 } from "tsoa";
 import { Request as ExpressRequest } from "express";
 import { GroupChatService } from "../services/groupChatService";
+import { ConversationMuteService } from "../services/conversationMuteService";
 import { checkRole } from "../middlewares";
 import { roles } from "../utils/roles";
 import { loggerMiddleware } from "../utils/loggers/loggingMiddleware";
@@ -143,6 +144,38 @@ export class GroupChatController {
   ) {
     const userId = req.user?.id as string;
     return GroupChatService.getGroupMessages(groupId, userId, limit, offset);
+  }
+  /**
+   * Search messages in a group chat by content, across full history
+   * GET /group-chats/{groupId}/messages/search?q=&limit=20&offset=0
+   */
+  @Get("/{groupId}/messages/search")
+  @Middlewares(
+    loggerMiddleware,
+    checkRole(
+      roles.ADMIN,
+      roles.STAFF,
+      roles.CHO,
+      roles.TRAINER,
+      roles.TRAINEE,
+      roles.DEVELOPER,
+    ),
+  )
+  public async searchGroupMessages(
+    @Request() req: ExpressRequest,
+    @Path() groupId: string,
+    @Query() q: string,
+    @Query() limit: number = 20,
+    @Query() offset: number = 0,
+  ) {
+    const userId = req.user?.id as string;
+    return GroupChatService.searchGroupMessages(
+      groupId,
+      userId,
+      q,
+      limit,
+      offset,
+    );
   }
   /**
    * Add a participant to the group
@@ -348,6 +381,35 @@ export class GroupChatController {
   ) {
     const userId = req.user?.id as string;
     return GroupChatService.updateGroup(groupId, userId, body);
+  }
+
+  /**
+   * Mute or unmute a group chat for the current user
+   */
+  @Put("/{groupId}/mute")
+  @Middlewares(
+    loggerMiddleware,
+    checkRole(
+      roles.ADMIN,
+      roles.STAFF,
+      roles.CHO,
+      roles.TRAINER,
+      roles.TRAINEE,
+      roles.DEVELOPER,
+    ),
+  )
+  public async muteGroupChat(
+    @Request() req: ExpressRequest,
+    @Path() groupId: string,
+    @Body() body: { muted: boolean },
+  ) {
+    const userId = req.user?.id as string;
+    return ConversationMuteService.setMute(
+      userId,
+      "group",
+      groupId,
+      body.muted,
+    );
   }
 
   /**

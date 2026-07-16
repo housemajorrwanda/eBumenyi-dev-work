@@ -38,6 +38,24 @@ export class UserService extends BaseService {
     return values.includes(industry) ? (industry as Industry) : undefined;
   }
 
+  /** Fire-and-forget login tracking — never blocks or fails a login attempt. */
+  private static async recordLoginEvent(
+    userId: string,
+    method: "password" | "otp" | "id_phone",
+  ): Promise<void> {
+    try {
+      await prisma.$transaction([
+        prisma.loginEvent.create({ data: { userId, method } }),
+        prisma.user.update({
+          where: { id: userId },
+          data: { lastLoginAt: new Date() },
+        }),
+      ]);
+    } catch {
+      // Login tracking must never break the login flow itself.
+    }
+  }
+
   private static logWeltelSyncFailure(context: string, error: unknown): void {
     const message =
       error instanceof AppError
@@ -339,6 +357,8 @@ export class UserService extends BaseService {
         userData.id,
       );
 
+      void UserService.recordLoginEvent(userData.id, "password");
+
       return {
         message: "Kwinjira byagenze neza",
         statusCode: 200,
@@ -536,6 +556,8 @@ export class UserService extends BaseService {
 
       const completedTours = await OnboardingService.getCompletedTours(user.id);
 
+      void UserService.recordLoginEvent(user.id, "id_phone");
+
       return {
         message: "Kwinjira byagenze neza",
         statusCode: 200,
@@ -599,6 +621,8 @@ export class UserService extends BaseService {
       const userRoles = user.userRoles.map((r: { name: RoleType }) => r.name);
 
       const completedTours = await OnboardingService.getCompletedTours(user.id);
+
+      void UserService.recordLoginEvent(user.id, "otp");
 
       return {
         message: "Kwinjira byagenze neza",

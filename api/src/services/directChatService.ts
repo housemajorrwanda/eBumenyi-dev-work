@@ -2,12 +2,17 @@ import { prisma } from "../utils/client";
 import AppError from "../utils/error";
 import { CacheService } from "./cacheService";
 import { NotificationHelper } from "../utils/notificationHelper";
+import { UserBlockService } from "./userBlockService";
 
 export class DirectChatService {
   /**
    * Get or create a direct chat between two users
    */
   public static async getOrCreateDirectChat(userId1: string, userId2: string) {
+    if (await UserBlockService.isBlocked(userId1, userId2)) {
+      throw new AppError("Cannot start a chat with this user", 403);
+    }
+
     // Ensure consistent ordering
     const [user1, user2] = [userId1, userId2].sort();
 
@@ -323,6 +328,12 @@ export class DirectChatService {
 
     if (!chat) {
       throw new AppError("Unauthorized - not a participant in this chat", 403);
+    }
+
+    const recipientForBlockCheck =
+      chat.userId1 === senderId ? chat.userId2 : chat.userId1;
+    if (await UserBlockService.isBlocked(senderId, recipientForBlockCheck)) {
+      throw new AppError("Cannot send messages to this user", 403);
     }
 
     const message = await prisma.directMessage.create({
@@ -1000,5 +1011,67 @@ export class DirectChatService {
       data: messages.reverse(),
       total: messages.length,
     };
+  }
+
+  /**
+   * Search messages in a direct chat by content, across the full conversation
+   * history (not just the most-recently-loaded page).
+   */
+  public static async searchDirectChatMessages(
+    chatId: string,
+    userId: string,
+    q: string,
+    limit: number = 20,
+    offset: number = 0,
+  ) {
+    // Verify user has access to this chat
+    const chat = await prisma.directChat.findFirst({
+      where: {
+        id: chatId,
+        OR: [{ userId1: userId }, { userId2: userId }],
+      },
+    });
+
+    if (!chat) {
+      throw new AppError("Direct chat not found or access denied", 404);
+    }
+
+    const where = {
+      chatId,
+      content: { contains: q, mode: "insensitive" as const },
+    };
+
+    const [messages, total] = await Promise.all([
+      prisma.directMessage.findMany({
+        where,
+        include: {
+          sender: {
+            select: { id: true, fullNames: true, photo: true },
+          },
+          likes: {
+            where: { userId },
+            select: { id: true },
+          },
+        },
+        orderBy: { timestamp: "desc" },
+        take: limit,
+        skip: offset,
+      }),
+      prisma.directMessage.count({ where }),
+    ]);
+
+    // For each match, work out its position under the same newest-first ordering
+    // used by getDirectChatMessages, so the frontend can jump straight to the
+    // page of the normal message list that contains this message.
+    const data = await Promise.all(
+      messages.map(async (msg) => {
+        const offsetInConversation = await prisma.directMessage.count({
+          where: { chatId, timestamp: { gt: msg.timestamp } },
+        });
+        return { ...msg, offsetInConversation };
+      }),
+    );
+
+    return { data, total };
   }
 }

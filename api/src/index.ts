@@ -568,8 +568,8 @@ app.get(
 );
 
 // Register main API routes
-app.use("/api/slides", slideNarrationRouter);
 RegisterRoutes(app);
+app.use("/api/slides", slideNarrationRouter);
 app.use("/api", DbdictionaryController);
 app.use("/api/monitoring", monitoringRouter);
 
