@@ -59,21 +59,27 @@ export default function LoginScreen() {
     setPhoneError(undefined);
     setNidError(undefined);
 
-    if (!phone || !nid) {
-      if (!nid) setNidError(t('fieldRequired') || 'Required');
-      if (!phone) setPhoneError(t('fieldRequired') || 'Required');
-      return;
-    }
+    // Validate both fields up front so both errors show at once, rather
+    // than bailing out on the first failing field and hiding the other.
+    let hasError = false;
 
-    if (!isValidRwandanPhone(phone)) {
+    if (!phone) {
+      setPhoneError(t('phoneRequired'));
+      hasError = true;
+    } else if (!isValidRwandanPhone(phone)) {
       setPhoneError(t('invalidPhone'));
-      return;
+      hasError = true;
     }
 
-    if (!isValidNID(nid)) {
+    if (!nid) {
+      setNidError(t('nidRequired'));
+      hasError = true;
+    } else if (!isValidNID(nid)) {
       setNidError('Irangamuntu igomba kuba imibare 16');
-      return;
+      hasError = true;
     }
+
+    if (hasError) return;
 
     setLoading(true);
     try {

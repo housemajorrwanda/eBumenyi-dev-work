@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -31,6 +31,13 @@ import {
 import { getCalendarEventById } from '@/services/calender';
 import VideoCard from '@/components/VideoViewer';
 import { formatRwDateShort } from '@/utils/format';
+import { useIsFocused } from '@react-navigation/native';
+import { CopilotProvider, CopilotStep, useCopilot } from 'react-native-copilot';
+import { WalkthroughableTouchable } from '@/components/onboarding/walkthroughable';
+import MascotTooltip from '@/components/onboarding/MascotTooltip';
+import { TOUR_KEYS, onboardingService, scheduleTourStart } from '@/services/onboarding.service';
+import { useOnboarding } from '@/contexts/OnboardingContext';
+import { useTourStepAdvance } from '@/hooks/useTourStepAdvance';
 
 const AUDIENCE_LABELS: Record<RecordingAudience, string> = {
   ALL: 'Abakoresha bose',
@@ -279,6 +286,7 @@ function RecordingRow({
   onDelete,
   onWatch,
   isDark,
+  highlightPublishButton,
 }: {
   recording: IMeetingRecording;
   onPublish: () => void;
@@ -286,9 +294,11 @@ function RecordingRow({
   onDelete: () => void;
   onWatch: () => void;
   isDark: boolean;
+  highlightPublishButton?: boolean;
 }) {
   const title = recording.title ?? recording.event?.title ?? 'Amavideyo';
   const borderColor = isDark ? '#374151' : '#e5e7eb';
+  const advanceRecordingsList = useTourStepAdvance('recordings-list');
   const textColor = isDark ? '#f9fafb' : '#111827';
   const subColor = isDark ? '#9ca3af' : '#6b7280';
 
@@ -320,15 +330,45 @@ function RecordingRow({
       </View>
 
       <View style={styles.rowActions}>
-        {recording.isPublished ? (
-          <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#fef3c7' }]} onPress={onUnpublish}>
-            <EyeOff size={16} color="#92400e" />
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#d1fae5' }]} onPress={onPublish}>
-            <Eye size={16} color="#065f46" />
-          </TouchableOpacity>
-        )}
+        {(() => {
+          const publishButton = recording.isPublished ? (
+            <>
+              <EyeOff size={16} color="#92400e" />
+            </>
+          ) : (
+            <>
+              <Eye size={16} color="#065f46" />
+            </>
+          );
+          const publishStyle = [
+            styles.actionBtn,
+            recording.isPublished ? { backgroundColor: '#fef3c7' } : { backgroundColor: '#d1fae5' },
+          ];
+          const onPublishPress = recording.isPublished ? onUnpublish : onPublish;
+          // The tooltip text instructs tapping this specific button — target
+          // it directly instead of the whole row, otherwise the library's
+          // pointer anchors to the row's edge (far from this button) and
+          // taps on the button's real position can fall outside the row's
+          // (much larger) measured hole.
+          if (highlightPublishButton) {
+            return (
+              <CopilotStep
+                text="Hano hagaragara amasomo n'inama byafashwe. Kanda kuri buto yo kureba (👁) kugira ngo wemeze ko abandi babibona."
+                order={1}
+                name="recordings-list"
+              >
+                <WalkthroughableTouchable style={publishStyle} onPress={advanceRecordingsList(onPublishPress)}>
+                  {publishButton}
+                </WalkthroughableTouchable>
+              </CopilotStep>
+            );
+          }
+          return (
+            <TouchableOpacity style={publishStyle} onPress={onPublishPress}>
+              {publishButton}
+            </TouchableOpacity>
+          );
+        })()}
         <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#fee2e2' }]} onPress={onDelete}>
           <Trash2 size={16} color="#dc2626" />
         </TouchableOpacity>
@@ -338,10 +378,33 @@ function RecordingRow({
 }
 
 // ─── Main Screen ───────────────────────────────────────────────────────────────
-export default function AdminRecordingsScreen() {
+function AdminRecordingsScreenContent() {
   const router = useRouter();
   const { isDark, themeColors } = useTheme();
   const queryClient = useQueryClient();
+  const { start, copilotEvents, stop, visible } = useCopilot();
+  // start()'s identity is not stable across CopilotProvider re-renders (the
+  // library doesn't memoize its internal visibility setter, which start
+  // depends on) — reading it through a ref means a re-render before the
+  // scheduled tour fires doesn't cancel it via the effect's cleanup.
+  const startRef = useRef(start);
+  startRef.current = start;
+  const { markComplete } = useOnboarding();
+  const isFocused = useIsFocused();
+  // If the user navigates away (tapping the real highlighted element can
+  // itself trigger navigation, but this also covers back/tab-switch/etc.)
+  // while a tour is visible, its CopilotProvider can stay mounted (stack
+  // navigators often keep the previous screen alive) — without this, the
+  // tour's Modal renders in RN's top-level layer and keeps floating over
+  // whatever screen is now active. Close it on the focus transition.
+  const wasFocusedRef = useRef(isFocused);
+  useEffect(() => {
+    if (wasFocusedRef.current && !isFocused && visible) {
+      stop().catch(() => {});
+    }
+    wasFocusedRef.current = isFocused;
+  }, [isFocused, visible, stop]);
+  const autoStartAttemptedRef = useRef(false);
 
   const [publishTarget, setPublishTarget] = useState<IMeetingRecording | null>(null);
   const [watchRecording, setWatchRecording] = useState<IMeetingRecording | null>(null);
@@ -385,6 +448,26 @@ export default function AdminRecordingsScreen() {
   const headerBg = isDark ? '#1f2937' : '#fff';
   const borderColor = isDark ? '#374151' : '#e5e7eb';
 
+  useEffect(() => {
+    let cancelSchedule: (() => void) | null = null;
+    let cancelled = false;
+    if (!isLoading && recordings.length > 0 && isFocused && !autoStartAttemptedRef.current) {
+      autoStartAttemptedRef.current = true;
+      void (async () => {
+        const done = await onboardingService.hasCompleted(TOUR_KEYS.RECORDINGS_ADMIN);
+        if (cancelled) return;
+        if (!done) { cancelSchedule = scheduleTourStart(() => startRef.current()); }
+      })();
+    }
+    return () => { cancelled = true; cancelSchedule?.(); };
+  }, [isLoading, recordings.length, isFocused]);
+
+  useEffect(() => {
+    const handleStop = () => { markComplete(TOUR_KEYS.RECORDINGS_ADMIN).catch(() => {}); };
+    copilotEvents.on('stop', handleStop);
+    return () => { copilotEvents.off('stop', handleStop); };
+  }, [copilotEvents, markComplete]);
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: bg }]}>
       <View style={[styles.header, { backgroundColor: headerBg, borderBottomColor: borderColor }]}>
@@ -412,7 +495,7 @@ export default function AdminRecordingsScreen() {
             </Text>
           </View>
         ) : (
-          recordings.map((r: IMeetingRecording) => (
+          recordings.map((r: IMeetingRecording, index: number) => (
             <RecordingRow
               key={r.id}
               recording={r}
@@ -421,6 +504,7 @@ export default function AdminRecordingsScreen() {
               onDelete={() => handleDelete(r.id)}
               onWatch={() => setWatchRecording(r)}
               isDark={isDark}
+              highlightPublishButton={index === 0}
             />
           ))
         )}
@@ -472,6 +556,23 @@ export default function AdminRecordingsScreen() {
         </SafeAreaView>
       </Modal>
     </SafeAreaView>
+  );
+}
+
+export default function AdminRecordingsScreen() {
+  return (
+    <CopilotProvider
+      tooltipComponent={MascotTooltip}
+      overlay="view"
+      backdropColor="rgba(0, 0, 0, 0.65)"
+      animationDuration={300}
+      stepNumberComponent={() => null}
+      arrowSize={10}
+      androidStatusBarVisible
+      labels={{ finish: 'Rangiza', next: 'Ibikurikiraho', previous: 'Inyuma', skip: 'Simbuka' }}
+    >
+      <AdminRecordingsScreenContent />
+    </CopilotProvider>
   );
 }
 

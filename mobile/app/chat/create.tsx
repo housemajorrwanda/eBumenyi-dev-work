@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   View,
@@ -17,10 +17,17 @@ import {
   useSafeAreaInsets,
 } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { useIsFocused } from '@react-navigation/native';
 import { ChevronLeft, Search } from 'lucide-react-native';
 import { getAllUsersNopagination } from '@/services/users.api';
 import { IUser } from '@/types';
 import * as MessagingAPI from '@/services/messaging.api';
+import { CopilotProvider, CopilotStep, useCopilot } from 'react-native-copilot';
+import { WalkthroughableView } from '@/components/onboarding/walkthroughable';
+import MascotTooltip from '@/components/onboarding/MascotTooltip';
+import { TOUR_KEYS, onboardingService, scheduleTourStart } from '@/services/onboarding.service';
+import { useTourStepAdvance } from '@/hooks/useTourStepAdvance';
+import { useOnboarding } from '@/contexts/OnboardingContext';
 
 const getRoleDisplayName = (role: string): string => {
   const roleMap: Record<string, string> = {
@@ -33,11 +40,35 @@ const getRoleDisplayName = (role: string): string => {
   return roleMap[role.toUpperCase()] || role;
 };
 
-export default function CreateChatScreen() {
+function CreateChatScreenContent() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [searchQuery, setSearchQuery] = useState('');
+  const { start, copilotEvents, stop, visible } = useCopilot();
+  // start()'s identity is not stable across CopilotProvider re-renders (the
+  // library doesn't memoize its internal visibility setter, which start
+  // depends on) — reading it through a ref means a re-render before the
+  // scheduled tour fires doesn't cancel it via the effect's cleanup.
+  const startRef = useRef(start);
+  startRef.current = start;
+  const advanceChatList = useTourStepAdvance('create-chat-list');
+  const { markComplete } = useOnboarding();
+  const isFocused = useIsFocused();
+  // If the user navigates away (tapping the real highlighted element can
+  // itself trigger navigation, but this also covers back/tab-switch/etc.)
+  // while a tour is visible, its CopilotProvider can stay mounted (stack
+  // navigators often keep the previous screen alive) — without this, the
+  // tour's Modal renders in RN's top-level layer and keeps floating over
+  // whatever screen is now active. Close it on the focus transition.
+  const wasFocusedRef = useRef(isFocused);
+  useEffect(() => {
+    if (wasFocusedRef.current && !isFocused && visible) {
+      stop().catch(() => {});
+    }
+    wasFocusedRef.current = isFocused;
+  }, [isFocused, visible, stop]);
+  const autoStartAttemptedRef = useRef(false);
   const [loadingUserId, setLoadingUserId] = useState<string | null>(null);
 
   const {
@@ -71,35 +102,71 @@ export default function CreateChatScreen() {
     user.fullNames.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
-  const renderMemberItem = ({ item }: { item: IUser }) => (
-    <TouchableOpacity
-      style={[styles.memberItem, loadingUserId === item.id && { opacity: 0.5 }]}
-      onPress={() => handleStartChat(item.id)}
-      disabled={loadingUserId === item.id}
-    >
-      <Image
-        source={{ uri: item.photo || 'https://i.pravatar.cc/150?img=1' }}
-        style={styles.memberAvatar}
-      />
-      <View style={styles.memberInfo}>
-        <Text style={styles.memberName}>{item.fullNames}</Text>
-        <Text style={styles.onlineText}>
-          {item.userRoles && item.userRoles.length > 0
-            ? getRoleDisplayName(item.userRoles[0].name)
-            : 'Umujyanama'}
-        </Text>
-      </View>
-      {loadingUserId === item.id && (
-        <ActivityIndicator size="small" color="#4D81D2" />
-      )}
-    </TouchableOpacity>
-  );
+  const renderMemberItem = ({ item, index }: { item: IUser; index: number }) => {
+    const row = (
+      <TouchableOpacity
+        style={[styles.memberItem, loadingUserId === item.id && { opacity: 0.5 }]}
+        onPress={advanceChatList(() => handleStartChat(item.id))}
+        disabled={loadingUserId === item.id}
+      >
+        <Image
+          source={{ uri: item.photo || 'https://i.pravatar.cc/150?img=1' }}
+          style={styles.memberAvatar}
+        />
+        <View style={styles.memberInfo}>
+          <Text style={styles.memberName}>{item.fullNames}</Text>
+          <Text style={styles.onlineText}>
+            {item.userRoles && item.userRoles.length > 0
+              ? getRoleDisplayName(item.userRoles[0].name)
+              : 'Umujyanama'}
+          </Text>
+        </View>
+        {loadingUserId === item.id && (
+          <ActivityIndicator size="small" color="#4D81D2" />
+        )}
+      </TouchableOpacity>
+    );
+    // Only the first member is a tour target — spotlighting the whole list
+    // left too little room for the tooltip to fit without being clipped.
+    if (index === 0) {
+      return (
+        <CopilotStep
+          text="Kanda ku izina ry'umunyamuryango kugira ngo utangire ibiganiro nawe."
+          order={2}
+          name="create-chat-list"
+        >
+          <WalkthroughableView>{row}</WalkthroughableView>
+        </CopilotStep>
+      );
+    }
+    return row;
+  };
 
   const responsiveStyles = {
     padding: width < 400 ? 10 : 12,
     fontSize: width < 400 ? 12 : 14,
     itemPadding: width < 400 ? 8 : 10,
   };
+
+  useEffect(() => {
+    let cancelSchedule: (() => void) | null = null;
+    let cancelled = false;
+    if (!isUsersLoading && isFocused && !autoStartAttemptedRef.current) {
+      autoStartAttemptedRef.current = true;
+      void (async () => {
+        const done = await onboardingService.hasCompleted(TOUR_KEYS.CREATE_CHAT);
+        if (cancelled) return;
+        if (!done) { cancelSchedule = scheduleTourStart(() => startRef.current()); }
+      })();
+    }
+    return () => { cancelled = true; cancelSchedule?.(); };
+  }, [isUsersLoading, isFocused]);
+
+  useEffect(() => {
+    const handleStop = () => { markComplete(TOUR_KEYS.CREATE_CHAT).catch(() => {}); };
+    copilotEvents.on('stop', handleStop);
+    return () => { copilotEvents.off('stop', handleStop); };
+  }, [copilotEvents, markComplete]);
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
@@ -111,24 +178,26 @@ export default function CreateChatScreen() {
         <View style={{ width: 20 }} />
       </View>
 
-      <View
-        style={[
-          styles.searchContainer,
-          {
-            paddingHorizontal: responsiveStyles.padding,
-            marginHorizontal: responsiveStyles.padding,
-          },
-        ]}
-      >
-        <Search size={16} color="#666c77ff" />
-        <TextInput
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          placeholder="Shakisha umunyamuryango..."
-          placeholderTextColor="#666c77ff"
-          style={[styles.searchInput, { fontSize: responsiveStyles.fontSize }]}
-        />
-      </View>
+      <CopilotStep text="Shakisha umunyamuryango ushaka." order={1} name="create-chat-search">
+        <WalkthroughableView
+          style={[
+            styles.searchContainer,
+            {
+              paddingHorizontal: responsiveStyles.padding,
+              marginHorizontal: responsiveStyles.padding,
+            },
+          ]}
+        >
+          <Search size={16} color="#666c77ff" />
+          <TextInput
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Shakisha umunyamuryango..."
+            placeholderTextColor="#666c77ff"
+            style={[styles.searchInput, { fontSize: responsiveStyles.fontSize }]}
+          />
+        </WalkthroughableView>
+      </CopilotStep>
 
       <View style={styles.content}>
         {isUsersLoading ? (
@@ -169,6 +238,23 @@ export default function CreateChatScreen() {
         )}
       </View>
     </SafeAreaView>
+  );
+}
+
+export default function CreateChatScreen() {
+  return (
+    <CopilotProvider
+      tooltipComponent={MascotTooltip}
+      overlay="view"
+      backdropColor="rgba(0, 0, 0, 0.65)"
+      animationDuration={300}
+      stepNumberComponent={() => null}
+      arrowSize={10}
+      androidStatusBarVisible
+      labels={{ finish: 'Rangiza', next: 'Ibikurikiraho', previous: 'Inyuma', skip: 'Simbuka' }}
+    >
+      <CreateChatScreenContent />
+    </CopilotProvider>
   );
 }
 

@@ -34,6 +34,8 @@ type Props = {
   // when true, show icons next to each option (defaults to false)
   showIcons?: boolean;
   labelColor?: string;
+  /** if true the field is invalid; if string provided it will be shown below the field */
+  error?: boolean | string;
 };
 
 export default function Dropdown({
@@ -48,6 +50,7 @@ export default function Dropdown({
   style,
   showIcons = false,
   labelColor: customLabelColor,
+  error,
 }: Props) {
   const { isDark, themeColors } = useTheme();
   const [visible, setVisible] = useState(false);
@@ -63,6 +66,8 @@ export default function Dropdown({
   const border = tColors.cardSubtitle ?? tColors.neutral60 ?? (isDark ? '#374151' : '#d1d5db');
   const labelColor = customLabelColor ?? (isDark ? '#d1d5db' : '#374151');
   const txtColor = tColors.cardText ?? (isDark ? '#ffffff' : '#111827');
+  const errorColor = tColors.error ?? '#ef4444';
+  const effectiveBorder = error ? errorColor : border;
 
   const buttonRef = useRef<any>(null);
   const [anchor, setAnchor] = useState<{ top?: number; left?: number; width?: number }>({});
@@ -211,7 +216,7 @@ export default function Dropdown({
         ref={buttonRef}
         style={[
           styles.button,
-          { backgroundColor: bg, borderColor: border, borderWidth: 1 },
+          { backgroundColor: bg, borderColor: effectiveBorder, borderWidth: 1 },
         ]}
         onPress={measureAndOpen}
       >
@@ -224,6 +229,10 @@ export default function Dropdown({
 
         <ChevronDown color={isDark ? '#cbd5e1' : '#374151'} size={18} />
       </TouchableOpacity>
+
+      {typeof error === 'string' && error.length ? (
+        <Text style={styles.errorText}>{error}</Text>
+      ) : null}
 
       <Modal animationType="fade" transparent visible={visible} onRequestClose={() => setVisible(false)}>
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setVisible(false)} />
@@ -288,6 +297,11 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     fontSize: 16,
+  },
+  errorText: {
+    color: '#ef4444',
+    marginTop: 6,
+    fontSize: 12,
   },
   modalOverlay: {
     flex: 1,

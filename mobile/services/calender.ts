@@ -29,10 +29,12 @@ export const getCalendarEvents = async (): Promise<ICalendarEvent[]> => {
 // For EXTERNAL notifications (when app is closed), see ExternalNotificationService below
 export class GlobalReminderService {
   private static intervalId: NodeJS.Timeout | null = null;
-  private static shownReminders = new Set<string>();
+  // Ring-alarm dedup, keyed `alarm-${eventId}-${minutesBefore}` — one per offset
   private static shownAlarms = new Set<string>();
+  // Plain-notification dedup, keyed `notify-${eventId}` — one per event, at startAt
+  private static shownNotifications = new Set<string>();
   private static alarmCallback: ((event: ICalendarEvent) => void) | null = null;
-  // Exact-time timeouts (one per future event) — fire at the millisecond the event starts
+  // Exact-time timeouts, keyed `${eventId}:ring:${minutes}` or `${eventId}:notify`
   private static exactAlarmTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
   private static events: ICalendarEvent[] = [];
   private static language: string = 'en';
@@ -61,19 +63,42 @@ export class GlobalReminderService {
       if (!event.id || String(event.id).startsWith('optimistic-')) return;
 
       const startMs = new Date(event.startAt).getTime();
-      const delay = startMs - now;
-      // NaN (Invalid Date) or out-of-range — skip
-      if (!Number.isFinite(delay) || delay <= 0 || delay > MAX_WINDOW) return;
 
-      const t = setTimeout(() => {
-        const alarmId = `alarm-${event.id}`;
-        if (!this.shownAlarms.has(alarmId) && this.alarmCallback) {
-          this.shownAlarms.add(alarmId);
-          this.alarmCallback(event);
-        }
-      }, delay);
+      // ── Ring timers — one per selected reminder offset ─────────────────────
+      const offsets = Array.isArray(event.reminderMinutesBefore)
+        ? event.reminderMinutesBefore
+        : (event.reminderMinutesBefore ? [event.reminderMinutesBefore] : []);
 
-      this.exactAlarmTimeouts.set(event.id, t);
+      offsets.forEach(minutes => {
+        if (!minutes || minutes <= 0) return;
+        const fireAt = startMs - minutes * 60 * 1000;
+        const delay = fireAt - now;
+        if (!Number.isFinite(delay) || delay <= 0 || delay > MAX_WINDOW) return;
+
+        const t = setTimeout(() => {
+          const alarmId = `alarm-${event.id}-${minutes}`;
+          if (!this.shownAlarms.has(alarmId) && this.alarmCallback) {
+            this.shownAlarms.add(alarmId);
+            this.alarmCallback(event);
+          }
+        }, delay);
+
+        this.exactAlarmTimeouts.set(`${event.id}:ring:${minutes}`, t);
+      });
+
+      // ── Notify timer — fires once, at the event's actual start time ────────
+      const notifyDelay = startMs - now;
+      if (Number.isFinite(notifyDelay) && notifyDelay > 0 && notifyDelay <= MAX_WINDOW) {
+        const t = setTimeout(() => {
+          const notifyId = `notify-${event.id}`;
+          if (!this.shownNotifications.has(notifyId)) {
+            this.shownNotifications.add(notifyId);
+            ExternalNotificationService.notifyEventStarting(event);
+          }
+        }, notifyDelay);
+
+        this.exactAlarmTimeouts.set(`${event.id}:notify`, t);
+      }
     });
   }
 
@@ -85,8 +110,11 @@ export class GlobalReminderService {
     return this.events.find(e => e.id === id);
   }
 
-  static unmarkAlarm(alarmId: string) {
-    this.shownAlarms.delete(alarmId);
+  static unmarkAlarmsForEvent(eventId: string) {
+    const prefix = `alarm-${eventId}-`;
+    Array.from(this.shownAlarms)
+      .filter(id => id.startsWith(prefix))
+      .forEach(id => this.shownAlarms.delete(id));
   }
 
   static updateLanguage(language: string, locale: string) {
@@ -118,57 +146,47 @@ export class GlobalReminderService {
     const now = new Date();
 
     this.events.forEach(event => {
-      // ── Reminder check (X minutes before event) ──────────────────────────
-      const reminderMinutes = Array.isArray(event.reminderMinutesBefore)
-        ? event.reminderMinutesBefore[0]
-        : event.reminderMinutesBefore;
+      // ── Ring check (X minutes before event, once per selected offset) ────
+      const offsets = Array.isArray(event.reminderMinutesBefore)
+        ? event.reminderMinutesBefore
+        : (event.reminderMinutesBefore ? [event.reminderMinutesBefore] : []);
 
-      if (reminderMinutes && reminderMinutes > 0) {
-        const reminderTime = new Date(event.startAt.getTime() - (reminderMinutes * 60 * 1000));
-        const reminderId = `reminder-${event.id}`;
+      offsets.forEach(minutes => {
+        if (!minutes || minutes <= 0) return;
+        const reminderTime = new Date(event.startAt.getTime() - (minutes * 60 * 1000));
+        const alarmId = `alarm-${event.id}-${minutes}`;
         const isReminderTime = now >= reminderTime && now <= new Date(reminderTime.getTime() + 30_000);
         const isFutureEvent = event.startAt > now;
-        const notShownYet = !this.shownReminders.has(reminderId);
 
-        if (isReminderTime && isFutureEvent && notShownYet) {
-          this.showReminder(event, reminderId);
+        if (isReminderTime && isFutureEvent && !this.shownAlarms.has(alarmId) && this.alarmCallback) {
+          this.shownAlarms.add(alarmId);
+          this.alarmCallback(event);
         }
-      }
+      });
 
-      // ── Alarm check (event start time reached) ───────────────────────────
-      const alarmId = `alarm-${event.id}`;
+      // ── Notify check (event start time reached) ───────────────────────────
+      const notifyId = `notify-${event.id}`;
       const isStartTime =
         now >= event.startAt &&
         now <= new Date(event.startAt.getTime() + 30_000);
 
-      if (isStartTime && !this.shownAlarms.has(alarmId) && this.alarmCallback) {
-        this.shownAlarms.add(alarmId);
-        this.alarmCallback(event);
+      if (isStartTime && !this.shownNotifications.has(notifyId)) {
+        this.shownNotifications.add(notifyId);
+        ExternalNotificationService.notifyEventStarting(event);
       }
     });
   }
 
-  private static showReminder(event: ICalendarEvent, reminderId: string) {
-    // Toast is now handled by NotificationsContext via socket
-    // Just mark as shown to prevent duplicate tracking
-    this.shownReminders.add(reminderId);
-
-    if (this.shownReminders.size > 50) {
-      const remindersArray = Array.from(this.shownReminders);
-      this.shownReminders = new Set(remindersArray.slice(-25));
-    }
-  }
-
   static resetShownReminders() {
-    this.shownReminders.clear();
     this.shownAlarms.clear();
+    this.shownNotifications.clear();
   }
 
   static getStatus() {
     return {
       isRunning: this.intervalId !== null,
       eventsCount: this.events.length,
-      shownRemindersCount: this.shownReminders.size,
+      shownNotificationsCount: this.shownNotifications.size,
       language: this.language,
       locale: this.locale,
     };
@@ -212,7 +230,7 @@ export class ExternalNotificationService {
       await Notifications.setNotificationChannelAsync('event-alarm', {
         name: 'Event Alarms',
         importance: Notifications.AndroidImportance.MAX,
-        description: 'Alarm that fires when an event is starting now',
+        description: 'Alarm that fires ahead of an event, at your reminder time',
         // 'alarm' maps to the bundled alarm.wav (no extension on Android)
         sound: 'alarm',
         vibrationPattern: [0, 500, 300, 500, 300, 500],
@@ -279,11 +297,11 @@ export class ExternalNotificationService {
   }
 
   /**
-   * Triggers an immediate alarm-grade notification when an event starts NOW.
-   * Uses the ALARM audio channel on Android (bypasses silent mode) and
-   * timeSensitive interruption level on iOS (bypasses most Focus modes).
+   * Posts a plain (non-ringing) local notification when an event starts NOW.
+   * Uses the default notification channel/sound \u2014 the loud alarm already
+   * happened earlier, at the reminder offset time, via NativeAlarmScheduler.
    */
-  static async triggerImmediateAlarm(event: ICalendarEvent): Promise<void> {
+  static async notifyEventStarting(event: ICalendarEvent): Promise<void> {
     try {
       await Notifications.scheduleNotificationAsync({
         content: {
@@ -291,25 +309,21 @@ export class ExternalNotificationService {
           body: event.location
             ? `Gitangiye ubu \u00B7 ${event.location}`
             : 'Igikorwa cyawe gitangiye ubu!',
-          sound: Platform.OS === 'android' ? 'alarm' : 'alarm.wav',
-          categoryIdentifier: 'alarm-actions',
+          sound: 'default',
           data: {
-            alarmId:    event.id,
-            type:       'alarm',
+            eventId:    event.id,
+            type:       'event-start',
             eventTitle: event.title,
             eventTime:  new Date(event.startAt).toISOString(),
           },
-          ...(Platform.OS === 'ios' && {
-            interruptionLevel: 'timeSensitive' as const,
-          }),
         },
         trigger: null, // fires immediately
         ...(Platform.OS === 'android' && {
-          android: { channelId: 'event-alarm' },
+          android: { channelId: 'calendar-reminders' },
         } as any),
       });
     } catch (err) {
-      console.log('[ExternalNotificationService] Failed to trigger alarm:', err);
+      console.log('[ExternalNotificationService] Failed to post start notification:', err);
     }
   }
 
@@ -361,27 +375,35 @@ export class ExternalNotificationService {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Schedule a native alarm for an event's start time.
+ * Schedule a native alarm for each of an event's reminder offsets
+ * (startAt − minutesBefore), one ring per selected offset.
  * Uses expo-alarm-module for reliable background/locked-screen delivery.
- * Safe to call multiple times — cancels any previous alarm before scheduling.
+ * Safe to call multiple times — clears this event's previously-scheduled
+ * offsets before scheduling the current set.
  */
 export async function scheduleEventAlarm(event: ICalendarEvent): Promise<void> {
-  if (!event.startAt) return;
+  if (!event.startAt || !event.id || String(event.id).startsWith('optimistic-')) return;
   const startAt = event.startAt instanceof Date ? event.startAt : new Date(event.startAt);
-  if (startAt.getTime() <= Date.now()) return; // past events — skip silently
-  try {
-    await NativeAlarmScheduler.scheduleAlarm(
-      startAt,
-      event.id,
-      event.title,
-    );
-  } catch (err) {
-    console.warn('[calender] scheduleEventAlarm failed:', err);
+
+  // Clear any previously-scheduled offsets for this event so edits that
+  // remove/change an offset don't leave an orphaned native alarm behind.
+  await NativeAlarmScheduler.cancelAlarm(event.id).catch(() => {});
+
+  const offsets = Array.isArray(event.reminderMinutesBefore) ? event.reminderMinutesBefore : [];
+  for (const minutes of offsets) {
+    if (!minutes || minutes <= 0) continue;
+    const fireAt = new Date(startAt.getTime() - minutes * 60 * 1000);
+    if (fireAt.getTime() <= Date.now()) continue; // this offset already elapsed — skip silently
+    try {
+      await NativeAlarmScheduler.scheduleAlarm(fireAt, event.id, event.title, String(minutes));
+    } catch (err) {
+      console.warn('[calender] scheduleEventAlarm failed for offset', minutes, err);
+    }
   }
 }
 
 /**
- * Cancel a previously-scheduled alarm for the given event id.
+ * Cancel every previously-scheduled alarm (all offsets) for the given event id.
  */
 export async function cancelEventAlarm(eventId: string): Promise<void> {
   try {

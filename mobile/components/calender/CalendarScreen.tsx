@@ -37,8 +37,9 @@ import {
   GlobalReminderService,
   updateCalendarEvent,
   deleteCalendarEvent,
+  scheduleEventAlarm,
+  cancelEventAlarm,
 } from '@/services/calender';
-import { NativeAlarmScheduler } from '@/services/NativeAlarmScheduler';
 import EventFormModal, { EventFormData } from './EventFormModal';
 import EventViewModal from './EventViewModal';
 import { usePersistentCountdown } from './PersistentCountdown';
@@ -46,6 +47,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useNotificationsContext } from '@/contexts/NotificationsContext';
 import { SocketService } from '@/services/socket.service';
+import { useIsFocused } from '@react-navigation/native';
+import { CopilotProvider, CopilotStep, useCopilot } from 'react-native-copilot';
+import { WalkthroughableView, WalkthroughableTouchable } from '@/components/onboarding/walkthroughable';
+import MascotTooltip from '@/components/onboarding/MascotTooltip';
+import { TOUR_KEYS, onboardingService, scheduleTourStart } from '@/services/onboarding.service';
+import { useOnboarding } from '@/contexts/OnboardingContext';
+import { useTourStepAdvance } from '@/hooks/useTourStepAdvance';
 
 type CalendarEvent = ICalendarEvent;
 
@@ -276,7 +284,7 @@ const EventCard: React.FC<EventCardProps> = ({ event, isDark, themeColors, onPre
 };
 
 // ─── Main CalendarScreen ───────────────────────────────────────────────────────
-const CalendarScreen = () => {
+const CalendarScreenContent = () => {
   const { isDark, themeColors } = useTheme();
   const { t } = useLanguage();
   const insets = useSafeAreaInsets();
@@ -284,6 +292,31 @@ const CalendarScreen = () => {
   const { user } = useAuth();
   const isAdmin = user?.roles?.some((r: string) => r === 'ADMIN') ?? false;
   const { notifications } = useNotificationsContext();
+  const { start, copilotEvents, stop, visible } = useCopilot();
+  // start()'s identity is not stable across CopilotProvider re-renders (the
+  // library doesn't memoize its internal visibility setter, which start
+  // depends on) — reading it through a ref means a re-render before the
+  // scheduled tour fires doesn't cancel it via the effect's cleanup.
+  const startRef = useRef(start);
+  startRef.current = start;
+  const { markComplete } = useOnboarding();
+  const advanceRecordings = useTourStepAdvance('calendar-recordings');
+  const advanceGrid = useTourStepAdvance('calendar-grid');
+  const isFocused = useIsFocused();
+  // If the user navigates away (tapping the real highlighted element can
+  // itself trigger navigation, but this also covers back/tab-switch/etc.)
+  // while a tour is visible, its CopilotProvider can stay mounted (stack
+  // navigators often keep the previous screen alive) — without this, the
+  // tour's Modal renders in RN's top-level layer and keeps floating over
+  // whatever screen is now active. Close it on the focus transition.
+  const wasFocusedRef = useRef(isFocused);
+  useEffect(() => {
+    if (wasFocusedRef.current && !isFocused && visible) {
+      stop().catch(() => {});
+    }
+    wasFocusedRef.current = isFocused;
+  }, [isFocused, visible, stop]);
+  const autoStartAttemptedRef = useRef(false);
 
   // Refresh when a participant notification arrives (other users' changes)
   useEffect(() => {
@@ -349,30 +382,58 @@ const CalendarScreen = () => {
     queryFn: getCalendarEvents,
   });
 
+  const lastScheduledAlarmEventIdRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (events.length > 0) {
       GlobalReminderService.updateEvents(events);
       ExternalNotificationService.rescheduleAllReminders(events);
 
-      // Schedule the nearest upcoming event as a native alarm.
-      // expo-alarm-module only keeps the next-firing alarm active at a time.
-      const now = new Date();
-      const futureEvents = events.filter(e => new Date(e.startAt) > now);
-      if (futureEvents.length > 0) {
-        const nextEvent = futureEvents.reduce((prev, current) =>
-          new Date(prev.startAt) < new Date(current.startAt) ? prev : current
-        );
-        setUpcomingEvent(nextEvent);
-        // Only schedule for real server IDs — skip optimistic placeholders
-        if (nextEvent.id && !String(nextEvent.id).startsWith('optimistic-')) {
-          NativeAlarmScheduler.scheduleAlarm(
-            new Date(nextEvent.startAt),
-            nextEvent.id,
-            nextEvent.title,
-          ).catch(err => console.warn('[CalendarScreen] Failed to schedule native alarm:', err));
+      // Pick the event whose SOONEST upcoming ring (startAt − offset, across all
+      // of its selected reminder offsets) is nearest to now — not the event
+      // whose startAt is nearest, since a later-starting event can have an
+      // earlier-firing reminder. Only that one event's alarms are kept
+      // natively scheduled at a time.
+      const now = Date.now();
+      let nearestAlarmEvent: ICalendarEvent | null = null;
+      let nearestFireAt = Infinity;
+
+      events.forEach(e => {
+        if (!e.id || String(e.id).startsWith('optimistic-')) return;
+        const startMs = new Date(e.startAt).getTime();
+        const offsets = Array.isArray(e.reminderMinutesBefore) ? e.reminderMinutesBefore : [];
+        offsets.forEach(minutes => {
+          if (!minutes || minutes <= 0) return;
+          const fireAt = startMs - minutes * 60000;
+          if (fireAt > now && fireAt < nearestFireAt) {
+            nearestFireAt = fireAt;
+            nearestAlarmEvent = e;
+          }
+        });
+      });
+
+      // Fall back to soonest-starting future event purely for the countdown
+      // display when no event has a future reminder offset to ring.
+      const futureEvents = events.filter(e => new Date(e.startAt) > new Date(now));
+      const soonestStarting = futureEvents.length > 0
+        ? futureEvents.reduce((prev, current) =>
+            new Date(prev.startAt) < new Date(current.startAt) ? prev : current
+          )
+        : null;
+
+      setUpcomingEvent(nearestAlarmEvent ?? soonestStarting);
+
+      if (nearestAlarmEvent) {
+        const nearestId = (nearestAlarmEvent as ICalendarEvent).id;
+        if (lastScheduledAlarmEventIdRef.current && lastScheduledAlarmEventIdRef.current !== nearestId) {
+          cancelEventAlarm(lastScheduledAlarmEventIdRef.current).catch(() => {});
         }
-      } else {
-        setUpcomingEvent(null);
+        scheduleEventAlarm(nearestAlarmEvent).catch(err =>
+          console.warn('[CalendarScreen] Failed to schedule native alarm:', err));
+        lastScheduledAlarmEventIdRef.current = nearestId;
+      } else if (lastScheduledAlarmEventIdRef.current) {
+        cancelEventAlarm(lastScheduledAlarmEventIdRef.current).catch(() => {});
+        lastScheduledAlarmEventIdRef.current = null;
       }
     }
   }, [events]);
@@ -434,6 +495,9 @@ const CalendarScreen = () => {
       const updatedList = events.map(e => e.id === updatedEvent.id ? updatedEvent : e);
       GlobalReminderService.updateEvents(updatedList);
       ExternalNotificationService.cancelEventReminder(updatedEvent.id);
+      // Clear any stale native alarm(s) — the events-effect above will
+      // reschedule fresh ones if this event is (still) the nearest.
+      cancelEventAlarm(updatedEvent.id).catch(() => {});
       const reminderMinutes = Array.isArray(updatedEvent.reminderMinutesBefore)
         ? updatedEvent.reminderMinutesBefore[0]
         : updatedEvent.reminderMinutesBefore;
@@ -455,8 +519,9 @@ const CalendarScreen = () => {
       if (ctx?.previous) queryClient.setQueryData(['CALENDAR_EVENTS'], ctx.previous);
       Toast.show({ type: 'error', text1: t('calendar.error.deleteTitle') || 'Error', text2: 'Failed to delete event' });
     },
-    onSuccess: () => {
+    onSuccess: (_data, id) => {
       queryClient.invalidateQueries({ queryKey: ['CALENDAR_EVENTS'] });
+      cancelEventAlarm(id).catch(() => {});
       Toast.show({ type: 'success', text1: t('calendar.success.deleteTitle') || 'Deleted', text2: 'Event removed from schedule' });
     },
   });
@@ -628,6 +693,26 @@ const CalendarScreen = () => {
 
   const isSubmitting = createEventMutation.isPending || updateEventMutation.isPending;
 
+  useEffect(() => {
+    let cancelSchedule: (() => void) | null = null;
+    let cancelled = false;
+    if (isFocused && !autoStartAttemptedRef.current) {
+      autoStartAttemptedRef.current = true;
+      void (async () => {
+        const done = await onboardingService.hasCompleted(TOUR_KEYS.CALENDAR);
+        if (cancelled) return;
+        if (!done) { cancelSchedule = scheduleTourStart(() => startRef.current()); }
+      })();
+    }
+    return () => { cancelled = true; cancelSchedule?.(); };
+  }, [isFocused]);
+
+  useEffect(() => {
+    const handleStop = () => { markComplete(TOUR_KEYS.CALENDAR).catch(() => {}); };
+    copilotEvents.on('stop', handleStop);
+    return () => { copilotEvents.off('stop', handleStop); };
+  }, [copilotEvents, markComplete]);
+
   // ─── Render ───────────────────────────────────────────────────────────────────
   return (
     <View style={[styles.screen, { backgroundColor: isDark ? '#0f172a' : '#f1f5f9' }]}>
@@ -691,7 +776,12 @@ const CalendarScreen = () => {
         </LinearGradient>
 
         {/* ─── Calendar grid ───────────────────────────────────────────────────── */}
-        <View style={[styles.calendarContainer, isDark && styles.calendarContainerDark]}>
+        <CopilotStep
+          text="Reba hano gahunda y'ibikorwa byawe. Kanda ku itariki kugira ngo urebe ibikorwa byayo. Ibikorwa bimwe na bimwe bigufasha kwibutswa (reminders) mbere y'igihe."
+          order={1}
+          name="calendar-grid"
+        >
+        <WalkthroughableView style={[styles.calendarContainer, isDark && styles.calendarContainerDark]}>
           {/* Weekday headers (Monday-first) */}
           <View style={styles.weekdayRow}>
             {WEEKDAY_KEYS.map(key => {
@@ -753,13 +843,13 @@ const CalendarScreen = () => {
                             : { elevation: 3 }),
                         },
                       ]}
-                      onPress={() => {
+                      onPress={advanceGrid(() => {
                         if (isSelected) {
                           setSelectedDate(null);
                         } else {
                           setSelectedDate(date);
                         }
-                      }}
+                      })}
                       accessibilityRole="button"
                       accessibilityLabel={date.toDateString()}
                     >
@@ -800,7 +890,8 @@ const CalendarScreen = () => {
                   );
                 })}
           </View>
-        </View>
+        </WalkthroughableView>
+        </CopilotStep>
 
         {/* ─── Selected day events ──────────────────────────────────────────────── */}
         <View style={styles.section}>
@@ -862,14 +953,20 @@ const CalendarScreen = () => {
 
       {/* ─── FAB row ─────────────────────────────────────────────────────────── */}
       <View style={[styles.fabRow, { bottom: insets.bottom + 24 }]}>
-        <TouchableOpacity
-          style={[styles.fabSecondary, { backgroundColor: themeColors.primary, shadowColor: themeColors.primary }]}
-          activeOpacity={0.85}
-          onPress={() => router.push(isAdmin ? '/recordings' : '/recordings/watch')}
+        <CopilotStep
+          text="Kanda hano kureba amasomo cyangwa inama zafashwe mbere."
+          order={2}
+          name="calendar-recordings"
         >
-          <PlayCircle size={18} color="#ffffff" />
-          <Text style={styles.fabLabel}>Ibyafashwe mu Nama</Text>
-        </TouchableOpacity>
+          <WalkthroughableTouchable
+            style={[styles.fabSecondary, { backgroundColor: themeColors.primary, shadowColor: themeColors.primary }]}
+            activeOpacity={0.85}
+            onPress={advanceRecordings(() => router.push(isAdmin ? '/recordings' : '/recordings/watch'))}
+          >
+            <PlayCircle size={18} color="#ffffff" />
+            <Text style={styles.fabLabel}>Ibyafashwe mu Nama</Text>
+          </WalkthroughableTouchable>
+        </CopilotStep>
 
         <TouchableOpacity
           style={[styles.fab, { backgroundColor: themeColors.primary, shadowColor: themeColors.primary }]}
@@ -904,6 +1001,21 @@ const CalendarScreen = () => {
     </View>
   );
 };
+
+const CalendarScreen = () => (
+  <CopilotProvider
+    tooltipComponent={MascotTooltip}
+    overlay="view"
+    backdropColor="rgba(0, 0, 0, 0.65)"
+    animationDuration={300}
+    stepNumberComponent={() => null}
+      arrowSize={10}
+    androidStatusBarVisible
+    labels={{ finish: 'Rangiza', next: 'Ibikurikiraho', previous: 'Inyuma', skip: 'Simbuka' }}
+  >
+    <CalendarScreenContent />
+  </CopilotProvider>
+);
 
 // ─── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({

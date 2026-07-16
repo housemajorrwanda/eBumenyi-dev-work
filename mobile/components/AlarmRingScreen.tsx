@@ -34,6 +34,21 @@ function formatDate(date: Date): string {
   });
 }
 
+/**
+ * This screen can appear either as a reminder (ringing ahead of the event,
+ * at the user's chosen offset) or, rarely, once the event has already
+ * started (e.g. a delayed/queued ring). Compute which wording applies at
+ * render time from the live gap to startAt, rather than trusting a static
+ * label — the alarm no longer always fires exactly at start time.
+ */
+function getRingLabel(startAt: Date): { label: string; minutesRemaining: number | null } {
+  const minutesRemaining = Math.round((startAt.getTime() - Date.now()) / 60000);
+  if (minutesRemaining > 0) {
+    return { label: 'Ukwibutsa', minutesRemaining };
+  }
+  return { label: 'Igikorwa gitangiye', minutesRemaining: null };
+}
+
 export default function AlarmRingScreen() {
   const { activeAlarm, dismissAlarm, snoozeAlarm } = useAlarmContext();
   const { isDark, themeColors } = useTheme();
@@ -88,6 +103,8 @@ export default function AlarmRingScreen() {
   const typeMeta =
     EVENT_TYPE_COLORS[activeAlarm.type] ?? { bg: '#f3f4f6', text: '#374151' };
 
+  const { label: ringLabel, minutesRemaining } = getRingLabel(startAt);
+
   const bg = isDark ? '#0f172a' : '#ffffff';
   const surface = isDark ? '#1e293b' : '#f0f4ff';
   const textPrimary = isDark ? '#f1f5f9' : '#0f172a';
@@ -122,7 +139,7 @@ export default function AlarmRingScreen() {
         <View style={styles.topBar}>
           <AlarmClock size={20} color={themeColors.primary} />
           <Text style={[styles.topBarLabel, { color: themeColors.primary }]}>
-            Igikorwa gitangiye
+            {ringLabel}
           </Text>
         </View>
 
@@ -158,6 +175,7 @@ export default function AlarmRingScreen() {
             <Clock size={15} color={textSecondary} style={{ marginRight: 6 }} />
             <Text style={[styles.timeText, { color: textSecondary }]}>
               {formatDate(startAt)} · {formatTime(startAt)}
+              {minutesRemaining !== null ? ` · mu minota ${minutesRemaining}` : ''}
             </Text>
           </View>
 

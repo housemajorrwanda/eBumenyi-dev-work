@@ -29,13 +29,44 @@ import { useTypingIndicators } from '@/hooks/useTypingIndicators';
 import { useUnreadCount } from '@/hooks/useUnreadCount';
 import { useActiveConversation } from '@/hooks/useActiveConversation';
 import * as MessagingAPI from '@/services/messaging.api';
+import { useIsFocused } from '@react-navigation/native';
+import { CopilotProvider, CopilotStep, useCopilot } from 'react-native-copilot';
+import { WalkthroughableView } from '@/components/onboarding/walkthroughable';
+import MascotTooltip from '@/components/onboarding/MascotTooltip';
+import { useTourStepAdvance } from '@/hooks/useTourStepAdvance';
+import { TOUR_KEYS, onboardingService, scheduleTourStart } from '@/services/onboarding.service';
+import { useOnboarding } from '@/contexts/OnboardingContext';
 
-export default function CommunityRoom() {
+function CommunityRoomContent() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const flatListRef = useRef<FlatList>(null);
   const { markConversationRead } = useUnreadCount();
   const { setActiveConversation, clearActiveConversation } = useActiveConversation();
+  const { start, copilotEvents, stop, visible } = useCopilot();
+  // start()'s identity is not stable across CopilotProvider re-renders (the
+  // library doesn't memoize its internal visibility setter, which start
+  // depends on) — reading it through a ref means a re-render before the
+  // scheduled tour fires doesn't cancel it via the effect's cleanup.
+  const startRef = useRef(start);
+  startRef.current = start;
+  const { markComplete } = useOnboarding();
+  const advanceFeedInput = useTourStepAdvance('feed-input');
+  const isFocused = useIsFocused();
+  // If the user navigates away (tapping the real highlighted element can
+  // itself trigger navigation, but this also covers back/tab-switch/etc.)
+  // while a tour is visible, its CopilotProvider can stay mounted (stack
+  // navigators often keep the previous screen alive) — without this, the
+  // tour's Modal renders in RN's top-level layer and keeps floating over
+  // whatever screen is now active. Close it on the focus transition.
+  const wasFocusedRef = useRef(isFocused);
+  useEffect(() => {
+    if (wasFocusedRef.current && !isFocused && visible) {
+      stop().catch(() => {});
+    }
+    wasFocusedRef.current = isFocused;
+  }, [isFocused, visible, stop]);
+  const autoStartAttemptedRef = useRef(false);
   const { data: currentUser } = useQuery({
     queryKey: ['currentUser'],
     queryFn: () => getMe(),
@@ -178,6 +209,26 @@ export default function CommunityRoom() {
     }
   }, [editingMessage]);
 
+  useEffect(() => {
+    let cancelSchedule: (() => void) | null = null;
+    let cancelled = false;
+    if (!isLoading && conversation && postMessages.length > 0 && !hasOpenComments && isFocused && !autoStartAttemptedRef.current) {
+      autoStartAttemptedRef.current = true;
+      void (async () => {
+        const done = await onboardingService.hasCompleted(TOUR_KEYS.COMMUNITY_FEED);
+        if (cancelled) return;
+        if (!done) { cancelSchedule = scheduleTourStart(() => startRef.current()); }
+      })();
+    }
+    return () => { cancelled = true; cancelSchedule?.(); };
+  }, [isLoading, conversation, postMessages.length, hasOpenComments, isFocused]);
+
+  useEffect(() => {
+    const handleStop = () => { markComplete(TOUR_KEYS.COMMUNITY_FEED).catch(() => {}); };
+    copilotEvents.on('stop', handleStop);
+    return () => { copilotEvents.off('stop', handleStop); };
+  }, [copilotEvents, markComplete]);
+
   // Show loading while messages are being fetched
    if (isLoading || !conversation) {
     return (
@@ -221,49 +272,66 @@ export default function CommunityRoom() {
               data={postMessages}
               style={{ flex: 1, backgroundColor: '#ffffff' }}
               keyExtractor={(item) => item?.id || Math.random().toString()}
-              renderItem={({ item, index }) => (
-                <View style={{ backgroundColor: '#ffffff' }}>
-                  <CommunityPostCard
-                    post={item}
-                    communityId={id || ''}
-                    onEdit={handleEditMessage}
-                    onDelete={handleDeleteMessage}
-                    onLike={(postId) => toggleLike?.(postId)}
-                    onCommentOpen={() => {
-                      // Scroll card into view when comments section opens
-                      setTimeout(() => {
-                        try {
-                          flatListRef.current?.scrollToIndex({
-                            index,
-                            animated: true,
-                            viewPosition: 0.8, // Show near bottom of visible area
-                          });
-                        } catch {
-                          flatListRef.current?.scrollToEnd({ animated: true });
-                        }
-                      }, 150);
-                    }}
-                    onCommentInputFocus={() => {
-                      // Scroll the card so its bottom sits just above the keyboard
-                      setTimeout(() => {
-                        try {
-                          flatListRef.current?.scrollToIndex({
-                            index,
-                            animated: true,
-                            viewPosition: 1, // Align bottom of card to bottom of visible area
-                            viewOffset: -(keyboardHeight + 16), // Push above keyboard
-                          });
-                        } catch {
-                          // Fallback: scroll to end if index fails
-                          flatListRef.current?.scrollToEnd({ animated: true });
-                        }
-                      }, 350);
-                    }}
-                    onReplyModeChange={(isReplying) => setIsReplyingToComment(isReplying)}
-                    onCommentsVisibilityChange={(isOpen) => setHasOpenComments(isOpen)}
-                  />
-                </View>
-              )}
+              renderItem={({ item, index }) => {
+                const card = (
+                  <View style={{ backgroundColor: '#ffffff' }}>
+                    <CommunityPostCard
+                      post={item}
+                      communityId={id || ''}
+                      onEdit={handleEditMessage}
+                      onDelete={handleDeleteMessage}
+                      onLike={(postId) => toggleLike?.(postId)}
+                      onCommentOpen={() => {
+                        // Scroll card into view when comments section opens
+                        setTimeout(() => {
+                          try {
+                            flatListRef.current?.scrollToIndex({
+                              index,
+                              animated: true,
+                              viewPosition: 0.8, // Show near bottom of visible area
+                            });
+                          } catch {
+                            flatListRef.current?.scrollToEnd({ animated: true });
+                          }
+                        }, 150);
+                      }}
+                      onCommentInputFocus={() => {
+                        // Scroll the card so its bottom sits just above the keyboard
+                        setTimeout(() => {
+                          try {
+                            flatListRef.current?.scrollToIndex({
+                              index,
+                              animated: true,
+                              viewPosition: 1, // Align bottom of card to bottom of visible area
+                              viewOffset: -(keyboardHeight + 16), // Push above keyboard
+                            });
+                          } catch {
+                            // Fallback: scroll to end if index fails
+                            flatListRef.current?.scrollToEnd({ animated: true });
+                          }
+                        }, 350);
+                      }}
+                      onReplyModeChange={(isReplying) => setIsReplyingToComment(isReplying)}
+                      onCommentsVisibilityChange={(isOpen) => setHasOpenComments(isOpen)}
+                    />
+                  </View>
+                );
+                // Only the first post is a tour target — spotlighting the
+                // whole feed left too little room for the tooltip to fit
+                // without being clipped.
+                if (index === 0) {
+                  return (
+                    <CopilotStep
+                      text="Hano ubona ibiganiro bya kominote. Reba ubutumwa ni ibitekerezo byatanzwe."
+                      order={1}
+                      name="feed-posts"
+                    >
+                      <WalkthroughableView>{card}</WalkthroughableView>
+                    </CopilotStep>
+                  );
+                }
+                return card;
+              }}
               contentContainerStyle={[styles.messagesList, { flexGrow: 1, backgroundColor: '#ffffff' }]}
               showsVerticalScrollIndicator={true}
               keyboardShouldPersistTaps="handled"
@@ -292,16 +360,25 @@ export default function CommunityRoom() {
 
         {/* Only show ChatInput when NO comments section is open */}
         {!hasOpenComments && (
-          <ChatInput
-            onSendMessage={handleSendMessage}
-            onSendAttachment={(url, type, fileName) => sendAttachment(url, type, fileName)}
-            disabled={isSending}
-            initialMessage={editText}
-            isEditing={!!editingMessage}
-            onEditCancel={handleCancelEdit}
-            onStartTyping={startTyping}
-            onStopTyping={stopTyping}
-          />
+          <CopilotStep
+            text="Koresha hano kohereza ubutumwa cyangwa gutanga igitekerezo kuri kominote."
+            order={2}
+            name="feed-input"
+          >
+            <WalkthroughableView>
+              <ChatInput
+                onSendMessage={handleSendMessage}
+                onSendAttachment={(url, type, fileName) => sendAttachment(url, type, fileName)}
+                disabled={isSending}
+                initialMessage={editText}
+                isEditing={!!editingMessage}
+                onEditCancel={handleCancelEdit}
+                onStartTyping={startTyping}
+                onStopTyping={stopTyping}
+                tourAdvance={advanceFeedInput}
+              />
+            </WalkthroughableView>
+          </CopilotStep>
         )}
 
         {/* Community Settings Modal */}
@@ -415,6 +492,23 @@ export default function CommunityRoom() {
         chatType="community"
       />
     </SafeAreaView>
+  );
+}
+
+export default function CommunityRoom() {
+  return (
+    <CopilotProvider
+      tooltipComponent={MascotTooltip}
+      overlay="view"
+      backdropColor="rgba(0, 0, 0, 0.65)"
+      animationDuration={300}
+      stepNumberComponent={() => null}
+      arrowSize={10}
+      androidStatusBarVisible
+      labels={{ finish: 'Rangiza', next: 'Ibikurikiraho', previous: 'Inyuma', skip: 'Simbuka' }}
+    >
+      <CommunityRoomContent />
+    </CopilotProvider>
   );
 }
 

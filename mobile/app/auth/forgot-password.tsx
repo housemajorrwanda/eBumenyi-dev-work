@@ -13,13 +13,19 @@ export default function ForgotPasswordScreen() {
   const { isDark, themeColors } = useTheme();
   const { t } = useLanguage();
   const [email, setEmail] = useState('');
+  const [emailError, setEmailError] = useState<string | undefined>(undefined);
 
   const topSpacer = Dimensions.get('window').height * 0.20;
 const formOffset = topSpacer / 4;
   const title = t('emailVerification.forgotTitle');
   const handleVerify = () => {
+    setEmailError(undefined);
     if (!email) {
-      Alert.alert(t('error'), t('email.placeHolder'));
+      setEmailError(t('emailRequired'));
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setEmailError(t('invalidEmail'));
       return;
     }
 
@@ -39,11 +45,12 @@ const formOffset = topSpacer / 4;
         <TextField
           label={t('email')}
           value={email}
-          onChangeText={setEmail}
+          onChangeText={(v) => { setEmail(v); setEmailError(undefined); }}
           placeholder={t('email.placeHolder')}
           keyboardType="email-address"
           autoCapitalize="none"
           icon={<Mail color={themeColors.primary ?? '#3363AD'} size={20} />}
+          error={emailError}
         />
 
         <Button

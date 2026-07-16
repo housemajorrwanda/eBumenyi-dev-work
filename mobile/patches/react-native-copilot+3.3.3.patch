@@ -1,0 +1,179 @@
+diff --git a/node_modules/react-native-copilot/dist/index.js b/node_modules/react-native-copilot/dist/index.js
+index 3aff2e2..27a19fb 100644
+--- a/node_modules/react-native-copilot/dist/index.js
++++ b/node_modules/react-native-copilot/dist/index.js
+@@ -88,7 +88,7 @@ var init_style = __esm({
+     import_react_native = require("react-native");
+     STEP_NUMBER_RADIUS = 14;
+     STEP_NUMBER_DIAMETER = STEP_NUMBER_RADIUS * 2;
+-    ZINDEX = 100;
++    ZINDEX = 9999;
+     MARGIN = 13;
+     OFFSET_WIDTH = 4;
+     ARROW_SIZE = 6;
+@@ -99,7 +99,8 @@ var init_style = __esm({
+         top: 0,
+         right: 0,
+         bottom: 0,
+-        zIndex: ZINDEX
++        zIndex: ZINDEX,
++        elevation: ZINDEX
+       },
+       arrow: {
+         position: "absolute",
+@@ -109,9 +110,10 @@ var init_style = __esm({
+         position: "absolute",
+         paddingTop: 15,
+         paddingHorizontal: 15,
+-        backgroundColor: "#fff",
++        backgroundColor: "transparent",
+         borderRadius: 3,
+-        overflow: "hidden"
++        overflow: "visible",
++        alignItems: "center"
+       },
+       tooltipText: {},
+       tooltipContainer: {
+@@ -383,7 +385,7 @@ var init_ViewMask = __esm({
+         width,
+         import_react_native5.Animated.multiply(-1, rightOverlayLeft)
+       );
+-      return /* @__PURE__ */ import_react4.default.createElement(import_react_native5.View, { style: props.style, onStartShouldSetResponder: props.onClick }, [
++      return /* @__PURE__ */ import_react4.default.createElement(import_react_native5.View, { style: props.style, onStartShouldSetResponder: props.onClick, pointerEvents: "box-none" }, [
+         {
+           right: leftOverlayRight,
+           backgroundColor: props.backdropColor
+@@ -564,34 +566,34 @@ var CopilotModal = (0, import_react5.forwardRef)(
+         const arrow = {};
+         arrow.position = "absolute";
+         if (verticalPosition === "bottom") {
+-          tooltip.top = rect.y + rect.height + margin;
++          tooltip.top = Math.min(
++            rect.y + rect.height + margin,
++            Math.max(newMeasuredLayout.height - margin, 0)
++          );
+           arrow.borderBottomColor = arrowColor;
+           arrow.borderTopColor = "transparent";
+           arrow.borderLeftColor = "transparent";
+           arrow.borderRightColor = "transparent";
+           arrow.top = tooltip.top - arrowSize * 2;
+         } else {
+-          tooltip.bottom = newMeasuredLayout.height - (rect.y - margin);
++          tooltip.bottom = Math.min(
++            Math.max(newMeasuredLayout.height - (rect.y - margin), 0),
++            Math.max(newMeasuredLayout.height - margin, 0)
++          );
+           arrow.borderTopColor = arrowColor;
+           arrow.borderLeftColor = "transparent";
+           arrow.borderRightColor = "transparent";
+           arrow.borderBottomColor = "transparent";
+           arrow.bottom = tooltip.bottom - arrowSize * 2;
+         }
+-        if (horizontalPosition === "left") {
+-          tooltip.right = Math.max(
+-            newMeasuredLayout.width - (rect.x + rect.width),
+-            0
+-          );
+-          tooltip.right = tooltip.right === 0 ? tooltip.right + margin : tooltip.right;
+-          tooltip.maxWidth = newMeasuredLayout.width - tooltip.right - margin;
+-          arrow.right = tooltip.right + margin;
+-        } else {
+-          tooltip.left = Math.max(rect.x, 0);
+-          tooltip.left = tooltip.left === 0 ? tooltip.left + margin : tooltip.left;
+-          tooltip.maxWidth = newMeasuredLayout.width - tooltip.left - margin;
+-          arrow.left = tooltip.left + margin;
+-        }
++        tooltip.left = margin;
++        tooltip.right = margin;
++        tooltip.maxWidth = Math.max(newMeasuredLayout.width - margin * 2, 0);
++        const arrowCenterX = Math.min(
++          Math.max(rect.x + rect.width / 2, margin + arrowSize),
++          newMeasuredLayout.width - margin - arrowSize
++        );
++        arrow.left = arrowCenterX - arrowSize;
+         sanitize(arrow);
+         sanitize(tooltip);
+         sanitize(rect);
+@@ -618,11 +620,19 @@ var CopilotModal = (0, import_react5.forwardRef)(
+         setTooltipStyles(tooltip);
+         setArrowStyles(arrow);
+         setLayout(newMeasuredLayout);
++        const clampedMaskX = Math.floor(Math.max(rect.x, 0));
++        const clampedMaskY = Math.floor(Math.max(rect.y, 0));
+         setMaskRect({
+-          width: rect.width,
+-          height: rect.height,
+-          x: Math.floor(Math.max(rect.x, 0)),
+-          y: Math.floor(Math.max(rect.y, 0))
++          width: Math.max(
++            Math.min(rect.width, newMeasuredLayout.width - clampedMaskX),
++            0
++          ),
++          height: Math.max(
++            Math.min(rect.height, newMeasuredLayout.height - clampedMaskY),
++            0
++          ),
++          x: clampedMaskX,
++          y: clampedMaskY
+         });
+       }),
+       [
+@@ -680,15 +690,10 @@ var CopilotModal = (0, import_react5.forwardRef)(
+       return null;
+     }
+     return /* @__PURE__ */ import_react5.default.createElement(
+-      import_react_native6.Modal,
+-      {
+-        animationType: "none",
+-        visible: true,
+-        onRequestClose: noop,
+-        transparent: true,
+-        supportedOrientations: ["portrait", "landscape"]
+-      },
+-      /* @__PURE__ */ import_react5.default.createElement(import_react_native6.View, { style: styles.container, onLayout: handleLayoutChange }, contentVisible && renderMask(), contentVisible && renderTooltip())
++      import_react_native6.View,
++      { style: styles.container, onLayout: handleLayoutChange, pointerEvents: "box-none" },
++      contentVisible && renderMask(),
++      contentVisible && renderTooltip()
+     );
+     function renderMask() {
+       const MaskComponent = overlay === "svg" ? (
+@@ -734,16 +739,18 @@ var CopilotModal = (0, import_react5.forwardRef)(
+               left: animatedValues.stepNumberLeft,
+               top: import_react_native6.Animated.add(animatedValues.top, -STEP_NUMBER_RADIUS)
+             }
+-          ]
++          ],
++          pointerEvents: "none"
+         },
+         /* @__PURE__ */ import_react5.default.createElement(StepNumberComponent, null)
+       ), !!arrowSize && /* @__PURE__ */ import_react5.default.createElement(import_react_native6.Animated.View, { key: "arrow", style: [styles.arrow, arrowStyles] }), /* @__PURE__ */ import_react5.default.createElement(
+         import_react_native6.Animated.View,
+         {
+           key: "tooltip",
+-          style: [styles.tooltip, tooltipStyles, tooltipStyle]
++          style: [styles.tooltip, tooltipStyles, tooltipStyle],
++          pointerEvents: "box-none"
+         },
+-        /* @__PURE__ */ import_react5.default.createElement(TooltipComponent, { labels })
++        /* @__PURE__ */ import_react5.default.createElement(TooltipComponent, { labels, tooltipStyles, screenLayout: layout })
+       ));
+     }
+   }
+@@ -1083,9 +1090,16 @@ var CopilotStep = ({
+   const wrapperRef = import_react11.default.useRef(null);
+   const measure = () => __async(void 0, null, function* () {
+     return yield new Promise((resolve) => {
++      let zeroResultTries = 0;
++      const MAX_ZERO_RESULT_TRIES = 120;
+       const measure2 = () => {
+         if (wrapperRef.current != null && "measure" in wrapperRef.current) {
+           wrapperRef.current.measure((_ox, _oy, width, height, x, y) => {
++            if ((width === 0 || height === 0) && zeroResultTries < MAX_ZERO_RESULT_TRIES) {
++              zeroResultTries += 1;
++              requestAnimationFrame(measure2);
++              return;
++            }
+             resolve({
+               x,
+               y,

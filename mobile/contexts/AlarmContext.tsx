@@ -42,8 +42,8 @@ export function AlarmProvider({ children }: { children: React.ReactNode }) {
     const uid = await NativeAlarmScheduler.getActiveAlarmUid().catch(() => null);
     if (!uid) return;
 
-    // uid format: "alarm_<eventId>"
-    const eventId = String(uid).replace(/^alarm_/, '');
+    const eventId = await NativeAlarmScheduler.getEventIdForUid(uid);
+    if (!eventId) return;
     const event = GlobalReminderService.getEventById(eventId);
     if (event) {
       triggerAlarm(event);
@@ -52,8 +52,15 @@ export function AlarmProvider({ children }: { children: React.ReactNode }) {
 
   const dismissAlarm = useCallback(async (eventId: string) => {
     setActiveAlarm(null);
+    // Cancel only the specific ringing offset — sibling offsets for the same
+    // event (e.g. a later "10 min before" reminder) should still fire.
+    const uid = await NativeAlarmScheduler.getActiveAlarmUid().catch(() => null);
     await NativeAlarmScheduler.stopRinging();
-    await NativeAlarmScheduler.cancelAlarm(eventId).catch(() => {});
+    if (uid) {
+      await NativeAlarmScheduler.cancelAlarmByUid(uid).catch(() => {});
+    } else {
+      await NativeAlarmScheduler.cancelAlarm(eventId).catch(() => {});
+    }
     await Notifications.dismissAllNotificationsAsync().catch(() => {});
   }, []);
 
@@ -70,9 +77,10 @@ export function AlarmProvider({ children }: { children: React.ReactNode }) {
       snoozeTime,
       eventId,
       event?.title ?? '',
+      'snooze',
     ).catch(() => {});
 
-    GlobalReminderService.unmarkAlarm(`alarm-${eventId}`);
+    GlobalReminderService.unmarkAlarmsForEvent(eventId);
 
     if (snoozeTimerRef.current) clearTimeout(snoozeTimerRef.current);
     snoozeTimerRef.current = setTimeout(() => {

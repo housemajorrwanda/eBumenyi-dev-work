@@ -1,9 +1,26 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Modal, Alert, RefreshControl } from 'react-native';
+﻿import React, { useState, useEffect, useCallback, useRef } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Image,
+  Modal,
+  Alert,
+  RefreshControl,
+} from 'react-native';
 import Header from '@/components/Header';
 import StatsCard from '@/components/StatsCard';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { Trophy, BookOpen, Book, Clock, MessageCircle } from 'lucide-react-native';
+import { useIsFocused } from '@react-navigation/native';
+import {
+  Trophy,
+  BookOpen,
+  Book,
+  Clock,
+  MessageCircle,
+} from 'lucide-react-native';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { getStudentCourseStats } from '@/services/course.api';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -16,36 +33,62 @@ import SystemReviewCard from '@/components/SystemReviewCard';
 import StorageService from '@/services/storage.service';
 import { systemReviewAPI } from '@/services/systemReview.api';
 import WelcomeVideo from '@/components/WelcomeVideo';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
-import { TOUR_KEYS } from '@/services/onboarding.service';
+import { TOUR_KEYS, onboardingService, scheduleTourStart } from '@/services/onboarding.service';
 import { useOnboarding } from '@/contexts/OnboardingContext';
 import { CopilotProvider, CopilotStep, useCopilot } from 'react-native-copilot';
-import { WalkthroughableView } from '@/components/onboarding/walkthroughable';
+import { WalkthroughableView, WalkthroughableTouchable } from '@/components/onboarding/walkthroughable';
 import MascotTooltip from '@/components/onboarding/MascotTooltip';
+import { useTourStepAdvance } from '@/hooks/useTourStepAdvance';
 
 function HomeScreenContent() {
   const { t } = useLanguage();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { start, copilotEvents } = useCopilot();
-  const { hasCompleted: hasDoneTour, markComplete: markTourComplete, syncReady, triggerSync } = useOnboarding();
+  const { start, copilotEvents, stop, visible } = useCopilot();
+  // start()'s identity is not stable across CopilotProvider re-renders (the
+  // library doesn't memoize its internal visibility setter, which start
+  // depends on) — reading it through a ref means a re-render before the
+  // scheduled tour fires doesn't cancel it via the effect's cleanup.
+  const startRef = useRef(start);
+  startRef.current = start;
+  const { markComplete: markTourComplete, triggerSync } = useOnboarding();
+  const advanceActivityBanner = useTourStepAdvance('activity-banner');
+  const advanceCarousel = useTourStepAdvance('course-carousel');
+  const advanceFilters = useTourStepAdvance('filters');
+  const advanceEnrolledCourses = useTourStepAdvance('enrolled-courses-list');
+  const isFocused = useIsFocused();
+  // If the user navigates away (tapping the real highlighted element can
+  // itself trigger navigation, but this also covers back/tab-switch/etc.)
+  // while a tour is visible, its CopilotProvider can stay mounted (stack
+  // navigators often keep the previous screen alive) — without this, the
+  // tour's Modal renders in RN's top-level layer and keeps floating over
+  // whatever screen is now active. Close it on the focus transition.
+  const wasFocusedRef = useRef(isFocused);
+  useEffect(() => {
+    if (wasFocusedRef.current && !isFocused && visible) {
+      stop().catch(() => {});
+    }
+    wasFocusedRef.current = isFocused;
+  }, [isFocused, visible, stop]);
+  // Guards the auto-trigger effect below so it only ever attempts to show the
+  // welcome video / start the tour ONCE per screen session — not every time
+  // `isFocused`/`start` change identity (e.g. the tour's own tooltip Modal can
+  // cause brief navigation-focus blips, and react-native-copilot's `start`
+  // changes identity whenever any step re-registers). Without this guard, each
+  // re-run re-evaluates "is the tour done?" (still false mid-tour) and calls
+  // start() again, silently resetting the user back to the first step.
+  const autoStartAttemptedRef = useRef(false);
   const [activeQuickAction, setActiveQuickAction] = useState<number>(1);
   const [isValidatingToken, setIsValidatingToken] = useState(true);
   const [showSystemReview, setShowSystemReview] = useState(false);
   const [isSystemReviewed, setIsSystemReviewed] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const WELCOME_STORAGE_KEY = 'welcome_video_shown';
   const [welcomeModalVisible, setWelcomeModalVisible] = useState(false);
 
   const hasWelcomeBeenSeen = useCallback(async (): Promise<boolean> => {
-    try {
-      const val = await AsyncStorage.getItem(WELCOME_STORAGE_KEY);
-      return Boolean(val && val !== '1');
-    } catch {
-      return false;
-    }
+    return onboardingService.hasCompleted(TOUR_KEYS.WELCOME_VIDEO);
   }, []);
 
   /** Returns true if the welcome modal was opened. */
@@ -58,14 +101,32 @@ function HomeScreenContent() {
     return false;
   }, [hasWelcomeBeenSeen]);
 
-  const startAppTourIfNeeded = useCallback(() => {
-    if (!hasDoneTour(TOUR_KEYS.APP)) {
-      setTimeout(() => start(), 500);
+  const startAppTourIfNeeded = useCallback(async () => {
+    const done = await onboardingService.hasCompleted(TOUR_KEYS.APP);
+    console.log(
+      '[onboarding] startAppTourIfNeeded — app tour already done?',
+      done
+    );
+    if (!done) {
+      scheduleTourStart(() => {
+        console.log(
+          '[onboarding] startAppTourIfNeeded — calling start() now, fn:',
+          typeof startRef.current
+        );
+        startRef.current();
+      });
     }
-  }, [hasDoneTour, start]);
+  }, []);
 
   const handleWelcomeVideoDone = useCallback(() => {
+    console.log('[onboarding] handleWelcomeVideoDone fired');
     setWelcomeModalVisible(false);
+    // Uses the context's markComplete (not onboardingService's directly) so
+    // completedTours updates reactively — the tab-bar tour in _layout.tsx
+    // reads TOUR_KEYS.WELCOME_VIDEO through this same context to know when
+    // it's safe to start, and it has no other way to observe this screen's
+    // local modal-dismissal state.
+    markTourComplete(TOUR_KEYS.WELCOME_VIDEO).catch(() => {});
     startAppTourIfNeeded();
   }, [startAppTourIfNeeded]);
 
@@ -74,13 +135,13 @@ function HomeScreenContent() {
     const checkTokenValidity = async () => {
       try {
         const validationResult = await validateUserToken();
-        
+
         if (!validationResult.isValid && validationResult.shouldRedirect) {
           // Token is invalid, redirect to login
           router.replace(validationResult.redirectTo);
           return;
         }
-        
+
         // Token is valid — trigger onboarding sync now that we have a valid JWT
         setIsValidatingToken(false);
         triggerSync();
@@ -95,7 +156,12 @@ function HomeScreenContent() {
   }, [router, triggerSync]);
 
   // fetch student-course-stats (declared here so isLoading is in scope for the tour useEffect below)
-  const { data: courseStatsData, isLoading, error, refetch } = useQuery<any>({
+  const {
+    data: courseStatsData,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery<any>({
     queryKey: ['COURSE'],
     queryFn: getStudentCourseStats,
     gcTime: 0,
@@ -103,33 +169,105 @@ function HomeScreenContent() {
   });
 
   // Welcome video first, then app tour (first-time users only).
+  // Reads completion state straight from local storage (same pattern as the course
+  // tour in chapters.tsx) instead of gating on OnboardingContext's `syncReady` —
+  // that gate depends on a chain of async steps (token validation -> triggerSync ->
+  // backend GET /onboarding) and if any link stalls, the tour silently never fires.
+  //
+  // Also gated on `isFocused`: this screen can be mounted (and its effects fire)
+  // before the user has actually navigated into the home tab — e.g. while still
+  // on the post-login module-selection screen, since the tabs navigator mounts
+  // its screens eagerly. The welcome video is a real RN <Modal>, which renders in
+  // a top-level native layer regardless of which JS screen is "visually active",
+  // so without this gate it can pop up over an unrelated screen.
   useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | null = null;
+    let cancelSchedule: (() => void) | null = null;
     let cancelled = false;
 
-    if (!isValidatingToken && syncReady && !isLoading) {
+    console.log(
+      '[onboarding] auto-effect run — isValidatingToken:',
+      isValidatingToken,
+      'isLoading:',
+      isLoading,
+      'isFocused:',
+      isFocused,
+      'alreadyAttempted:',
+      autoStartAttemptedRef.current
+    );
+
+    if (
+      !isValidatingToken &&
+      !isLoading &&
+      isFocused &&
+      !autoStartAttemptedRef.current
+    ) {
+      autoStartAttemptedRef.current = true;
       void (async () => {
         const openedWelcome = await showWelcomeVideoIfNeeded();
+        console.log(
+          '[onboarding] auto-effect — openedWelcome:',
+          openedWelcome,
+          'cancelled:',
+          cancelled
+        );
         if (cancelled || openedWelcome) return;
-        if (!hasDoneTour(TOUR_KEYS.APP)) {
-          timer = setTimeout(() => start(), 500);
+        const done = await onboardingService.hasCompleted(TOUR_KEYS.APP);
+        console.log('[onboarding] auto-effect — app tour already done?', done);
+        if (cancelled) return;
+        if (!done) {
+          cancelSchedule = scheduleTourStart(() => {
+            console.log(
+              '[onboarding] auto-effect — calling start() now, fn:',
+              typeof startRef.current
+            );
+            startRef.current();
+          });
         }
       })();
     }
 
     return () => {
       cancelled = true;
-      if (timer) clearTimeout(timer);
+      cancelSchedule?.();
     };
-  }, [isValidatingToken, syncReady, isLoading, hasDoneTour, start, showWelcomeVideoIfNeeded]);
+  }, [
+    isValidatingToken,
+    isLoading,
+    isFocused,
+    showWelcomeVideoIfNeeded,
+  ]);
+
+  // Diagnostic: trace the copilot lifecycle so we can see whether start() actually
+  // finds a registered step (vs. silently retrying forever / never visually showing).
+  useEffect(() => {
+    const onStart = () =>
+      console.log(
+        '[onboarding][copilot] "start" event fired — a step was found'
+      );
+    const onStepChange = (step: any) =>
+      console.log('[onboarding][copilot] "stepChange" ->', step?.name);
+    const onStop = () =>
+      console.log('[onboarding][copilot] "stop" event fired');
+    copilotEvents.on('start', onStart);
+    copilotEvents.on('stepChange', onStepChange);
+    copilotEvents.on('stop', onStop);
+    return () => {
+      copilotEvents.off('start', onStart);
+      copilotEvents.off('stepChange', onStepChange);
+      copilotEvents.off('stop', onStop);
+    };
+  }, [copilotEvents]);
 
   // Mark app tour complete when copilot stops
   useEffect(() => {
     const handleStop = () => {
+      console.log('[onboarding] copilot stopped — marking app tour complete');
       markTourComplete(TOUR_KEYS.APP).catch(() => {});
     };
     copilotEvents.on('stop', handleStop);
-    return () => { copilotEvents.off('stop', handleStop); };
+    return () => {
+      copilotEvents.off('stop', handleStop);
+    };
   }, [copilotEvents, markTourComplete]);
 
   // Check system review status on component mount
@@ -149,15 +287,17 @@ function HomeScreenContent() {
   }, [isValidatingToken]);
 
   // Handle system review submission
-  const handleSystemReviewSubmit = async (reviewData: CreateSystemReviewDto) => {    
+  const handleSystemReviewSubmit = async (
+    reviewData: CreateSystemReviewDto
+  ) => {
     try {
       // Submit to backend
       await systemReviewAPI.submitSystemReview(reviewData);
-      
+
       // Store review status locally
       await StorageService.storeSystemReviewStatus(true);
       setIsSystemReviewed(true);
-      
+
       Alert.alert('Murakoze!', 'Igitekerezo cyawe cyakiriwe neza.');
       setShowSystemReview(false);
     } catch (error) {
@@ -172,15 +312,6 @@ function HomeScreenContent() {
     { id: 2, title: 'Watangiye', icon: '✓', color: '#EFF1F8' },
     { id: 3, title: 'Utaratangira', icon: '⏸', color: '#EFF1F8' },
   ];
-
-  // Refresh course stats whenever the tab comes into focus (e.g. returning from a course)
-  useFocusEffect(
-    useCallback(() => {
-      if (!isValidatingToken) {
-        queryClient.invalidateQueries({ queryKey: ['COURSE'] });
-      }
-    }, [isValidatingToken, queryClient])
-  );
 
   // Refresh course stats whenever the tab comes into focus (e.g. returning from a course)
   useFocusEffect(
@@ -209,18 +340,25 @@ function HomeScreenContent() {
     return <LoadingSpinner message={'Gusuzuma uburenganzira...'} />;
   }
 
-
   // Handle loading and error states
   if (isLoading) {
     return <LoadingSpinner message={'Gufungura amakuru...'} />;
   }
 
-  if (error) {
+  // Only show the error screen when we have nothing to display. A background
+  // refetch (e.g. from useFocusEffect's invalidateQueries on every tab focus —
+  // which fires right as the tour starts) can fail transiently while
+  // courseStatsData still holds good cached data; replacing the whole screen
+  // in that case unmounts every CopilotStep (including the ones in Header),
+  // which resets the in-progress tour back to its first step.
+  if (error && !courseStatsData) {
     return (
       <View style={styles.container}>
-        <Header title={t('home')}/>
+        <Header title={t('home')} />
         <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>Habaye ikosa mu gufungura amakuru</Text>
+          <Text style={styles.errorText}>
+            Habaye ikosa mu gufungura amakuru
+          </Text>
         </View>
       </View>
     );
@@ -228,7 +366,7 @@ function HomeScreenContent() {
 
   return (
     <View style={styles.container}>
-      <Header title={t('home')} />
+      <Header title={t('home')} tourEnabled />
       <ScrollView
         style={styles.content}
         showsVerticalScrollIndicator={false}
@@ -245,11 +383,11 @@ function HomeScreenContent() {
         {/* Innovative Stats Cards */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Incamake y&apos; amasomo</Text>
-          
+
           {/* Course Stats Row */}
           <CopilotStep
-            text="Hano ubona incamake y'amasomo yawe: amasomo yose wahabwa, watangiye kwiga, n'ayo utaratangira."
-            order={2}
+            text="Hano ubona incamake y'amasomo yawe: Amasomo yose ufite, ayo Watangiye kwiga, n'ayo Utaratangira."
+            order={5}
             name="stats"
           >
             <WalkthroughableView style={styles.statsSecondaryRow}>
@@ -281,7 +419,9 @@ function HomeScreenContent() {
                 <View style={styles.activityIconWrapper}>
                   {courseStatsData?.lastViewedLocation?.coverIcon ? (
                     <Image
-                      source={{ uri: courseStatsData.lastViewedLocation.coverIcon }}
+                      source={{
+                        uri: courseStatsData.lastViewedLocation.coverIcon,
+                      }}
                       style={styles.activityIconImage}
                       // resizeMode="contain"
                     />
@@ -290,88 +430,160 @@ function HomeScreenContent() {
                   )}
                 </View>
                 <View style={styles.activityContent}>
-                  <Text style={styles.activityTitle} numberOfLines={1}>{courseStatsData?.lastViewedLocation?.courseTitle}</Text>
-                  <Text style={styles.activitySubtitle} numberOfLines={1}>icyigwa {courseStatsData?.lastViewedLocation?.chapterNumber}: {courseStatsData?.lastViewedLocation?.chapterTitle}</Text>
+                  <Text style={styles.activityTitle} numberOfLines={1}>
+                    {courseStatsData?.lastViewedLocation?.courseTitle}
+                  </Text>
+                  <Text style={styles.activitySubtitle} numberOfLines={1}>
+                    icyigwa {courseStatsData?.lastViewedLocation?.chapterNumber}
+                    : {courseStatsData?.lastViewedLocation?.chapterTitle}
+                  </Text>
                 </View>
               </View>
-              <TouchableOpacity 
-                style={styles.activityRight}
-                onPress={() => {
-                  const loc = courseStatsData?.lastViewedLocation;
-                  if (loc?.courseId && loc?.sectionId && loc?.chapterId) {
-                    if (loc.slideId) {
-                      router.push(`/courses/${loc.courseId}/${loc.chapterId}/course-content?slideId=${loc.slideId}`);
-                    } else {
-                      router.push(`/courses/${loc.courseId}/${loc.chapterId}/course-content?page=1`);
-                    }
-                  }
-                }}
-                activeOpacity={0.8}
+              {/* The tooltip text instructs tapping 'Komeza' specifically —
+                  target that button directly instead of the whole banner
+                  (a wide target, containing icon/title/subtitle text too,
+                  anchors the library's pointer away from the button and can
+                  make the button un-tappable if the banner's measured hole
+                  doesn't line up with the button's real position). */}
+              <CopilotStep
+                text="Iyi mirongo igaragaza isomo uheruka kwiga. Kanda 'Komeza' kugira ngo ukomereze aho wagarukiye."
+                order={6}
+                name="activity-banner"
               >
-                <View style={styles.continueButton}>
-                  <Text style={styles.continueButtonText}>Komeza</Text>
-                </View>
-              </TouchableOpacity>
+                <WalkthroughableTouchable
+                  style={styles.activityRight}
+                  onPress={advanceActivityBanner(() => {
+                    const loc = courseStatsData?.lastViewedLocation;
+                    if (loc?.courseId && loc?.sectionId && loc?.chapterId) {
+                      if (loc.slideId) {
+                        router.push(
+                          `/courses/${loc.courseId}/${loc.chapterId}/course-content?slideId=${loc.slideId}`
+                        );
+                      } else {
+                        router.push(
+                          `/courses/${loc.courseId}/${loc.chapterId}/course-content?page=1`
+                        );
+                      }
+                    }
+                  })}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.continueButton}>
+                    <Text style={styles.continueButtonText}>Komeza</Text>
+                  </View>
+                </WalkthroughableTouchable>
+              </CopilotStep>
             </View>
           )}
         </View>
 
         {/* Upcoming Courses */}
 
-        
-          <CopilotStep
-            text="Izi ni amasomo agiye gukurikira. Sura ujye ibumoso kugira ngo ubone menshi!"
-            order={1}
-            name="course-carousel"
-          >
-            <WalkthroughableView style={styles.section}>
-              {courseStatsData?.courses?.slice(0, 8).filter((course: IStudentCourse) => !course.isEnrolled).length > 0 ? (
-                <>
-                  <Text style={styles.sectionTitle}>Amasomo agiye gukurikira</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.upcomingScrollContainer}>
-                    {courseStatsData.courses.filter((course: IStudentCourse) => !course.isEnrolled).slice(0, 12).map((course: IStudentCourse) => (
+        <CopilotStep
+          text="Aya ni amasomo ugiye gukurikira. Nyuza urutoki hano kugira ngo ubone andi menshi!"
+          order={7}
+          name="course-carousel"
+        >
+          <WalkthroughableView style={styles.section}>
+            {courseStatsData?.courses
+              ?.slice(0, 8)
+              .filter((course: IStudentCourse) => !course.isEnrolled).length >
+            0 ? (
+              <>
+                <Text style={styles.sectionTitle}>
+                  Amasomo agiye gukurikira
+                </Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.upcomingScrollContainer}
+                >
+                  {courseStatsData.courses
+                    .filter((course: IStudentCourse) => !course.isEnrolled)
+                    .slice(0, 12)
+                    .map((course: IStudentCourse) => (
                       <RevisedCourseCard
                         key={course.courseId}
                         course={course}
-                        onPress={() => router.push(getLastViewedSlidePath(courseStatsData, course.courseId))}
+                        onPress={advanceCarousel(() =>
+                          router.push(
+                            getLastViewedSlidePath(
+                              courseStatsData,
+                              course.courseId
+                            )
+                          )
+                        )}
                       />
                     ))}
-                  </ScrollView>
-                </>
-              ) : (
-                <>
-                  <Text style={styles.sectionTitle}>Amasomo aheruka</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.upcomingScrollContainer}>
-                    {courseStatsData?.courses?.slice(0, 8).map((course: IStudentCourse) => (
+                </ScrollView>
+              </>
+            ) : (
+              <>
+                <Text style={styles.sectionTitle}>Amasomo aheruka</Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.upcomingScrollContainer}
+                >
+                  {courseStatsData?.courses
+                    ?.slice(0, 8)
+                    .map((course: IStudentCourse) => (
                       <RevisedCourseCard
                         key={`recent-${course.courseId}`}
                         course={course}
-                        onPress={() => router.push(getLastViewedSlidePath(courseStatsData, course.courseId))}
+                        onPress={advanceCarousel(() =>
+                          router.push(
+                            getLastViewedSlidePath(
+                              courseStatsData,
+                              course.courseId
+                            )
+                          )
+                        )}
                       />
                     ))}
-                  </ScrollView>
-                </>
-              )}
-            </WalkthroughableView>
-          </CopilotStep>
+                </ScrollView>
+              </>
+            )}
+          </WalkthroughableView>
+        </CopilotStep>
         {/* Recent Courses */}
         {/* Quick Actions */}
         <CopilotStep
-          text="Koresha ibi bice kugira ngo ubone amasomo yose, watangiye kwiga, cyangwa utaratangira. Shakisha no gukomeza aho wahagaritsemo!"
-          order={3}
+          text='Kanda kuri "Yose", "Watangiye" cyangwa "Utaratangira" kugira ngo uhite ubona amasomo ahuye n&apos;icyiciro ushaka kureba.'
+          order={8}
           name="filters"
         >
           <WalkthroughableView style={styles.quickActions}>
             {quickActions.map((action) => (
               <TouchableOpacity
                 key={action.id}
-                style={[styles.quickAction, { backgroundColor: activeQuickAction === action.id ? '#4D81D2' : action.color }]}
+                style={[
+                  styles.quickAction,
+                  {
+                    backgroundColor:
+                      activeQuickAction === action.id
+                        ? '#4D81D2'
+                        : action.color,
+                  },
+                ]}
                 activeOpacity={0.85}
-                onPress={() => setActiveQuickAction(action.id)}
+                onPress={advanceFilters(() => setActiveQuickAction(action.id))}
               >
                 <View style={styles.quickActionRow}>
                   <Text style={styles.quickActionIcon}>{action.icon}</Text>
-                  <Text style={[styles.quickActionTitle, { color: activeQuickAction === action.id ? action.color : '#4D81D2' }]}>{action.title}</Text>
+                  <Text
+                    style={[
+                      styles.quickActionTitle,
+                      {
+                        color:
+                          activeQuickAction === action.id
+                            ? action.color
+                            : '#4D81D2',
+                      },
+                    ]}
+                  >
+                    {action.title}
+                  </Text>
                 </View>
               </TouchableOpacity>
             ))}
@@ -383,32 +595,58 @@ function HomeScreenContent() {
           {activeQuickAction === 1 && (
             <View>
               {courseStatsData?.courses?.length > 0 ? (
-                courseStatsData.courses.map((course: IStudentCourse) => (
-                  <TouchableOpacity key={course.courseId} style={styles.compactCard} activeOpacity={0.9} onPress={() => router.push(getLastViewedSlidePath(courseStatsData, course.courseId))}>
+                courseStatsData.courses.map((course: IStudentCourse, index: number) => {
+                const card = (
+                  <TouchableOpacity
+                    style={styles.compactCard}
+                    activeOpacity={0.9}
+                    onPress={advanceEnrolledCourses(() =>
+                      router.push(
+                        getLastViewedSlidePath(courseStatsData, course.courseId)
+                      )
+                    )}
+                  >
                     <View style={styles.compactLeftWithPercent}>
                       <View style={styles.compactLeftRow}>
                         <View style={styles.compactAvatar}>
                           {course.coverIcon ? (
-                            <Image source={{ uri: course.coverIcon }} style={styles.compactAvatarImage} />
+                            <Image
+                              source={{ uri: course.coverIcon }}
+                              style={styles.compactAvatarImage}
+                            />
                           ) : (
                             <Text>📘</Text>
                           )}
                         </View>
                         <View style={styles.compactContent}>
-                          <Text style={styles.compactTitle} numberOfLines={2}>{course.title}</Text>
+                          <Text style={styles.compactTitle} numberOfLines={2}>
+                            {course.title}
+                          </Text>
                           <View style={styles.chipsRow}>
                             <View style={styles.chip}>
-                              <Text style={styles.chipText} numberOfLines={1} ellipsizeMode="tail">
+                              <Text
+                                style={styles.chipText}
+                                numberOfLines={1}
+                                ellipsizeMode="tail"
+                              >
                                 ibyigwa: {course.totalChapters}
                               </Text>
                             </View>
                             <View style={styles.chip}>
-                              <Text style={styles.chipText} numberOfLines={1} ellipsizeMode="tail">
+                              <Text
+                                style={styles.chipText}
+                                numberOfLines={1}
+                                ellipsizeMode="tail"
+                              >
                                 Amasaha: {course.courseDuration}
                               </Text>
                             </View>
                             <View style={styles.chip}>
-                              <Text style={styles.chipText} numberOfLines={1} ellipsizeMode="tail">
+                              <Text
+                                style={styles.chipText}
+                                numberOfLines={1}
+                                ellipsizeMode="tail"
+                              >
                                 Ibizamini: {course.totalTests}
                               </Text>
                             </View>
@@ -418,13 +656,32 @@ function HomeScreenContent() {
                       {course.progress > 0 && (
                         <View style={styles.percentWrapperInside}>
                           <View style={styles.percentCircleSmall}>
-                            <Text style={styles.percentSmallText}>{Math.round(course.progress)}%</Text>
+                            <Text style={styles.percentSmallText}>
+                              {Math.round(course.progress)}%
+                            </Text>
                           </View>
                         </View>
                       )}
                     </View>
                   </TouchableOpacity>
-                ))
+                );
+                // Only the first course card is a tour target — spotlighting
+                // the whole list left too little room for the tooltip to
+                // fit without being clipped.
+                if (index === 0) {
+                  return (
+                    <CopilotStep
+                      key={course.courseId}
+                      text="Hano hagaragara amasomo yawe, ukurikije icyiciro wahisemo haruguru. Kanda ku isomo kugira ngo utangire cyangwa ukomeze kwiga."
+                      order={9}
+                      name="enrolled-courses-list"
+                    >
+                      <WalkthroughableView>{card}</WalkthroughableView>
+                    </CopilotStep>
+                  );
+                }
+                return <React.Fragment key={course.courseId}>{card}</React.Fragment>;
+                })
               ) : (
                 <View style={styles.emptyStateContainer}>
                   <Text style={styles.emptyStateText}>Nta masomo ahari</Text>
@@ -432,118 +689,266 @@ function HomeScreenContent() {
               )}
             </View>
           )}
-          
+
           {/* Enrolled Courses tab */}
           {activeQuickAction === 2 && (
             <View>
-              {courseStatsData?.courses?.filter((course: IStudentCourse) => course.isEnrolled).length > 0 ? (
-                courseStatsData.courses.filter((course: IStudentCourse) => course.isEnrolled).map((course: IStudentCourse) => (
-                  <TouchableOpacity key={course.courseId} style={styles.compactCard} activeOpacity={0.9} onPress={() => router.push(getLastViewedSlidePath(courseStatsData, course.courseId))}>
-                    <View style={styles.compactLeftWithPercent}>
-                      <View style={styles.compactLeftRow}>
-                        <View style={styles.compactAvatar}>
-                          {course.coverIcon ? (
-                            <Image source={{ uri: course.coverIcon }} style={styles.compactAvatarImage} />
-                          ) : (
-                            <Text>📘</Text>
-                          )}
-                        </View>
-                        <View style={styles.compactContent}>
-                          <Text style={styles.compactTitle} numberOfLines={2}>{course.title}</Text>
-                          <View style={styles.chipsRow}>
-                         {!course.isCompleted && (
-                            <View style={styles.chip}>
-                              <Text style={styles.chipText} numberOfLines={1} ellipsizeMode="tail">
-                                Yatangiye: {formatDate(course?.enrollmentDate)}
-                              </Text>
-                            </View>
-                            )}
-                            <View style={styles.chip}>
-                              <Text style={styles.chipText} numberOfLines={1} ellipsizeMode="tail">
-                                ibyigwa: {course.totalChapters}
-                              </Text>
-                            </View>
-                            <View style={styles.chip}>
-                              <Text style={styles.chipText} numberOfLines={1} ellipsizeMode="tail">
-                                Ibizamini: {course.completedTests}/{course.totalTests}
-                              </Text>
-                            </View>
-                            {course.isCompleted && (
-                              <View style={[styles.chip, {flexDirection: 'row', alignItems: 'center', flexShrink: 1, minWidth: 0, maxWidth: 70}]}> 
-                                <Text style={[styles.chipText, {flexShrink: 1, minWidth: 0, marginRight: 4}]} numberOfLines={1} ellipsizeMode="tail">Bihubuje</Text>
-                                <Trophy size={10} color="#F59E0B" />
-                              </View>
-                            )}
-                          </View>
-                        </View>
-                      </View>
-                      {course.progress > 0 && (
-                        <View style={styles.percentWrapperInside}>
-                          <View style={styles.percentCircleSmall}>
-                            <Text style={styles.percentSmallText}>{Math.round(course.progress)}%</Text>
-                          </View>
-                        </View>
+              {courseStatsData?.courses?.filter(
+                (course: IStudentCourse) => course.isEnrolled
+              ).length > 0 ? (
+                courseStatsData.courses
+                  .filter((course: IStudentCourse) => course.isEnrolled)
+                  .map((course: IStudentCourse, index: number) => {
+                  const card = (
+                    <TouchableOpacity
+                      style={styles.compactCard}
+                      activeOpacity={0.9}
+                      onPress={advanceEnrolledCourses(() =>
+                        router.push(
+                          getLastViewedSlidePath(
+                            courseStatsData,
+                            course.courseId
+                          )
+                        )
                       )}
-                    </View>
-                  </TouchableOpacity>
-                ))
+                    >
+                      <View style={styles.compactLeftWithPercent}>
+                        <View style={styles.compactLeftRow}>
+                          <View style={styles.compactAvatar}>
+                            {course.coverIcon ? (
+                              <Image
+                                source={{ uri: course.coverIcon }}
+                                style={styles.compactAvatarImage}
+                              />
+                            ) : (
+                              <Text>📘</Text>
+                            )}
+                          </View>
+                          <View style={styles.compactContent}>
+                            <Text style={styles.compactTitle} numberOfLines={2}>
+                              {course.title}
+                            </Text>
+                            <View style={styles.chipsRow}>
+                              {!course.isCompleted && (
+                                <View style={styles.chip}>
+                                  <Text
+                                    style={styles.chipText}
+                                    numberOfLines={1}
+                                    ellipsizeMode="tail"
+                                  >
+                                    Yatangiye:{' '}
+                                    {formatDate(course?.enrollmentDate)}
+                                  </Text>
+                                </View>
+                              )}
+                              <View style={styles.chip}>
+                                <Text
+                                  style={styles.chipText}
+                                  numberOfLines={1}
+                                  ellipsizeMode="tail"
+                                >
+                                  ibyigwa: {course.totalChapters}
+                                </Text>
+                              </View>
+                              <View style={styles.chip}>
+                                <Text
+                                  style={styles.chipText}
+                                  numberOfLines={1}
+                                  ellipsizeMode="tail"
+                                >
+                                  Ibizamini: {course.completedTests}/
+                                  {course.totalTests}
+                                </Text>
+                              </View>
+                              {course.isCompleted && (
+                                <View
+                                  style={[
+                                    styles.chip,
+                                    {
+                                      flexDirection: 'row',
+                                      alignItems: 'center',
+                                      flexShrink: 1,
+                                      minWidth: 0,
+                                      maxWidth: 70,
+                                    },
+                                  ]}
+                                >
+                                  <Text
+                                    style={[
+                                      styles.chipText,
+                                      {
+                                        flexShrink: 1,
+                                        minWidth: 0,
+                                        marginRight: 4,
+                                      },
+                                    ]}
+                                    numberOfLines={1}
+                                    ellipsizeMode="tail"
+                                  >
+                                    Bihubuje
+                                  </Text>
+                                  <Trophy size={10} color="#F59E0B" />
+                                </View>
+                              )}
+                            </View>
+                          </View>
+                        </View>
+                        {course.progress > 0 && (
+                          <View style={styles.percentWrapperInside}>
+                            <View style={styles.percentCircleSmall}>
+                              <Text style={styles.percentSmallText}>
+                                {Math.round(course.progress)}%
+                              </Text>
+                            </View>
+                          </View>
+                        )}
+                      </View>
+                    </TouchableOpacity>
+                  );
+                  if (index === 0) {
+                    return (
+                      <CopilotStep
+                        key={course.courseId}
+                        text="Hano hagaragara amasomo yawe, ukurikije icyiciro wahisemo haruguru. Kanda ku isomo kugira ngo utangire cyangwa ukomeze kwiga."
+                        order={9}
+                        name="enrolled-courses-list"
+                      >
+                        <WalkthroughableView>{card}</WalkthroughableView>
+                      </CopilotStep>
+                    );
+                  }
+                  return <React.Fragment key={course.courseId}>{card}</React.Fragment>;
+                  })
               ) : (
                 <View style={styles.emptyStateContainer}>
-                  <Text style={styles.emptyStateText}>Nta masomo ahari watangiye</Text>
+                  <Text style={styles.emptyStateText}>
+                    Nta masomo ahari watangiye
+                  </Text>
                 </View>
               )}
             </View>
           )}
-          
+
           {/* Unenrolled Courses tab */}
           {activeQuickAction === 3 && (
             <View>
-              {courseStatsData?.courses?.filter((course: any) => !course.isEnrolled).length > 0 ? (
-                courseStatsData.courses.filter((course: any) => !course.isEnrolled).map((course: any) => (
-                  <TouchableOpacity key={course.courseId} style={styles.compactCard} activeOpacity={0.9} onPress={() => router.push(getLastViewedSlidePath(courseStatsData, course.courseId))}>
-                    <View style={styles.compactLeftWithPercent}>
-                      <View style={styles.compactLeftRow}>
-                        <View style={styles.compactAvatar}>
-                          {course.coverIcon ? (
-                            <Image source={{ uri: course.coverIcon }} style={styles.compactAvatarImage} />
-                          ) : (
-                            <Text>📘</Text>
-                          )}
-                        </View>
-                         <View style={styles.compactContent}>
-                          <Text style={styles.compactTitle} numberOfLines={2}>{course.title}</Text>
-                          <View style={styles.chipsRow}>
-                            <View style={styles.chip}>
-                              <Text style={styles.chipText} numberOfLines={1} ellipsizeMode="tail">
-                                ibyigwa: {course.totalChapters}
-                              </Text>
+              {courseStatsData?.courses?.filter(
+                (course: any) => !course.isEnrolled
+              ).length > 0 ? (
+                courseStatsData.courses
+                  .filter((course: any) => !course.isEnrolled)
+                  .map((course: any, index: number) => {
+                  const card = (
+                    <TouchableOpacity
+                      style={styles.compactCard}
+                      activeOpacity={0.9}
+                      onPress={advanceEnrolledCourses(() =>
+                        router.push(
+                          getLastViewedSlidePath(
+                            courseStatsData,
+                            course.courseId
+                          )
+                        )
+                      )}
+                    >
+                      <View style={styles.compactLeftWithPercent}>
+                        <View style={styles.compactLeftRow}>
+                          <View style={styles.compactAvatar}>
+                            {course.coverIcon ? (
+                              <Image
+                                source={{ uri: course.coverIcon }}
+                                style={styles.compactAvatarImage}
+                              />
+                            ) : (
+                              <Text>📘</Text>
+                            )}
+                          </View>
+                          <View style={styles.compactContent}>
+                            <Text style={styles.compactTitle} numberOfLines={2}>
+                              {course.title}
+                            </Text>
+                            <View style={styles.chipsRow}>
+                              <View style={styles.chip}>
+                                <Text
+                                  style={styles.chipText}
+                                  numberOfLines={1}
+                                  ellipsizeMode="tail"
+                                >
+                                  ibyigwa: {course.totalChapters}
+                                </Text>
+                              </View>
+                              <View style={styles.chip}>
+                                <Text
+                                  style={styles.chipText}
+                                  numberOfLines={1}
+                                  ellipsizeMode="tail"
+                                >
+                                  Amasaha: {course.courseDuration}
+                                </Text>
+                              </View>
+                              <View style={styles.chip}>
+                                <Text
+                                  style={styles.chipText}
+                                  numberOfLines={1}
+                                  ellipsizeMode="tail"
+                                >
+                                  Ibizamini: {course.totalTests}
+                                </Text>
+                              </View>
+                              {course.progress < 0 && (
+                                <View
+                                  style={[
+                                    styles.chip,
+                                    {
+                                      flexDirection: 'row',
+                                      alignItems: 'center',
+                                      flexShrink: 1,
+                                      minWidth: 0,
+                                      maxWidth: 80,
+                                    },
+                                  ]}
+                                >
+                                  <Text
+                                    style={[
+                                      styles.chipText,
+                                      { flexShrink: 1, minWidth: 0 },
+                                    ]}
+                                    numberOfLines={1}
+                                    ellipsizeMode="tail"
+                                  >
+                                    {course.isEnrolled
+                                      ? course.isStarted
+                                        ? 'Watangiye'
+                                        : 'Wiyandikishije'
+                                      : 'Ntaratangira'}
+                                  </Text>
+                                </View>
+                              )}
                             </View>
-                            <View style={styles.chip}>
-                              <Text style={styles.chipText} numberOfLines={1} ellipsizeMode="tail">
-                                Amasaha: {course.courseDuration}
-                              </Text>
-                            </View>
-                            <View style={styles.chip}>
-                              <Text style={styles.chipText} numberOfLines={1} ellipsizeMode="tail">
-                                Ibizamini: {course.totalTests}
-                              </Text>
-                            </View>
-                             {course.progress < 0 && (
-                            <View style={[styles.chip, {flexDirection: 'row', alignItems: 'center', flexShrink: 1, minWidth: 0, maxWidth: 80}]}> 
-                              <Text style={[styles.chipText, {flexShrink: 1, minWidth: 0}]} numberOfLines={1} ellipsizeMode="tail">
-                                {course.isEnrolled ? (course.isStarted ? 'Watangiye' : 'Wiyandikishije') : 'Ntaratangira'}
-                              </Text>
-                            </View>
-                             )}
                           </View>
                         </View>
                       </View>
-                    </View>
-                  </TouchableOpacity>
-                ))
+                    </TouchableOpacity>
+                  );
+                  if (index === 0) {
+                    return (
+                      <CopilotStep
+                        key={course.courseId}
+                        text="Hano hagaragara amasomo yawe, ukurikije icyiciro wahisemo haruguru. Kanda ku isomo kugira ngo utangire cyangwa ukomeze kwiga."
+                        order={9}
+                        name="enrolled-courses-list"
+                      >
+                        <WalkthroughableView>{card}</WalkthroughableView>
+                      </CopilotStep>
+                    );
+                  }
+                  return <React.Fragment key={course.courseId}>{card}</React.Fragment>;
+                  })
               ) : (
                 <View style={styles.emptyStateContainer}>
-                  <Text style={styles.emptyStateText}>Nta masomo ahari utaratangira</Text>
+                  <Text style={styles.emptyStateText}>
+                    Nta masomo ahari utaratangira
+                  </Text>
                 </View>
               )}
             </View>
@@ -557,20 +962,17 @@ function HomeScreenContent() {
           visible={welcomeModalVisible}
           animationType="slide"
           transparent={true}
-          onRequestClose={() => setWelcomeModalVisible(false)}
+          onRequestClose={handleWelcomeVideoDone}
         >
           <View style={{ flex: 1, backgroundColor: 'transparent' }}>
-            <WelcomeVideo
-              forceVisible
-              onDone={handleWelcomeVideoDone}
-            />
+            <WelcomeVideo forceVisible onDone={handleWelcomeVideoDone} />
           </View>
         </Modal>
       )}
 
       {/* Floating Chat Button - Only show when user has completed at least one course and hasn't reviewed the system yet */}
       {courseStatsData?.summary?.completedCourses > 0 && !isSystemReviewed && (
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.chatButton}
           onPress={() => {
             setShowSystemReview(true);
@@ -582,9 +984,9 @@ function HomeScreenContent() {
       )}
 
       {/* System Review Modal */}
-      <Modal 
-        visible={showSystemReview} 
-        animationType="slide" 
+      <Modal
+        visible={showSystemReview}
+        animationType="slide"
         transparent={false}
         onRequestClose={() => setShowSystemReview(false)}
       >
@@ -603,10 +1005,24 @@ export default function HomeScreen() {
   return (
     <CopilotProvider
       tooltipComponent={MascotTooltip}
-      overlay="svg"
+      overlay="view"
       backdropColor="rgba(0, 0, 0, 0.65)"
       animationDuration={300}
       stepNumberComponent={() => null}
+      arrowSize={10}
+      // On Android, the library's default (false) subtracts StatusBar height
+      // from every measured element's y-position, assuming the modal's own
+      // coordinate space already includes the status bar. That doesn't hold
+      // for this app's layout, so every highlight box was shifted upward by
+      // roughly the status bar's height — most visible on elements already
+      // near the top of the screen (the header icons).
+      androidStatusBarVisible
+      labels={{
+        finish: 'Rangiza',
+        next: 'Ibikurikiraho',
+        previous: 'Inyuma',
+        skip: 'Simbuka',
+      }}
     >
       <HomeScreenContent />
     </CopilotProvider>
@@ -754,7 +1170,7 @@ const styles = StyleSheet.create({
     paddingLeft: 4,
     paddingRight: 4,
     alignItems: 'flex-start',
-    marginBottom: 4
+    marginBottom: 4,
   },
   upcomingCardHorizontal: {
     width: 140,
@@ -961,7 +1377,7 @@ const styles = StyleSheet.create({
     color: '#1f2937',
     flexShrink: 1,
     minWidth: 0,
-    marginBottom: 4
+    marginBottom: 4,
   },
   messageAffiliation: {
     fontSize: 10,
@@ -1085,7 +1501,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 0.4,
-    borderColor: '#4D81D2'
+    borderColor: '#4D81D2',
   },
   compactAvatarImage: {
     width: 32,
@@ -1101,7 +1517,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#3363AD'
+    borderColor: '#3363AD',
   },
   percentSmallText: {
     color: '#4A4F60',

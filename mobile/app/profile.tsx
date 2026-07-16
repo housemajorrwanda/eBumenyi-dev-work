@@ -1,5 +1,5 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Image,
   KeyboardAvoidingView, Platform, Keyboard, TouchableWithoutFeedback,
@@ -39,6 +39,14 @@ import { validateUserToken } from '@/utils/tokenValidation';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import DatePickerModal from '@/components/common/DatePickerModal';
 import { SocketService } from '@/services/socket.service';
+import { clearAuthSession } from '@/utils/authSession';
+import { useIsFocused } from '@react-navigation/native';
+import { CopilotProvider, CopilotStep, useCopilot } from 'react-native-copilot';
+import { WalkthroughableView, WalkthroughableTouchable } from '@/components/onboarding/walkthroughable';
+import MascotTooltip from '@/components/onboarding/MascotTooltip';
+import { TOUR_KEYS, onboardingService, scheduleTourStart } from '@/services/onboarding.service';
+import { useOnboarding } from '@/contexts/OnboardingContext';
+import { useTourStepAdvance } from '@/hooks/useTourStepAdvance';
 
 const TABS = [
   { id: 'profile', labelKey: 'profile.tab.profile', Icon: User },
@@ -47,7 +55,7 @@ const TABS = [
   { id: 'settings', labelKey: 'profile.tab.settings', Icon: Settings2 },
 ];
 
-export default function ProfileEditScreen() {
+function ProfileEditScreenContent() {
   const { t, language, setLanguage } = useLanguage();
   const { theme, setTheme, isDark, themeColors } = useTheme();
   const router = useRouter();
@@ -70,6 +78,9 @@ export default function ProfileEditScreen() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [changingPassword, setChangingPassword] = useState(false);
+  const [currentPasswordError, setCurrentPasswordError] = useState<string | undefined>(undefined);
+  const [newPasswordError, setNewPasswordError] = useState<string | undefined>(undefined);
+  const [confirmPasswordError, setConfirmPasswordError] = useState<string | undefined>(undefined);
 
   // Profile form
   const [name, setName] = useState('');
@@ -77,6 +88,10 @@ export default function ProfileEditScreen() {
   const [email, setEmail] = useState('');
   const [gender, setGender] = useState('');
   const [idNumber, setIdNumber] = useState('');
+  const [nameError, setNameError] = useState<string | undefined>(undefined);
+  const [phoneError, setPhoneError] = useState<string | undefined>(undefined);
+  const [emailError, setEmailError] = useState<string | undefined>(undefined);
+  const [idNumberError, setIdNumberError] = useState<string | undefined>(undefined);
   const [role, setRole] = useState('');
   const [district, setDistrict] = useState('');
   const [sector, setSector] = useState('');
@@ -331,6 +346,36 @@ export default function ProfileEditScreen() {
   };
 
   const handleUpdateProfile = () => {
+    setNameError(undefined);
+    setPhoneError(undefined);
+    setEmailError(undefined);
+    setIdNumberError(undefined);
+
+    if (!name.trim()) setNameError(t('nameRequired'));
+    if (!phone.trim()) setPhoneError(t('phoneRequired'));
+    if (!name.trim() || !phone.trim()) return;
+
+    const cleanedPhone = phone.replace(/\D/g, '');
+    const localPrefixes = ['078', '079', '072', '073'];
+    const intlPrefixes = localPrefixes.map((p) => '250' + p.slice(1));
+    const validPhone =
+      (cleanedPhone.length === 10 && localPrefixes.some((p) => cleanedPhone.startsWith(p))) ||
+      (cleanedPhone.length === 12 && intlPrefixes.some((p) => cleanedPhone.startsWith(p)));
+    if (!validPhone) {
+      setPhoneError(t('invalidPhone'));
+      return;
+    }
+
+    if (idNumber.trim() && !/^1\d{15}$/.test(idNumber.trim())) {
+      setIdNumberError(t('invalidNID'));
+      return;
+    }
+
+    if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setEmailError(t('invalidEmail'));
+      return;
+    }
+
     const formData = new FormData();
     formData.append('fullNames', name);
     formData.append('phoneNumber', phone);
@@ -348,16 +393,21 @@ export default function ProfileEditScreen() {
   };
 
   const handleChangePassword = async () => {
+    setCurrentPasswordError(undefined);
+    setNewPasswordError(undefined);
+    setConfirmPasswordError(undefined);
     if (!currentPassword || !newPassword || !confirmPassword) {
-      Toast.show({ type: 'error', text1: t('fillRequired') });
+      if (!currentPassword) setCurrentPasswordError(t('currentPasswordRequired'));
+      if (!newPassword) setNewPasswordError(t('newPasswordRequired'));
+      if (!confirmPassword) setConfirmPasswordError(t('confirmPasswordRequired'));
       return;
     }
     if (newPassword !== confirmPassword) {
-      Toast.show({ type: 'error', text1: t('profile.passwordMismatch') });
+      setConfirmPasswordError(t('profile.passwordMismatch'));
       return;
     }
     if (newPassword.length < 8) {
-      Toast.show({ type: 'error', text1: t('profile.passwordTooShort') });
+      setNewPasswordError(t('profile.passwordTooShort'));
       return;
     }
     setChangingPassword(true);
@@ -378,7 +428,7 @@ export default function ProfileEditScreen() {
       SocketService.disconnect();
       SocketService.disconnectNamespaces();
       queryClient.clear();
-      await AsyncStorage.clear();
+      await clearAuthSession();
     } catch (err) {
       console.log('Error clearing cache/storage on logout', err);
     } finally {
@@ -391,6 +441,53 @@ export default function ProfileEditScreen() {
     await Promise.all(keys.map(k => AsyncStorage.removeItem(k)));
     Toast.show({ type: 'success', text1: t('profile.cacheCleared') });
   };
+
+  const { start, copilotEvents, stop, visible } = useCopilot();
+  // start()'s identity is not stable across CopilotProvider re-renders (the
+  // library doesn't memoize its internal visibility setter, which start
+  // depends on) — reading it through a ref means a re-render before the
+  // scheduled tour fires doesn't cancel it via the effect's cleanup.
+  const startRef = useRef(start);
+  startRef.current = start;
+  const { markComplete } = useOnboarding();
+  const advancePhoto = useTourStepAdvance('profile-photo');
+  const advanceLogout = useTourStepAdvance('profile-logout');
+  const advanceTabs = useTourStepAdvance('profile-tabs');
+  const isFocused = useIsFocused();
+  // If the user navigates away (tapping the real highlighted element can
+  // itself trigger navigation, but this also covers back/tab-switch/etc.)
+  // while a tour is visible, its CopilotProvider can stay mounted (stack
+  // navigators often keep the previous screen alive) — without this, the
+  // tour's Modal renders in RN's top-level layer and keeps floating over
+  // whatever screen is now active. Close it on the focus transition.
+  const wasFocusedRef = useRef(isFocused);
+  useEffect(() => {
+    if (wasFocusedRef.current && !isFocused && visible) {
+      stop().catch(() => {});
+    }
+    wasFocusedRef.current = isFocused;
+  }, [isFocused, visible, stop]);
+  const autoStartAttemptedRef = useRef(false);
+
+  useEffect(() => {
+    let cancelSchedule: (() => void) | null = null;
+    let cancelled = false;
+    if (!isValidatingToken && isFocused && !autoStartAttemptedRef.current) {
+      autoStartAttemptedRef.current = true;
+      void (async () => {
+        const done = await onboardingService.hasCompleted(TOUR_KEYS.PROFILE);
+        if (cancelled) return;
+        if (!done) { cancelSchedule = scheduleTourStart(() => startRef.current()); }
+      })();
+    }
+    return () => { cancelled = true; cancelSchedule?.(); };
+  }, [isValidatingToken, isFocused]);
+
+  useEffect(() => {
+    const handleStop = () => { markComplete(TOUR_KEYS.PROFILE).catch(() => {}); };
+    copilotEvents.on('stop', handleStop);
+    return () => { copilotEvents.off('stop', handleStop); };
+  }, [copilotEvents, markComplete]);
 
   if (isValidatingToken) return <LoadingSpinner />;
 
@@ -428,28 +525,37 @@ export default function ProfileEditScreen() {
             <Text style={styles.title}>{t('profile.header')}</Text>
           </View>
         </View>
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <LogOutIcon color="#FFFFFF" size={20} />
-          <Text style={styles.logoutText}>{t('profile.logout')}</Text>
-        </TouchableOpacity>
+        <CopilotStep text="Kanda hano gusohoka muri konte yawe." order={3} name="profile-logout">
+          <WalkthroughableTouchable style={styles.logoutButton} onPress={advanceLogout(handleLogout)}>
+            <LogOutIcon color="#FFFFFF" size={20} />
+            <Text style={styles.logoutText}>{t('profile.logout')}</Text>
+          </WalkthroughableTouchable>
+        </CopilotStep>
       </View>
 
       {/* Profile photo (always visible) */}
       <View style={styles.profileSection}>
-        <View style={styles.profileImageContainer}>
-          <Image
-            source={{ uri: imageUri || userData?.photo || DEFAULT_AVATAR }}
-            style={styles.profileImage}
-          />
-          <TouchableOpacity style={styles.cameraButton} onPress={pickImage}>
-            <Camera color="#3363AD" size={16} />
-          </TouchableOpacity>
-          {userData?.photo && userData.photo !== DEFAULT_AVATAR && (
-            <TouchableOpacity style={styles.deleteButton} onPress={() => deleteAvatarMutation.mutate()}>
-              <Trash2 color="#FF4444" size={14} />
+        {/* The tooltip text instructs tapping the photo's change/remove
+            controls specifically — target just this container instead of
+            the whole profile section, which also includes the unrelated
+            name text below (a wider target anchors the library's pointer
+            away from these buttons and can make them un-tappable). */}
+        <CopilotStep text="Kanda hano guhindura ifoto yawe cyangwa kuyikuraho." order={1} name="profile-photo">
+          <WalkthroughableView style={styles.profileImageContainer}>
+            <Image
+              source={{ uri: imageUri || userData?.photo || DEFAULT_AVATAR }}
+              style={styles.profileImage}
+            />
+            <TouchableOpacity style={styles.cameraButton} onPress={advancePhoto(pickImage)}>
+              <Camera color="#3363AD" size={16} />
             </TouchableOpacity>
-          )}
-        </View>
+            {userData?.photo && userData.photo !== DEFAULT_AVATAR && (
+              <TouchableOpacity style={styles.deleteButton} onPress={advancePhoto(() => deleteAvatarMutation.mutate())}>
+                <Trash2 color="#FF4444" size={14} />
+              </TouchableOpacity>
+            )}
+          </WalkthroughableView>
+        </CopilotStep>
         {userData?.fullNames ? (
           <Text style={styles.profileName}>{userData.fullNames}</Text>
         ) : null}
@@ -458,25 +564,31 @@ export default function ProfileEditScreen() {
       {/* White card with tab bar + content */}
       <View style={[styles.card, ds.card]}>
         {/* Tab bar */}
-        <View style={[styles.tabBar, ds.tabBar]}>
-          {TABS.map(({ id, labelKey, Icon }) => {
-            const active = activeTab === id;
-            return (
-              <TouchableOpacity
-                key={id}
-                onPress={() => setActiveTab(id)}
-                style={styles.tab}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.tabIconBox, active && styles.tabIconBoxActive]}>
-                  <Icon size={16} color={active ? '#3363AD' : '#9ca3af'} />
-                </View>
-                <Text style={[styles.tabLabel, active && styles.activeTabLabel]} numberOfLines={1} adjustsFontSizeToFit>{t(labelKey)}</Text>
-                <View style={[styles.tabUnderline, active && styles.tabUnderlineActive]} />
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+        <CopilotStep
+          text="Hitamo  kugira ngo uhindure amakuru yawe bwite, uburyo bwo kubona amatangazo, umutekano , cyangwa igenamiterere."
+          order={2}
+          name="profile-tabs"
+        >
+          <WalkthroughableView style={[styles.tabBar, ds.tabBar]}>
+            {TABS.map(({ id, labelKey, Icon }) => {
+              const active = activeTab === id;
+              return (
+                <TouchableOpacity
+                  key={id}
+                  onPress={advanceTabs(() => setActiveTab(id))}
+                  style={styles.tab}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.tabIconBox, active && styles.tabIconBoxActive]}>
+                    <Icon size={16} color={active ? '#3363AD' : '#9ca3af'} />
+                  </View>
+                  <Text style={[styles.tabLabel, active && styles.activeTabLabel]} numberOfLines={1} adjustsFontSizeToFit>{t(labelKey)}</Text>
+                  <View style={[styles.tabUnderline, active && styles.tabUnderlineActive]} />
+                </TouchableOpacity>
+              );
+            })}
+          </WalkthroughableView>
+        </CopilotStep>
 
 
         {/* Tab content */}
@@ -500,19 +612,21 @@ export default function ProfileEditScreen() {
                   <TextField
                     label={t('profile.fullName')}
                     value={name}
-                    onChangeText={setName}
+                    onChangeText={(v) => { setName(v); setNameError(undefined); }}
                     placeholder={t('profile.fullNamePlaceholder')}
                     icon={<User color="#3363AD" size={20} />}
+                    error={nameError}
                   />
 
                   <TextField
                     label={t('profile.emailLabel')}
                     value={email}
-                    onChangeText={setEmail}
+                    onChangeText={(v) => { setEmail(v); setEmailError(undefined); }}
                     placeholder={t('profile.emailLabel')}
                     icon={<Mail color="#3363AD" size={20} />}
                     keyboardType="email-address"
                     autoCapitalize="none"
+                    error={emailError}
                   />
 
                   <View style={styles.rowContainer}>
@@ -520,10 +634,11 @@ export default function ProfileEditScreen() {
                       <TextField
                         label={t('profile.phoneLabel')}
                         value={phone}
-                        onChangeText={setPhone}
+                        onChangeText={(v) => { setPhone(v); setPhoneError(undefined); }}
                         placeholder={t('profile.phonePlaceholder')}
                         icon={<Phone color="#3363AD" size={14} />}
                         keyboardType="phone-pad"
+                        error={phoneError}
                       />
                     </View>
                     <View style={{ flex: 1, marginLeft: 4 }}>
@@ -544,10 +659,11 @@ export default function ProfileEditScreen() {
                   <TextField
                     label={t('profile.nid')}
                     value={idNumber}
-                    onChangeText={setIdNumber}
+                    onChangeText={(v) => { setIdNumber(v); setIdNumberError(undefined); }}
                     placeholder={t('profile.nidPlaceholder')}
                     icon={<CreditCard color="#3363AD" size={18} />}
                     keyboardType="phone-pad"
+                    error={idNumberError}
                   />
 
                   <View style={styles.rowContainer}>
@@ -797,30 +913,33 @@ export default function ProfileEditScreen() {
                       <TextField
                         label={t('profile.currentPassword')}
                         value={currentPassword}
-                        onChangeText={setCurrentPassword}
+                        onChangeText={(v) => { setCurrentPassword(v); setCurrentPasswordError(undefined); }}
                         placeholder={t('profile.currentPasswordPlaceholder')}
                         icon={<Lock color="#3363AD" size={20} />}
                         secureTextEntry
+                        error={currentPasswordError}
                       />
                     </View>
                     <View style={styles.inputContainer}>
                       <TextField
                         label={t('profile.newPassword')}
                         value={newPassword}
-                        onChangeText={setNewPassword}
+                        onChangeText={(v) => { setNewPassword(v); setNewPasswordError(undefined); }}
                         placeholder={t('profile.newPasswordPlaceholder')}
                         icon={<Lock color="#3363AD" size={20} />}
                         secureTextEntry
+                        error={newPasswordError}
                       />
                     </View>
                     <View style={styles.inputContainer}>
                       <TextField
                         label={t('profile.confirmNewPassword')}
                         value={confirmPassword}
-                        onChangeText={setConfirmPassword}
+                        onChangeText={(v) => { setConfirmPassword(v); setConfirmPasswordError(undefined); }}
                         placeholder={t('profile.confirmNewPasswordPlaceholder')}
                         icon={<Lock color="#3363AD" size={20} />}
                         secureTextEntry
+                        error={confirmPasswordError}
                       />
                     </View>
 
@@ -911,8 +1030,8 @@ export default function ProfileEditScreen() {
                     </TouchableOpacity>
                   ))}
 
-                  {/* ── Read-aloud voice section ── */}
-                  <Text style={[styles.sectionTitle, ds.sectionTitle, { marginTop: 24 }]}>
+                          {/* ── Read-aloud voice section ── */}
+                          <Text style={[styles.sectionTitle, ds.sectionTitle, { marginTop: 24 }]}>
                     {t('profile.narrationVoice')}
                   </Text>
                   <Text style={[styles.settingDesc, ds.settingDesc, { marginBottom: 10 }]}>
@@ -982,6 +1101,7 @@ export default function ProfileEditScreen() {
                       )}
                     </TouchableOpacity>
                   ))}
+
 
                   <Text style={[styles.sectionTitle, ds.sectionTitle, { marginTop: 24 }]}>{t('profile.timezone')}</Text>
                   <Dropdown
@@ -1059,6 +1179,23 @@ export default function ProfileEditScreen() {
         </KeyboardAvoidingView>
       </View>
     </View>
+  );
+}
+
+export default function ProfileEditScreen() {
+  return (
+    <CopilotProvider
+      tooltipComponent={MascotTooltip}
+      overlay="view"
+      backdropColor="rgba(0, 0, 0, 0.65)"
+      animationDuration={300}
+      stepNumberComponent={() => null}
+      arrowSize={10}
+      androidStatusBarVisible
+      labels={{ finish: 'Rangiza', next: 'Ibikurikiraho', previous: 'Inyuma', skip: 'Simbuka' }}
+    >
+      <ProfileEditScreenContent />
+    </CopilotProvider>
   );
 }
 

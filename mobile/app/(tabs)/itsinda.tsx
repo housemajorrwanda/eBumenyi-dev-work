@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -38,6 +38,13 @@ import {
   choUpdateMyGroup,
 } from '@/services/choGroup.api';
 import { ICHOGroupMember } from '@/types';
+import { useIsFocused } from '@react-navigation/native';
+import { CopilotProvider, CopilotStep, useCopilot } from 'react-native-copilot';
+import { WalkthroughableView, WalkthroughableTouchable } from '@/components/onboarding/walkthroughable';
+import MascotTooltip from '@/components/onboarding/MascotTooltip';
+import { TOUR_KEYS, onboardingService, scheduleTourStart } from '@/services/onboarding.service';
+import { useOnboarding } from '@/contexts/OnboardingContext';
+import { useTourStepAdvance } from '@/hooks/useTourStepAdvance';
 
 const PLACEHOLDER_AVATAR =
   'https://img.freepik.com/premium-vector/user-profile-icon-flat-style-member-avatar-vector-illustration-isolated-background-human-permission-sign-business-concept_157943-15752.jpg';
@@ -83,10 +90,36 @@ function MetricCard({
   );
 }
 
-export default function ItsindaScreen() {
+function ItsindaScreenContent() {
   const router = useRouter();
   const { isDark, themeColors } = useTheme();
   const queryClient = useQueryClient();
+  const { start, copilotEvents, stop, visible } = useCopilot();
+  const advanceHeader = useTourStepAdvance('itsinda-header');
+  const advanceAdd = useTourStepAdvance('itsinda-add');
+  const advanceMembers = useTourStepAdvance('itsinda-members');
+  // start()'s identity is not stable across CopilotProvider re-renders (the
+  // library doesn't memoize its internal visibility setter, which start
+  // depends on) — reading it through a ref means a re-render before the
+  // scheduled tour fires doesn't cancel it via the effect's cleanup.
+  const startRef = useRef(start);
+  startRef.current = start;
+  const { markComplete } = useOnboarding();
+  const isFocused = useIsFocused();
+  // If the user navigates away (tapping the real highlighted element can
+  // itself trigger navigation, but this also covers back/tab-switch/etc.)
+  // while a tour is visible, its CopilotProvider can stay mounted (stack
+  // navigators often keep the previous screen alive) — without this, the
+  // tour's Modal renders in RN's top-level layer and keeps floating over
+  // whatever screen is now active. Close it on the focus transition.
+  const wasFocusedRef = useRef(isFocused);
+  useEffect(() => {
+    if (wasFocusedRef.current && !isFocused && visible) {
+      stop().catch(() => {});
+    }
+    wasFocusedRef.current = isFocused;
+  }, [isFocused, visible, stop]);
+  const autoStartAttemptedRef = useRef(false);
 
   const [search, setSearch] = useState('');
   const [pendingRemove, setPendingRemove] = useState<ICHOGroupMember | null>(null);
@@ -198,6 +231,26 @@ export default function ItsindaScreen() {
   const borderColor = isDark ? '#374151' : '#e5e7eb';
   const inputBg = isDark ? '#374151' : '#f3f4f6';
 
+  useEffect(() => {
+    let cancelSchedule: (() => void) | null = null;
+    let cancelled = false;
+    if (!isLoading && !isError && group && isFocused && !autoStartAttemptedRef.current) {
+      autoStartAttemptedRef.current = true;
+      void (async () => {
+        const done = await onboardingService.hasCompleted(TOUR_KEYS.ITSINDA);
+        if (cancelled) return;
+        if (!done) { cancelSchedule = scheduleTourStart(() => startRef.current()); }
+      })();
+    }
+    return () => { cancelled = true; cancelSchedule?.(); };
+  }, [isLoading, isError, group, isFocused]);
+
+  useEffect(() => {
+    const handleStop = () => { markComplete(TOUR_KEYS.ITSINDA).catch(() => {}); };
+    copilotEvents.on('stop', handleStop);
+    return () => { copilotEvents.off('stop', handleStop); };
+  }, [copilotEvents, markComplete]);
+
   // ─── Loading / error states ────────────────────────────────────────────────
 
   if (isLoading) {
@@ -222,143 +275,10 @@ export default function ItsindaScreen() {
     );
   }
 
-  // ─── List header ──────────────────────────────────────────────────────────
+  // ─── List header (CHO card + spinner only — CopilotSteps live in the main JSX) ──
 
   const ListHeader = (
     <View>
-      {/* Page header */}
-      <View style={[styles.pageHeader, { backgroundColor: themeColors.primary }]}>
-        <View style={styles.pageTitleRow}>
-          <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.groupName} numberOfLines={1}>{group.name}</Text>
-              {(group.sectors?.length ?? 0) > 0 && (
-                <View style={styles.sectorRow}>
-                  <MapPin size={12} color="rgba(255,255,255,0.8)" />
-                  <Text style={styles.sectorText}>{group.sectors!.join(', ')}</Text>
-                </View>
-              )}
-            </View>
-            <TouchableOpacity
-              style={styles.headerIconBtn}
-              onPress={openEdit}
-              activeOpacity={0.7}
-            >
-              <Pencil size={18} color="#ffffff" />
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-
-      {/* Inline edit form */}
-      {isEditing && (
-        <View style={[styles.editForm, { backgroundColor: cardBg, borderColor }]}>
-          <Text style={[styles.editFormTitle, { color: textPrimary }]}>Hindura itsinda</Text>
-          <View style={styles.editFields}>
-            <View style={styles.editField}>
-              <Text style={[styles.editLabel, { color: textMuted }]}>Izina *</Text>
-              <TextInput
-                style={[styles.editInput, { backgroundColor: inputBg, color: textPrimary, borderColor }]}
-                value={editName}
-                onChangeText={setEditName}
-                placeholder="Izina ry'itsinda"
-                placeholderTextColor={textMuted}
-              />
-            </View>
-            <View style={styles.editField}>
-              <Text style={[styles.editLabel, { color: textMuted }]}>Akagari</Text>
-              <TextInput
-                style={[styles.editInput, { backgroundColor: inputBg, color: textPrimary, borderColor }]}
-                value={editSector}
-                onChangeText={setEditSector}
-                placeholder="urugero: Nyarugenge"
-                placeholderTextColor={textMuted}
-              />
-            </View>
-          </View>
-          <View style={styles.editActions}>
-            <TouchableOpacity
-              style={[styles.editCancelBtn, { backgroundColor: inputBg }]}
-              onPress={() => setIsEditing(false)}
-              disabled={isUpdating}
-            >
-              <X size={14} color={textMuted} />
-              <Text style={[styles.editCancelText, { color: textMuted }]}>Hagarika</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.editSaveBtn,
-                { backgroundColor: themeColors.primary },
-                (!editName.trim() || isUpdating) && styles.disabledBtn,
-              ]}
-              onPress={() => updateGroup()}
-              disabled={!editName.trim() || isUpdating}
-            >
-              {isUpdating ? (
-                <ActivityIndicator size="small" color="#ffffff" />
-              ) : (
-                <>
-                  <Check size={14} color="#ffffff" />
-                  <Text style={styles.editSaveText}>Bika</Text>
-                </>
-              )}
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
-
-      {/* Metric cards */}
-      <View style={styles.metricsRow}>
-        <MetricCard
-          title="Abagize"
-          value={memberCount}
-          icon={<Users size={16} color={themeColors.primary} />}
-          accentColor={themeColors.primary}
-          bgColor={themeColors.primary + '18'}
-        />
-        <MetricCard
-          title="Biga"
-          value={activeCount}
-          icon={<Activity size={16} color="#f59e0b" />}
-          accentColor="#f59e0b"
-          bgColor="#fef3c7"
-        />
-        <MetricCard
-          title="Intambwe"
-          value={`${avgProgress}%`}
-          icon={<TrendingUp size={16} color="#8b5cf6" />}
-          accentColor="#8b5cf6"
-          bgColor="#ede9fe"
-        />
-      </View>
-
-      {/* Search + Refresh */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16, marginBottom: 8 }}>
-        <View style={[styles.searchBar, { backgroundColor: inputBg, flex: 1, marginBottom: 0 }]}>
-          <Search size={16} color={textMuted} />
-          <TextInput
-            style={[styles.searchInput, { color: textPrimary }]}
-            placeholder="Shakisha umunyamuryango..."
-            placeholderTextColor={textMuted}
-            value={search}
-            onChangeText={setSearch}
-          />
-          {search.length > 0 && (
-            <TouchableOpacity onPress={() => setSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <X size={14} color={textMuted} />
-            </TouchableOpacity>
-          )}
-        </View>
-        <TouchableOpacity
-          style={[styles.addBtn, { backgroundColor: themeColors.primary }]}
-          onPress={() => router.push('/cho-group/invite')}
-          activeOpacity={0.8}
-        >
-          <UserPlus size={18} color="#ffffff" />
-          <Text style={styles.addBtnText}>Ongeramo</Text>
-        </TouchableOpacity>
-      </View>
-
       {/* CHO leader card */}
       {choMatchesSearch && cho && (
         <TouchableOpacity
@@ -388,93 +308,270 @@ export default function ItsindaScreen() {
         </TouchableOpacity>
       )}
 
-      {/* Empty state */}
       {membersLoading && <LoadingSpinner variant="inline" message="" />}
     </View>
   );
 
   return (
     <SafeAreaView style={[styles.flex, { backgroundColor: themeColors.primary }]} edges={['top']}>
-      <FlatList
-        data={filtered}
-        keyExtractor={(item) => item.id}
-        style={{ backgroundColor: bg }}
-        ListHeaderComponent={ListHeader}
-        renderItem={({ item }) => {
-          const u = item.student.user;
-          return (
-            <TouchableOpacity
-              style={[
-                styles.memberCard,
-                { backgroundColor: cardBg, borderColor, marginHorizontal: 16, marginBottom: 8 },
-              ]}
-              onPress={() => router.push(`/students/${item.student.id}`)}
-              activeOpacity={0.8}
-            >
-              <View style={styles.memberCardInner}>
-                <MemberAvatar name={u.fullNames} photo={u.photo} />
-                <View style={styles.memberInfo}>
-                  <Text style={[styles.memberName, { color: textPrimary }]} numberOfLines={1}>
-                    {u.fullNames}
-                  </Text>
-                  <View style={[styles.roleBadge, { backgroundColor: '#d1fae5' }]}>
-                    <Text style={[styles.roleBadgeText, { color: '#059669' }]}>Umujyanama(CHW)</Text>
+      <View style={[styles.flex, { backgroundColor: bg }]}>
+
+        {/* Step 1: the edit button specifically — the tooltip text instructs
+            tapping it, so it's the target, not the whole header bar (a wide
+            target like the full header anchors the library's arrow to
+            whichever edge it measures from, which can land far from the
+            pencil itself, and made it un-tappable since taps on the pencil's
+            real position fell outside the mask's — wrongly wide — hole). */}
+        <View style={[styles.pageHeader, { backgroundColor: themeColors.primary }]}>
+          <View style={styles.pageTitleRow}>
+            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.groupName} numberOfLines={1}>{group.name}</Text>
+                {(group.sectors?.length ?? 0) > 0 && (
+                  <View style={styles.sectorRow}>
+                    <MapPin size={12} color="rgba(255,255,255,0.8)" />
+                    <Text style={styles.sectorText}>{group.sectors!.join(', ')}</Text>
                   </View>
-                  {u.phoneNumber ? (
-                    <View style={styles.infoRow}>
-                      <Phone size={11} color={textMuted} />
-                      <Text style={[styles.infoText, { color: textMuted }]}>{u.phoneNumber}</Text>
-                    </View>
-                  ) : null}
-                  {(u.district || u.sector) ? (
-                    <View style={styles.infoRow}>
-                      <MapPin size={11} color={textMuted} />
-                      <Text style={[styles.infoText, { color: textMuted }]} numberOfLines={1}>
-                        {[u.district, u.sector].filter(Boolean).join(', ')}
-                      </Text>
-                    </View>
-                  ) : null}
-                </View>
-                <TouchableOpacity
-                  style={styles.removeBtn}
-                  onPress={() => setPendingRemove(item)}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                  <UserMinus size={18} color="#ef4444" />
-                </TouchableOpacity>
+                )}
               </View>
-            </TouchableOpacity>
-          );
-        }}
-        ListEmptyComponent={
-          !membersLoading ? (
-            <View style={styles.centeredInList}>
-              <Users size={36} color={borderColor} />
-              <Text style={[styles.emptyTitle, { color: textMuted, fontSize: 15 }]}>
-                {search ? 'Nta munyamuryango uhuye' : 'Nta bagize itsinda bahari'}
-              </Text>
-              {!search && (
-                <TouchableOpacity
-                  style={[styles.actionBtn, { backgroundColor: themeColors.primary, marginTop: 12 }]}
-                  onPress={() => router.push('/cho-group/invite')}
+              <CopilotStep
+                text="Hano ugaragara izina ry'itsinda ryawe. Kanda kuri ikimenyetso cyo guhindura (✏) guhindura izina n'amakuru y'itsinda."
+                order={1}
+                name="itsinda-header"
+              >
+                <WalkthroughableTouchable
+                  style={styles.headerIconBtn}
+                  onPress={advanceHeader(openEdit)}
+                  activeOpacity={0.7}
                 >
-                  <UserPlus size={16} color="#ffffff" />
-                  <Text style={styles.actionBtnText}>Ongeramo CHW wa mbere</Text>
+                  <Pencil size={18} color="#ffffff" />
+                </WalkthroughableTouchable>
+              </CopilotStep>
+            </View>
+          </View>
+        </View>
+
+        {/* Inline edit form */}
+        {isEditing && (
+          <View style={[styles.editForm, { backgroundColor: cardBg, borderColor }]}>
+            <Text style={[styles.editFormTitle, { color: textPrimary }]}>Hindura itsinda</Text>
+            <View style={styles.editFields}>
+              <View style={styles.editField}>
+                <Text style={[styles.editLabel, { color: textMuted }]}>Izina *</Text>
+                <TextInput
+                  style={[styles.editInput, { backgroundColor: inputBg, color: textPrimary, borderColor }]}
+                  value={editName}
+                  onChangeText={setEditName}
+                  placeholder="Izina ry'itsinda"
+                  placeholderTextColor={textMuted}
+                />
+              </View>
+              <View style={styles.editField}>
+                <Text style={[styles.editLabel, { color: textMuted }]}>Akagari</Text>
+                <TextInput
+                  style={[styles.editInput, { backgroundColor: inputBg, color: textPrimary, borderColor }]}
+                  value={editSector}
+                  onChangeText={setEditSector}
+                  placeholder="urugero: Nyarugenge"
+                  placeholderTextColor={textMuted}
+                />
+              </View>
+            </View>
+            <View style={styles.editActions}>
+              <TouchableOpacity
+                style={[styles.editCancelBtn, { backgroundColor: inputBg }]}
+                onPress={() => setIsEditing(false)}
+                disabled={isUpdating}
+              >
+                <X size={14} color={textMuted} />
+                <Text style={[styles.editCancelText, { color: textMuted }]}>Hagarika</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.editSaveBtn,
+                  { backgroundColor: themeColors.primary },
+                  (!editName.trim() || isUpdating) && styles.disabledBtn,
+                ]}
+                onPress={() => updateGroup()}
+                disabled={!editName.trim() || isUpdating}
+              >
+                {isUpdating ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
+                ) : (
+                  <>
+                    <Check size={14} color="#ffffff" />
+                    <Text style={styles.editSaveText}>Bika</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {/* Step 2: Stats cards */}
+        <CopilotStep
+          text="Hano ubona umubare w'abagize itsinda, abiga ndetse nintambwe bagezeho muri rusange."
+          order={2}
+          name="itsinda-stats"
+        >
+          <WalkthroughableView style={styles.metricsRow}>
+            <MetricCard
+              title="Abagize"
+              value={memberCount}
+              icon={<Users size={16} color={themeColors.primary} />}
+              accentColor={themeColors.primary}
+              bgColor={themeColors.primary + '18'}
+            />
+            <MetricCard
+              title="Biga"
+              value={activeCount}
+              icon={<Activity size={16} color="#f59e0b" />}
+              accentColor="#f59e0b"
+              bgColor="#fef3c7"
+            />
+            <MetricCard
+              title="Intambwe"
+              value={`${avgProgress}%`}
+              icon={<TrendingUp size={16} color="#8b5cf6" />}
+              accentColor="#8b5cf6"
+              bgColor="#ede9fe"
+            />
+          </WalkthroughableView>
+        </CopilotStep>
+
+        {/* Step 3: Search + Add */}
+        <CopilotStep
+          text="Shakisha umunyamuryango hano, cyangwa kanda 'Ongeramo' kongeramo CHW mushya mu itsinda."
+          order={3}
+          name="itsinda-add"
+        >
+          <WalkthroughableView style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16, marginBottom: 8 }}>
+            <View style={[styles.searchBar, { backgroundColor: inputBg, flex: 1, marginBottom: 0 }]}>
+              <Search size={16} color={textMuted} />
+              <TextInput
+                style={[styles.searchInput, { color: textPrimary }]}
+                placeholder="Shakisha umunyamuryango..."
+                placeholderTextColor={textMuted}
+                value={search}
+                onChangeText={setSearch}
+              />
+              {search.length > 0 && (
+                <TouchableOpacity onPress={() => setSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <X size={14} color={textMuted} />
                 </TouchableOpacity>
               )}
             </View>
-          ) : null
-        }
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefetching}
-            onRefresh={refetch}
-            tintColor={themeColors.primary}
+            <TouchableOpacity
+              style={[styles.addBtn, { backgroundColor: themeColors.primary }]}
+              onPress={advanceAdd(() => router.push('/cho-group/invite'))}
+              activeOpacity={0.8}
+            >
+              <UserPlus size={18} color="#ffffff" />
+              <Text style={styles.addBtnText}>Ongeramo</Text>
+            </TouchableOpacity>
+          </WalkthroughableView>
+        </CopilotStep>
+
+        {/* Step 4: Member list */}
+        <View style={styles.flex}>
+          <FlatList
+            data={filtered}
+            keyExtractor={(item) => item.id}
+            style={{ backgroundColor: bg }}
+            ListHeaderComponent={ListHeader}
+            renderItem={({ item, index }) => {
+              const u = item.student.user;
+              const card = (
+                <TouchableOpacity
+                  style={[
+                    styles.memberCard,
+                    { backgroundColor: cardBg, borderColor, marginHorizontal: 16, marginBottom: 8 },
+                  ]}
+                  onPress={advanceMembers(() => router.push(`/students/${item.student.id}`))}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.memberCardInner}>
+                    <MemberAvatar name={u.fullNames} photo={u.photo} />
+                    <View style={styles.memberInfo}>
+                      <Text style={[styles.memberName, { color: textPrimary }]} numberOfLines={1}>
+                        {u.fullNames}
+                      </Text>
+                      <View style={[styles.roleBadge, { backgroundColor: '#d1fae5' }]}>
+                        <Text style={[styles.roleBadgeText, { color: '#059669' }]}>Umujyanama(CHW)</Text>
+                      </View>
+                      {u.phoneNumber ? (
+                        <View style={styles.infoRow}>
+                          <Phone size={11} color={textMuted} />
+                          <Text style={[styles.infoText, { color: textMuted }]}>{u.phoneNumber}</Text>
+                        </View>
+                      ) : null}
+                      {(u.district || u.sector) ? (
+                        <View style={styles.infoRow}>
+                          <MapPin size={11} color={textMuted} />
+                          <Text style={[styles.infoText, { color: textMuted }]} numberOfLines={1}>
+                            {[u.district, u.sector].filter(Boolean).join(', ')}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
+                    <TouchableOpacity
+                      style={styles.removeBtn}
+                      onPress={() => setPendingRemove(item)}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <UserMinus size={18} color="#ef4444" />
+                    </TouchableOpacity>
+                  </View>
+                </TouchableOpacity>
+              );
+              // Only the first member is a tour target — spotlighting the
+              // whole list left too little room for the tooltip to fit
+              // without being clipped.
+              if (index === 0) {
+                return (
+                  <CopilotStep
+                    text="Urutonde rw'abagize itsinda ryawe. Kanda ku izina ry'umunyamuryango kureba aho bageze mu masomo (monitoring)."
+                    order={4}
+                    name="itsinda-members"
+                  >
+                    <WalkthroughableView>{card}</WalkthroughableView>
+                  </CopilotStep>
+                );
+              }
+              return card;
+            }}
+            ListEmptyComponent={
+              !membersLoading ? (
+                <View style={styles.centeredInList}>
+                  <Users size={36} color={borderColor} />
+                  <Text style={[styles.emptyTitle, { color: textMuted, fontSize: 15 }]}>
+                    {search ? 'Nta munyamuryango uhuye' : 'Nta bagize itsinda bahari'}
+                  </Text>
+                  {!search && (
+                    <TouchableOpacity
+                      style={[styles.actionBtn, { backgroundColor: themeColors.primary, marginTop: 12 }]}
+                      onPress={() => router.push('/cho-group/invite')}
+                    >
+                      <UserPlus size={16} color="#ffffff" />
+                      <Text style={styles.actionBtnText}>Ongeramo CHW wa mbere</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              ) : null
+            }
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={isRefetching}
+                onRefresh={refetch}
+                tintColor={themeColors.primary}
+              />
+            }
           />
-        }
-      />
+        </View>
+
+      </View>
 
       {/* Remove confirmation Modal */}
       <Modal
@@ -523,6 +620,23 @@ export default function ItsindaScreen() {
         </View>
       </Modal>
     </SafeAreaView>
+  );
+}
+
+export default function ItsindaScreen() {
+  return (
+    <CopilotProvider
+      tooltipComponent={MascotTooltip}
+      overlay="view"
+      backdropColor="rgba(0, 0, 0, 0.65)"
+      animationDuration={300}
+      stepNumberComponent={() => null}
+      arrowSize={10}
+      androidStatusBarVisible
+      labels={{ finish: 'Rangiza', next: 'Ibikurikiraho', previous: 'Inyuma', skip: 'Simbuka' }}
+    >
+      <ItsindaScreenContent />
+    </CopilotProvider>
   );
 }
 

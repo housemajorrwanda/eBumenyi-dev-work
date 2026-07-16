@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -30,6 +30,12 @@ import { getCalendarEventById } from '@/services/calender';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
 import { isValidMeetingUrl, extractMeetingId, normalizeMeetingUrl } from '@/utils/deepLinking';
+import { useIsFocused } from '@react-navigation/native';
+import { CopilotProvider, CopilotStep, useCopilot } from 'react-native-copilot';
+import { WalkthroughableView } from '@/components/onboarding/walkthroughable';
+import MascotTooltip from '@/components/onboarding/MascotTooltip';
+import { TOUR_KEYS, onboardingService, scheduleTourStart } from '@/services/onboarding.service';
+import { useOnboarding } from '@/contexts/OnboardingContext';
 
 const eventTypeColors: Record<string, string> = {
   TRAINING: '#22c55e',
@@ -37,7 +43,7 @@ const eventTypeColors: Record<string, string> = {
   DEADLINE: '#ef4444',
 };
 
-export default function CalendarEventDetailScreen() {
+function CalendarEventDetailScreenContent() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -45,6 +51,29 @@ export default function CalendarEventDetailScreen() {
   const { t } = useLanguage();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { start, copilotEvents, stop, visible } = useCopilot();
+  // start()'s identity is not stable across CopilotProvider re-renders (the
+  // library doesn't memoize its internal visibility setter, which start
+  // depends on) — reading it through a ref means a re-render before the
+  // scheduled tour fires doesn't cancel it via the effect's cleanup.
+  const startRef = useRef(start);
+  startRef.current = start;
+  const { markComplete } = useOnboarding();
+  const isFocused = useIsFocused();
+  // If the user navigates away (tapping the real highlighted element can
+  // itself trigger navigation, but this also covers back/tab-switch/etc.)
+  // while a tour is visible, its CopilotProvider can stay mounted (stack
+  // navigators often keep the previous screen alive) — without this, the
+  // tour's Modal renders in RN's top-level layer and keeps floating over
+  // whatever screen is now active. Close it on the focus transition.
+  const wasFocusedRef = useRef(isFocused);
+  useEffect(() => {
+    if (wasFocusedRef.current && !isFocused && visible) {
+      stop().catch(() => {});
+    }
+    wasFocusedRef.current = isFocused;
+  }, [isFocused, visible, stop]);
+  const autoStartAttemptedRef = useRef(false);
 
   // Fetch event details
   const { data: event, isLoading, error, refetch } = useQuery<ICalendarEvent, Error>({
@@ -157,6 +186,26 @@ export default function CalendarEventDetailScreen() {
 
   const styles = createStyles(isDark, themeColors, typeColor, insets);
 
+  useEffect(() => {
+    let cancelSchedule: (() => void) | null = null;
+    let cancelled = false;
+    if (!isLoading && !error && event && isFocused && !autoStartAttemptedRef.current) {
+      autoStartAttemptedRef.current = true;
+      void (async () => {
+        const done = await onboardingService.hasCompleted(TOUR_KEYS.EVENT_DETAIL);
+        if (cancelled) return;
+        if (!done) { cancelSchedule = scheduleTourStart(() => startRef.current()); }
+      })();
+    }
+    return () => { cancelled = true; cancelSchedule?.(); };
+  }, [isLoading, error, event, isFocused]);
+
+  useEffect(() => {
+    const handleStop = () => { markComplete(TOUR_KEYS.EVENT_DETAIL).catch(() => {}); };
+    copilotEvents.on('stop', handleStop);
+    return () => { copilotEvents.off('stop', handleStop); };
+  }, [copilotEvents, markComplete]);
+
   // Loading state
   if (isLoading) {
     return (
@@ -232,7 +281,12 @@ export default function CalendarEventDetailScreen() {
         </View>
 
         {/* Primary Info Card (Date & Time) */}
-        <View style={[styles.primaryCard, { 
+        <CopilotStep
+          text="Hano hagaragara amakuru y'ibikorwa: itariki, igihe n'ibisobanuro."
+          order={1}
+          name="event-info"
+        >
+        <WalkthroughableView style={[styles.primaryCard, {
           backgroundColor: isDark ? '#1e3a8a' : '#eff6ff',
           borderColor: `${themeColors.primary}40`
         }]}>
@@ -253,7 +307,8 @@ export default function CalendarEventDetailScreen() {
                   : formatTime(new Date(event.startAt))}
             </Text>
           </View>
-        </View>
+        </WalkthroughableView>
+        </CopilotStep>
 
         {/* Secondary Details (Inline) */}
         <View style={styles.secondarySection}>
@@ -309,14 +364,20 @@ export default function CalendarEventDetailScreen() {
 
         {/* Participants count */}
         {event.participants && event.participants.length > 0 && (
-          <View style={styles.participantsRow}>
-            <View style={styles.participantsDetail}>
-              <Users size={16} color={themeColors.primary} />
-              <Text style={styles.participantsLabel}>
-                {event.participants.length} {t('calendar.participants') || 'participant(s)'}
-              </Text>
-            </View>
-          </View>
+          <CopilotStep
+            text="Hano ubona abazitabira iki gikorwa."
+            order={2}
+            name="event-attendance"
+          >
+            <WalkthroughableView style={styles.participantsRow}>
+              <View style={styles.participantsDetail}>
+                <Users size={16} color={themeColors.primary} />
+                <Text style={styles.participantsLabel}>
+                  {event.participants.length} {t('calendar.participants') || 'participant(s)'}
+                </Text>
+              </View>
+            </WalkthroughableView>
+          </CopilotStep>
         )}
       </ScrollView>
 
@@ -341,6 +402,23 @@ export default function CalendarEventDetailScreen() {
 
       </View>
     </View>
+  );
+}
+
+export default function CalendarEventDetailScreen() {
+  return (
+    <CopilotProvider
+      tooltipComponent={MascotTooltip}
+      overlay="view"
+      backdropColor="rgba(0, 0, 0, 0.65)"
+      animationDuration={300}
+      stepNumberComponent={() => null}
+      arrowSize={10}
+      androidStatusBarVisible
+      labels={{ finish: 'Rangiza', next: 'Ibikurikiraho', previous: 'Inyuma', skip: 'Simbuka' }}
+    >
+      <CalendarEventDetailScreenContent />
+    </CopilotProvider>
   );
 }
 

@@ -1,5 +1,5 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -24,11 +24,18 @@ import { INotification } from '@/types';
 import { useNotificationFilters } from '@/hooks/useNotificationFilters';
 import { useNotificationSearch } from '@/hooks/useNotificationSearch';
 import { isValidMeetingUrl, extractMeetingId } from '@/utils/deepLinking';
+import { useIsFocused } from '@react-navigation/native';
+import { CopilotProvider, CopilotStep, useCopilot } from 'react-native-copilot';
+import { WalkthroughableView, WalkthroughableTouchable } from '@/components/onboarding/walkthroughable';
+import MascotTooltip from '@/components/onboarding/MascotTooltip';
+import { TOUR_KEYS, onboardingService, scheduleTourStart } from '@/services/onboarding.service';
+import { useOnboarding } from '@/contexts/OnboardingContext';
+import { useTourStepAdvance } from '@/hooks/useTourStepAdvance';
 
 type FilterType = 'all' | 'unread' | 'read';
 type NotificationType = 'all' | 'calendar' | 'course' | 'message' | 'alert' | 'system';
 
-export default function NotificationsPage() {
+function NotificationsPageContent() {
   const router = useRouter();
   const { isDark, themeColors } = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
@@ -125,6 +132,15 @@ export default function NotificationsPage() {
 
     return data;
   }, [groupedNotifications]);
+
+  // The tour's "notifications-list" step targets this specific row instead of
+  // the whole FlatList (which left the tooltip no room to render without
+  // being clipped) — the first entry can be a date-group header, so find the
+  // first actual notification, not just index 0.
+  const firstNotificationKey = useMemo(
+    () => flattenedData.find((d) => d.type === 'item')?.key,
+    [flattenedData]
+  );
 
   // Handlers
   const handleRefresh = useCallback(async () => {
@@ -241,16 +257,28 @@ export default function NotificationsPage() {
       }
 
       if (item.data) {
-        return (
+        const card = (
           <NotificationCard
             notification={item.data}
-            onPress={handleNotificationPress}
-            onLongPress={handleNotificationLongPress}
+            onPress={advanceNotificationsList(handleNotificationPress)}
+            onLongPress={advanceNotificationsList(handleNotificationLongPress)}
             onDelete={deleteNotification}
             isSelected={selectedIds.includes(item.data.id)}
             isSelectionMode={isSelectionMode}
           />
         );
+        if (item.key === firstNotificationKey) {
+          return (
+            <CopilotStep
+              text="Hano hagaragara amatangazo yawe yose. Kanda ku menya cyangwa kureba ibisobanuro, cyangwa ukande cyane kugira ngo uhitemo menshi no kuyashyira mu byasomwe."
+              order={2}
+              name="notifications-list"
+            >
+              <WalkthroughableView>{card}</WalkthroughableView>
+            </CopilotStep>
+          );
+        }
+        return card;
       }
 
       return null;
@@ -262,6 +290,7 @@ export default function NotificationsPage() {
       deleteNotification,
       selectedIds,
       isSelectionMode,
+      firstNotificationKey,
     ]
   );
 
@@ -270,6 +299,52 @@ export default function NotificationsPage() {
     if (activeFilter === 'unread') return 'unread';
     return 'all';
   };
+
+  const { start, copilotEvents, stop, visible } = useCopilot();
+  const advanceFilter = useTourStepAdvance('notifications-filter');
+  const advanceNotificationsList = useTourStepAdvance('notifications-list');
+  // start()'s identity is not stable across CopilotProvider re-renders (the
+  // library doesn't memoize its internal visibility setter, which start
+  // depends on) — reading it through a ref means a re-render before the
+  // scheduled tour fires doesn't cancel it via the effect's cleanup.
+  const startRef = useRef(start);
+  startRef.current = start;
+  const { markComplete } = useOnboarding();
+  const isFocused = useIsFocused();
+  // If the user navigates away (tapping the real highlighted element can
+  // itself trigger navigation, but this also covers back/tab-switch/etc.)
+  // while a tour is visible, its CopilotProvider can stay mounted (stack
+  // navigators often keep the previous screen alive) — without this, the
+  // tour's Modal renders in RN's top-level layer and keeps floating over
+  // whatever screen is now active. Close it on the focus transition.
+  const wasFocusedRef = useRef(isFocused);
+  useEffect(() => {
+    if (wasFocusedRef.current && !isFocused && visible) {
+      stop().catch(() => {});
+    }
+    wasFocusedRef.current = isFocused;
+  }, [isFocused, visible, stop]);
+  const autoStartAttemptedRef = useRef(false);
+
+  useEffect(() => {
+    let cancelSchedule: (() => void) | null = null;
+    let cancelled = false;
+    if (isFocused && !autoStartAttemptedRef.current) {
+      autoStartAttemptedRef.current = true;
+      void (async () => {
+        const done = await onboardingService.hasCompleted(TOUR_KEYS.NOTIFICATIONS);
+        if (cancelled) return;
+        if (!done) { cancelSchedule = scheduleTourStart(() => startRef.current()); }
+      })();
+    }
+    return () => { cancelled = true; cancelSchedule?.(); };
+  }, [isFocused]);
+
+  useEffect(() => {
+    const handleStop = () => { markComplete(TOUR_KEYS.NOTIFICATIONS).catch(() => {}); };
+    copilotEvents.on('stop', handleStop);
+    return () => { copilotEvents.off('stop', handleStop); };
+  }, [copilotEvents, markComplete]);
 
   return (
     <SafeAreaView
@@ -344,12 +419,23 @@ export default function NotificationsPage() {
             onChangeText={setSearchQuery}
           />
         </View>
-        <TouchableOpacity
-          style={styles.filterButton}
-          onPress={() => setShowAdvancedFilters(true)}
+        {/* The tooltip text instructs tapping the filter button specifically
+            — target it directly instead of the whole search row (a wide
+            target that also contains the unrelated search input, which
+            anchors the library's pointer away from this button and can
+            make it un-tappable). */}
+        <CopilotStep
+          text="Aha ushobora guhitamo ubwoko bwamatangazo ushaka kubona mbere muburyo bwihuse."
+          order={1}
+          name="notifications-filter"
         >
-          <Filter size={18} color={isDark ? '#9ca3af' : '#6b7280'} />
-        </TouchableOpacity>
+          <WalkthroughableTouchable
+            style={styles.filterButton}
+            onPress={advanceFilter(() => setShowAdvancedFilters(true))}
+          >
+            <Filter size={18} color={isDark ? '#9ca3af' : '#6b7280'} />
+          </WalkthroughableTouchable>
+        </CopilotStep>
       </View>
 
       {/* Filter Tabs */}
@@ -360,27 +446,29 @@ export default function NotificationsPage() {
       />
 
       {/* Notification List */}
-      <FlatList
-        data={flattenedData}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.key}
-        contentContainerStyle={styles.listContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            tintColor={themeColors.primary}
-          />
-        }
-        ListEmptyComponent={
-          connected ? (
-            <NotificationEmpty type={getEmptyStateType()} searchQuery={searchQuery} />
-          ) : (
-            <LoadingSpinner message="Shakisha amatangazo..." isDark={isDark} />
-          )
-        }
-        showsVerticalScrollIndicator={false}
-      />
+      <View style={{ flex: 1 }}>
+        <FlatList
+          data={flattenedData}
+          renderItem={renderItem}
+          keyExtractor={(item) => item.key}
+          contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor={themeColors.primary}
+            />
+          }
+          ListEmptyComponent={
+            connected ? (
+              <NotificationEmpty type={getEmptyStateType()} searchQuery={searchQuery} />
+            ) : (
+              <LoadingSpinner message="Shakisha amatangazo..." isDark={isDark} />
+            )
+          }
+          showsVerticalScrollIndicator={false}
+        />
+      </View>
 
       {/* Bulk Actions Bar */}
       {isSelectionMode && (
@@ -400,6 +488,23 @@ export default function NotificationsPage() {
         onTypeChange={setActiveType}
       />
     </SafeAreaView>
+  );
+}
+
+export default function NotificationsPage() {
+  return (
+    <CopilotProvider
+      tooltipComponent={MascotTooltip}
+      overlay="view"
+      backdropColor="rgba(0, 0, 0, 0.65)"
+      animationDuration={300}
+      stepNumberComponent={() => null}
+      arrowSize={10}
+      androidStatusBarVisible
+      labels={{ finish: 'Rangiza', next: 'Ibikurikiraho', previous: 'Inyuma', skip: 'Simbuka' }}
+    >
+      <NotificationsPageContent />
+    </CopilotProvider>
   );
 }
 

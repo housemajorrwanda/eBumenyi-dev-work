@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -18,16 +18,47 @@ import { ChevronLeft, Search, UserPlus, MapPin } from 'lucide-react-native';
 import { searchCHWCandidates, choDirectlyAddMember } from '@/services/choGroup.api';
 import { IStudentSearchResult } from '@/types';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useIsFocused } from '@react-navigation/native';
+import { CopilotProvider, CopilotStep, useCopilot } from 'react-native-copilot';
+import { WalkthroughableView, WalkthroughableTouchable } from '@/components/onboarding/walkthroughable';
+import MascotTooltip from '@/components/onboarding/MascotTooltip';
+import { TOUR_KEYS, onboardingService, scheduleTourStart } from '@/services/onboarding.service';
+import { useOnboarding } from '@/contexts/OnboardingContext';
+import { useTourStepAdvance } from '@/hooks/useTourStepAdvance';
 
 const PLACEHOLDER_AVATAR =
   'https://img.freepik.com/premium-vector/user-profile-icon-flat-style-member-avatar-vector-illustration-isolated-background-human-permission-sign-business-concept_157943-15752.jpg';
 
-export default function InviteScreen() {
+function InviteScreenContent() {
   const router = useRouter();
   const { isDark, themeColors } = useTheme();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [invitedIds, setInvitedIds] = useState<Set<string>>(new Set());
+  const { start, copilotEvents, stop, visible } = useCopilot();
+  const advanceInviteList = useTourStepAdvance('invite-list');
+  // start()'s identity is not stable across CopilotProvider re-renders (the
+  // library doesn't memoize its internal visibility setter, which start
+  // depends on) — reading it through a ref means a re-render before the
+  // scheduled tour fires doesn't cancel it via the effect's cleanup.
+  const startRef = useRef(start);
+  startRef.current = start;
+  const { markComplete } = useOnboarding();
+  const isFocused = useIsFocused();
+  // If the user navigates away (tapping the real highlighted element can
+  // itself trigger navigation, but this also covers back/tab-switch/etc.)
+  // while a tour is visible, its CopilotProvider can stay mounted (stack
+  // navigators often keep the previous screen alive) — without this, the
+  // tour's Modal renders in RN's top-level layer and keeps floating over
+  // whatever screen is now active. Close it on the focus transition.
+  const wasFocusedRef = useRef(isFocused);
+  useEffect(() => {
+    if (wasFocusedRef.current && !isFocused && visible) {
+      stop().catch(() => {});
+    }
+    wasFocusedRef.current = isFocused;
+  }, [isFocused, visible, stop]);
+  const autoStartAttemptedRef = useRef(false);
 
   const { data: students = [], isLoading } = useQuery({
     queryKey: ['chw-candidates', search],
@@ -54,16 +85,89 @@ export default function InviteScreen() {
     addMember(student.id);
   };
 
+  useEffect(() => {
+    let cancelSchedule: (() => void) | null = null;
+    let cancelled = false;
+    if (!isLoading && isFocused && !autoStartAttemptedRef.current) {
+      autoStartAttemptedRef.current = true;
+      void (async () => {
+        const done = await onboardingService.hasCompleted(TOUR_KEYS.INVITE_CHW);
+        if (cancelled) return;
+        if (!done) { cancelSchedule = scheduleTourStart(() => startRef.current()); }
+      })();
+    }
+    return () => { cancelled = true; cancelSchedule?.(); };
+  }, [isLoading, isFocused]);
+
+  useEffect(() => {
+    const handleStop = () => { markComplete(TOUR_KEYS.INVITE_CHW).catch(() => {}); };
+    copilotEvents.on('stop', handleStop);
+    return () => { copilotEvents.off('stop', handleStop); };
+  }, [copilotEvents, markComplete]);
+
   const cardBg = isDark ? '#1f2937' : '#ffffff';
   const textPrimary = isDark ? '#f9fafb' : '#1f2937';
   const textMuted = isDark ? '#9ca3af' : '#6b7280';
   const bgColor = isDark ? '#111827' : '#f8fafc';
   const inputBg = isDark ? '#374151' : '#f3f4f6';
 
-  const renderStudent = ({ item }: { item: IStudentSearchResult }) => {
+  const renderStudent = ({ item, index }: { item: IStudentSearchResult; index: number }) => {
     const alreadyInGroup = !!item.groupMembership;
     const alreadyAdded = invitedIds.has(item.id);
     const disabled = alreadyInGroup || alreadyAdded || isPending;
+
+    const inviteButtonContent = isPending ? (
+      <ActivityIndicator size="small" color="#ffffff" />
+    ) : alreadyAdded ? (
+      <Text style={[styles.inviteBtnText, { color: '#059669' }]}>Wongewe</Text>
+    ) : alreadyInGroup ? (
+      <Text style={[styles.inviteBtnText, { color: '#9ca3af' }]}>Afite itsinda</Text>
+    ) : (
+      <>
+        <UserPlus size={14} color="#ffffff" />
+        <Text style={[styles.inviteBtnText, { color: '#ffffff' }]}>Ongeramo</Text>
+      </>
+    );
+    const inviteButtonStyle = [
+      styles.inviteBtn,
+      {
+        backgroundColor: alreadyAdded
+          ? '#D1FAE5'
+          : disabled
+          ? '#e5e7eb'
+          : themeColors.primary,
+      },
+    ];
+    // The tooltip text instructs tapping 'Ongeramo' specifically — target
+    // that button directly instead of the whole card (a wide target
+    // containing an unrelated avatar/name/location too, which isn't even
+    // itself tappable, anchors the library's pointer away from the button
+    // and can make the button un-tappable).
+    const inviteButton = index === 0 ? (
+      <CopilotStep
+        text="Hano ugaragara urutonde rw'abagize. Kanda kuri 'Ongeramo' kongeramo CHW mushya mu itsinda."
+        order={2}
+        name="invite-list"
+      >
+        <WalkthroughableTouchable
+          style={inviteButtonStyle}
+          onPress={advanceInviteList(() => handleAdd(item))}
+          disabled={disabled}
+          activeOpacity={0.8}
+        >
+          {inviteButtonContent}
+        </WalkthroughableTouchable>
+      </CopilotStep>
+    ) : (
+      <TouchableOpacity
+        style={inviteButtonStyle}
+        onPress={() => handleAdd(item)}
+        disabled={disabled}
+        activeOpacity={0.8}
+      >
+        {inviteButtonContent}
+      </TouchableOpacity>
+    );
 
     return (
       <View style={[styles.studentCard, { backgroundColor: cardBg }]}>
@@ -90,34 +194,7 @@ export default function InviteScreen() {
             </View>
           )}
         </View>
-        <TouchableOpacity
-          style={[
-            styles.inviteBtn,
-            {
-              backgroundColor: alreadyAdded
-                ? '#D1FAE5'
-                : disabled
-                ? '#e5e7eb'
-                : themeColors.primary,
-            },
-          ]}
-          onPress={() => handleAdd(item)}
-          disabled={disabled}
-          activeOpacity={0.8}
-        >
-          {isPending ? (
-            <ActivityIndicator size="small" color="#ffffff" />
-          ) : alreadyAdded ? (
-            <Text style={[styles.inviteBtnText, { color: '#059669' }]}>Wongewe</Text>
-          ) : alreadyInGroup ? (
-            <Text style={[styles.inviteBtnText, { color: '#9ca3af' }]}>Afite itsinda</Text>
-          ) : (
-            <>
-              <UserPlus size={14} color="#ffffff" />
-              <Text style={[styles.inviteBtnText, { color: '#ffffff' }]}>Ongeramo</Text>
-            </>
-          )}
-        </TouchableOpacity>
+        {inviteButton}
       </View>
     );
   };
@@ -135,43 +212,68 @@ export default function InviteScreen() {
         </View>
 
         {/* Search */}
-        <View style={[styles.searchWrapper, { backgroundColor: bgColor }]}>
-          <View style={[styles.searchBar, { backgroundColor: inputBg }]}>
-            <Search size={16} color={textMuted} />
-            <TextInput
-              style={[styles.searchInput, { color: textPrimary }]}
-              placeholder="Shakisha amazina cyangwa telefone..."
-              placeholderTextColor={textMuted}
-              value={search}
-              onChangeText={setSearch}
-              returnKeyType="search"
-            />
-          </View>
-          <Text style={[styles.hintText, { color: textMuted }]}>
-            Shakisha CHW utarimo itsinda mu karere kawe, hanyuma umwongere.
-          </Text>
-        </View>
+        <CopilotStep
+          text="Shakisha CHW ushaka kongeramo mu itsinda ryawe."
+          order={1}
+          name="invite-search"
+        >
+          <WalkthroughableView style={[styles.searchWrapper, { backgroundColor: bgColor }]}>
+            <View style={[styles.searchBar, { backgroundColor: inputBg }]}>
+              <Search size={16} color={textMuted} />
+              <TextInput
+                style={[styles.searchInput, { color: textPrimary }]}
+                placeholder="Shakisha amazina cyangwa telefone..."
+                placeholderTextColor={textMuted}
+                value={search}
+                onChangeText={setSearch}
+                returnKeyType="search"
+              />
+            </View>
+            <Text style={[styles.hintText, { color: textMuted }]}>
+              Shakisha CHW utarimo itsinda mu karere kawe, hanyuma umwongere.
+            </Text>
+          </WalkthroughableView>
+        </CopilotStep>
 
         {isLoading ? (
           <LoadingSpinner />
         ) : (
-          <FlatList
-            data={students}
-            keyExtractor={(item) => item.id}
-            renderItem={renderStudent}
-            contentContainerStyle={styles.list}
-            showsVerticalScrollIndicator={false}
-            ListEmptyComponent={
-              <View style={styles.centered}>
-                <Text style={[styles.emptyText, { color: textMuted }]}>
-                  {search ? 'Nta muturage uhuye n\'ubushakashatsi' : 'Andika izina cg telefone kugira ngo ushakishe'}
-                </Text>
-              </View>
-            }
-          />
+          <View style={{ flex: 1 }}>
+            <FlatList
+              data={students}
+              keyExtractor={(item) => item.id}
+              renderItem={renderStudent}
+              contentContainerStyle={styles.list}
+              showsVerticalScrollIndicator={false}
+              ListEmptyComponent={
+                <View style={styles.centered}>
+                  <Text style={[styles.emptyText, { color: textMuted }]}>
+                    {search ? 'Nta muturage uhuye n\'ubushakashatsi' : 'Andika izina cg telefone kugira ngo ushakishe'}
+                  </Text>
+                </View>
+              }
+            />
+          </View>
         )}
       </View>
     </SafeAreaView>
+  );
+}
+
+export default function InviteScreen() {
+  return (
+    <CopilotProvider
+      tooltipComponent={MascotTooltip}
+      overlay="view"
+      backdropColor="rgba(0, 0, 0, 0.65)"
+      animationDuration={300}
+      stepNumberComponent={() => null}
+      arrowSize={10}
+      androidStatusBarVisible
+      labels={{ finish: 'Rangiza', next: 'Ibikurikiraho', previous: 'Inyuma', skip: 'Simbuka' }}
+    >
+      <InviteScreenContent />
+    </CopilotProvider>
   );
 }
 

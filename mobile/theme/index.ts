@@ -15,7 +15,8 @@ export const colors = {
     cardBg: '#FFFFFF',
     cardText: '#111827',
     cardSubtitle: '#595F74',
-    cardShadow: 'rgba(16,24,40,0.06)'
+    cardShadow: 'rgba(16,24,40,0.06)',
+    error: '#ef4444'
   },
   dark: {
     // Dark gradient using dark and primary
@@ -30,7 +31,8 @@ export const colors = {
     cardBg: '#111827',
     cardText: '#f8fafc',
     cardSubtitle: 'rgba(255,255,255,0.75)',
-    cardShadow: 'rgba(0,0,0,0.6)'
+    cardShadow: 'rgba(0,0,0,0.6)',
+    error: '#ef4444'
   }
 } as const;
 

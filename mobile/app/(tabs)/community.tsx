@@ -8,8 +8,15 @@ import {
   TextInput,
   RefreshControl,
 } from 'react-native';
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useRouter, useFocusEffect } from 'expo-router';
+import { useIsFocused } from '@react-navigation/native';
+import { CopilotProvider, CopilotStep, useCopilot } from 'react-native-copilot';
+import { WalkthroughableView, WalkthroughableTouchable } from '@/components/onboarding/walkthroughable';
+import MascotTooltip from '@/components/onboarding/MascotTooltip';
+import { TOUR_KEYS, onboardingService, scheduleTourStart } from '@/services/onboarding.service';
+import { useOnboarding } from '@/contexts/OnboardingContext';
+import { useTourStepAdvance } from '@/hooks/useTourStepAdvance';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { PlusCircle, Check, CheckCheck, Users, MessageSquare, Globe, ImageIcon, Film, Mic, FileText, Paperclip } from 'lucide-react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -42,11 +49,36 @@ function getMediaInfo(msgType: string, content?: string): MediaPreview | null {
   return null;
 }
 
-export default function CommunityScreen() {
+function CommunityScreenContent() {
   const [activeTab, setActiveTab] = useState<'messages' | 'community' | 'group'>('messages');
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const { start, copilotEvents, stop, visible } = useCopilot();
+  // start()'s identity is not stable across CopilotProvider re-renders (the
+  // library doesn't memoize its internal visibility setter, which start
+  // depends on) — reading it through a ref means a re-render before the
+  // scheduled tour fires doesn't cancel it via the effect's cleanup.
+  const startRef = useRef(start);
+  startRef.current = start;
+  const { markComplete } = useOnboarding();
+  const advanceFab = useTourStepAdvance('community-fab');
+  const advanceTabs = useTourStepAdvance('community-tabs');
+  const isFocused = useIsFocused();
+  // If the user navigates away (tapping the real highlighted element can
+  // itself trigger navigation, but this also covers back/tab-switch/etc.)
+  // while a tour is visible, its CopilotProvider can stay mounted (stack
+  // navigators often keep the previous screen alive) — without this, the
+  // tour's Modal renders in RN's top-level layer and keeps floating over
+  // whatever screen is now active. Close it on the focus transition.
+  const wasFocusedRef = useRef(isFocused);
+  useEffect(() => {
+    if (wasFocusedRef.current && !isFocused && visible) {
+      stop().catch(() => {});
+    }
+    wasFocusedRef.current = isFocused;
+  }, [isFocused, visible, stop]);
+  const autoStartAttemptedRef = useRef(false);
   const [lastPreviews, setLastPreviews] = useState<Record<string, { Icon: React.ComponentType<any> | null; text: string; time?: string }>>({});
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -506,14 +538,39 @@ export default function CommunityScreen() {
     return `${years}y`;
   };
 
+  useEffect(() => {
+    let cancelSchedule: (() => void) | null = null;
+    let cancelled = false;
+    if (isFocused && !autoStartAttemptedRef.current) {
+      autoStartAttemptedRef.current = true;
+      void (async () => {
+        const done = await onboardingService.hasCompleted(TOUR_KEYS.COMMUNITY);
+        if (cancelled) return;
+        if (!done) { cancelSchedule = scheduleTourStart(() => startRef.current()); }
+      })();
+    }
+    return () => { cancelled = true; cancelSchedule?.(); };
+  }, [isFocused]);
+
+  useEffect(() => {
+    const handleStop = () => { markComplete(TOUR_KEYS.COMMUNITY).catch(() => {}); };
+    copilotEvents.on('stop', handleStop);
+    return () => { copilotEvents.off('stop', handleStop); };
+  }, [copilotEvents, markComplete]);
+
   return (
     <View style={styles.container}>
       <Header />
 
-      <View style={styles.tabContainer}>
+      <CopilotStep
+        text="Hano uhitamo uburyo bw'ibiganiro: Amatsinda, Ubutumwa cyangwa Kominote."
+        order={1}
+        name="community-tabs"
+      >
+        <WalkthroughableView style={styles.tabContainer}>
         <TouchableOpacity
           style={[styles.tab, activeTab === 'group' && styles.activeTab]}
-          onPress={() => setActiveTab('group')}>
+          onPress={advanceTabs(() => setActiveTab('group'))}>
           <View style={[styles.tabContent, activeTab === 'group' && styles.activeTabContent]}>
             <View style={{ position: 'relative' }}>
               <Users size={20} color={activeTab === 'group' ? '#4D81D2' : '#6b7280'} strokeWidth={2} />
@@ -531,7 +588,7 @@ export default function CommunityScreen() {
 
         <TouchableOpacity
           style={[styles.tab, activeTab === 'messages' && styles.activeTab]}
-          onPress={() => setActiveTab('messages')}>
+          onPress={advanceTabs(() => setActiveTab('messages'))}>
           <View style={[styles.tabContent, activeTab === 'messages' && styles.activeTabContent]}>
             <View style={{ position: 'relative' }}>
               <MessageSquare size={20} color={activeTab === 'messages' ? '#4D81D2' : '#6b7280'} strokeWidth={2} />
@@ -549,7 +606,7 @@ export default function CommunityScreen() {
 
         <TouchableOpacity
           style={[styles.tab, activeTab === 'community' && styles.activeTab]}
-          onPress={() => setActiveTab('community')}>
+          onPress={advanceTabs(() => setActiveTab('community'))}>
           <View style={[styles.tabContent, activeTab === 'community' && styles.activeTabContent]}>
             <View style={{ position: 'relative' }}>
               <Globe size={20} color={activeTab === 'community' ? '#4D81D2' : '#6b7280'} strokeWidth={2} />
@@ -564,16 +621,25 @@ export default function CommunityScreen() {
             </Text>
           </View>
         </TouchableOpacity>
-      </View>
+        </WalkthroughableView>
+      </CopilotStep>
 
       {/* Search bar */}
-      <TextInput
-        placeholder="Shakira hano..."
-        placeholderTextColor="#9ca3af"
-        style={styles.searchInput}
-        value={searchQuery}
-        onChangeText={setSearchQuery}
-      />
+      <CopilotStep
+        text="Andika hano kugira ngo ushake ibiganiro, amatsinda cyangwa kominote."
+        order={2}
+        name="community-search"
+      >
+        <WalkthroughableView>
+          <TextInput
+            placeholder="Shakira hano..."
+            placeholderTextColor="#9ca3af"
+            style={styles.searchInput}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+        </WalkthroughableView>
+      </CopilotStep>
 
       {/* Tab content */}
       {activeTab === 'messages' ? (
@@ -648,33 +714,61 @@ export default function CommunityScreen() {
       )}
 
       {activeTab === 'messages' ? (
-        <TouchableOpacity
-          style={styles.fab}
-          onPress={() => router.push('/chat/create')}
-          accessibilityRole="button"
-          accessibilityLabel="Tangira ikiganiro">
-          <PlusCircle size={22} color="#fff" />
-        </TouchableOpacity>
+        <CopilotStep text="Kanda hano kugira ngo utangire ikiganiro gishya, itsinda, cyangwa kominote." order={3} name="community-fab">
+          <WalkthroughableTouchable
+            style={styles.fab}
+            onPress={advanceFab(() => router.push('/chat/create'))}
+            accessibilityRole="button"
+            accessibilityLabel="Tangira ikiganiro">
+            <PlusCircle size={22} color="#fff" />
+          </WalkthroughableTouchable>
+        </CopilotStep>
       ) : activeTab === 'group' ? (
-        <TouchableOpacity
-          style={styles.fab}
-          onPress={() => router.push('/group/create')}
-          accessibilityRole="button"
-          accessibilityLabel="Fungura itsinda">
-          <PlusCircle size={22} color="#fff" />
-        </TouchableOpacity>
+        <CopilotStep text="Kanda hano kugira ngo utangire ikiganiro gishya, itsinda, cyangwa kominote." order={3} name="community-fab">
+          <WalkthroughableTouchable
+            style={styles.fab}
+            onPress={advanceFab(() => router.push('/group/create'))}
+            accessibilityRole="button"
+            accessibilityLabel="Fungura itsinda">
+            <PlusCircle size={22} color="#fff" />
+          </WalkthroughableTouchable>
+        </CopilotStep>
       ) : activeTab === 'community' ? (
-        <TouchableOpacity
-          style={styles.fab}
-          onPress={() => router.push('/community/create')}
-          accessibilityRole="button"
-          accessibilityLabel="Fungura kominote">
-          <PlusCircle size={22} color="#fff" />
-        </TouchableOpacity>
+        <CopilotStep text="Kanda hano kugira ngo utangire ikiganiro gishya, itsinda, cyangwa kominote." order={3} name="community-fab">
+          <WalkthroughableTouchable
+            style={styles.fab}
+            onPress={advanceFab(() => router.push('/community/create'))}
+            accessibilityRole="button"
+            accessibilityLabel="Fungura kominote">
+            <PlusCircle size={22} color="#fff" />
+          </WalkthroughableTouchable>
+        </CopilotStep>
       ) : null}
 
 
     </View>
+  );
+}
+
+export default function CommunityScreen() {
+  return (
+    <CopilotProvider
+      tooltipComponent={MascotTooltip}
+      overlay="view"
+      backdropColor="rgba(0, 0, 0, 0.65)"
+      animationDuration={300}
+      stepNumberComponent={() => null}
+      arrowSize={10}
+      androidStatusBarVisible
+      labels={{
+        finish: 'Rangiza',
+        next: 'Ibikurikiraho',
+        previous: 'Inyuma',
+        skip: 'Simbuka',
+      }}
+    >
+      <CommunityScreenContent />
+    </CopilotProvider>
   );
 }
 

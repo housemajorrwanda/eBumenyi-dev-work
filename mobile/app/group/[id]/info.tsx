@@ -70,7 +70,11 @@ export default function GroupInfoScreen() {
   };
 
   const handleSaveName = async () => {
-    if (!groupName.trim() || !id) return;
+    if (!id) return;
+    if (!groupName.trim()) {
+      Alert.alert('Ikosa', 'Izina ntirishobora kuba ubusa');
+      return;
+    }
     setIsSavingName(true);
     try {
       await MessagingAPI.updateGroup(id, { name: groupName.trim() });

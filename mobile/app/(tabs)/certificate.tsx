@@ -1,6 +1,6 @@
 import { CertificateCard } from '@/components/CertificateCard';
 import Header from '@/components/Header';
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -16,13 +16,45 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import PostCourseRecommendationsModal from '@/components/PostCourseRecommendationsModal';
 import { getMyCertificates } from '@/services/certificate.api';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { useIsFocused } from '@react-navigation/native';
+import { CopilotProvider, CopilotStep, useCopilot } from 'react-native-copilot';
+import { WalkthroughableView, WalkthroughableTouchable } from '@/components/onboarding/walkthroughable';
+import MascotTooltip from '@/components/onboarding/MascotTooltip';
+import { TOUR_KEYS, onboardingService, scheduleTourStart } from '@/services/onboarding.service';
+import { useOnboarding } from '@/contexts/OnboardingContext';
+import { useTourStepAdvance } from '@/hooks/useTourStepAdvance';
 
-export default function CertificateScreen() {
+function CertificateScreenContent() {
   const queryClient = useQueryClient();
   const [activeCourseIndex, setActiveCourseIndex] = useState(0);
   const scrollViewRef = useRef<FlatList>(null);
   const { width: screenWidth } = Dimensions.get('window');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const { start, copilotEvents, stop, visible } = useCopilot();
+  // start()'s identity is not stable across CopilotProvider re-renders (the
+  // library doesn't memoize its internal visibility setter, which start
+  // depends on) — reading it through a ref means a re-render before the
+  // scheduled tour fires doesn't cancel it via the effect's cleanup.
+  const startRef = useRef(start);
+  startRef.current = start;
+  const { markComplete } = useOnboarding();
+  const advanceRecommendations = useTourStepAdvance('certificate-recommendations');
+  const advancePdf = useTourStepAdvance('certificate-pdf');
+  const isFocused = useIsFocused();
+  // If the user navigates away (tapping the real highlighted element can
+  // itself trigger navigation, but this also covers back/tab-switch/etc.)
+  // while a tour is visible, its CopilotProvider can stay mounted (stack
+  // navigators often keep the previous screen alive) — without this, the
+  // tour's Modal renders in RN's top-level layer and keeps floating over
+  // whatever screen is now active. Close it on the focus transition.
+  const wasFocusedRef = useRef(isFocused);
+  useEffect(() => {
+    if (wasFocusedRef.current && !isFocused && visible) {
+      stop().catch(() => {});
+    }
+    wasFocusedRef.current = isFocused;
+  }, [isFocused, visible, stop]);
+  const autoStartAttemptedRef = useRef(false);
 
   const [recModalVisible, setRecModalVisible] = useState(false);
   const [recModalCourseId, setRecModalCourseId] = useState<string | null>(null);
@@ -61,7 +93,6 @@ export default function CertificateScreen() {
     queryFn: getMyCertificates,
   });
 
-  // Handle pull-to-refresh
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
@@ -75,7 +106,37 @@ export default function CertificateScreen() {
   };
 
   const certificates = certificatesData?.data || [];
-  // Handle loading state
+
+  // Auto-start the tour once per session, only when certificate data is loaded
+  // and at least one certificate exists (empty-list targets have zero height and
+  // can't be measured reliably by react-native-copilot).
+  useEffect(() => {
+    let cancelSchedule: (() => void) | null = null;
+    let cancelled = false;
+
+    if (!isLoading && certificates.length > 0 && isFocused && !autoStartAttemptedRef.current) {
+      autoStartAttemptedRef.current = true;
+      void (async () => {
+        const done = await onboardingService.hasCompleted(TOUR_KEYS.CERTIFICATE);
+        if (cancelled) return;
+        if (!done) {
+          cancelSchedule = scheduleTourStart(() => startRef.current());
+        }
+      })();
+    }
+
+    return () => {
+      cancelled = true;
+      cancelSchedule?.();
+    };
+  }, [isLoading, certificates.length, isFocused]);
+
+  useEffect(() => {
+    const handleStop = () => { markComplete(TOUR_KEYS.CERTIFICATE).catch(() => {}); };
+    copilotEvents.on('stop', handleStop);
+    return () => { copilotEvents.off('stop', handleStop); };
+  }, [copilotEvents, markComplete]);
+
   if (isLoading) {
     return (
       <View style={styles.container}>
@@ -85,7 +146,6 @@ export default function CertificateScreen() {
     );
   }
 
-  // Handle error state
   if (error) {
     return (
       <View style={styles.container}>
@@ -114,116 +174,145 @@ export default function CertificateScreen() {
         }
       >
         <View style={styles.content}>
-          <View style={styles.section}>
-            <View style={{paddingHorizontal: 8}}>
-              <Text style={styles.sectionTitle}>Isomo</Text>
-            </View>
-            <FlatList
-              ref={scrollViewRef}
-              data={certificates}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
-                <View style={[styles.courseCard, { width: screenWidth - 24, marginRight: 10 }]}>
-                  <View style={styles.courseTopRow}>
-                    <Image
-                      source={{
-                        uri: item.image,
-                      }}
-                      style={styles.courseImage}
-                    />
-                    <View style={styles.courseInfo}>
-                      <Text style={styles.courseTitle}>{item.title}</Text>
+          {/* Step 1: Certificate carousel */}
+          <CopilotStep
+            text="Nyuza urutoki hano kugira ngo ujye ku mpamyabumenyi y'isomo rikurikira. Ibyerekeye amanota yawe bigaragara hepfo."
+            order={1}
+            name="certificate-carousel"
+          >
+            <WalkthroughableView style={styles.section}>
+              <View style={{paddingHorizontal: 8}}>
+                <Text style={styles.sectionTitle}>Isomo</Text>
+              </View>
+              <FlatList
+                ref={scrollViewRef}
+                data={certificates}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item, index }) => (
+                  <View style={[styles.courseCard, { width: screenWidth - 24, marginRight: 10 }]}>
+                    <View style={styles.courseTopRow}>
+                      <Image
+                        source={{ uri: item.image }}
+                        style={styles.courseImage}
+                      />
+                      <View style={styles.courseInfo}>
+                        <Text style={styles.courseTitle}>{item.title}</Text>
+                      </View>
+                    </View>
+                    <View style={styles.courseFooter}>
+                      <View style={styles.tag}>
+                        <Text style={styles.tagText}>Ubutumwa</Text>
+                      </View>
+                      {/* Step 2: Recommendations link on the active card only */}
+                      {index === activeCourseIndex ? (
+                        <CopilotStep
+                          text="Kanda hano kugira ngo ubone inama zihariye z'isomo warangije."
+                          order={2}
+                          name="certificate-recommendations"
+                        >
+                          <WalkthroughableTouchable
+                            style={styles.viewButton}
+                            onPress={advanceRecommendations(() => openRecommendations(item.courseId))}
+                          >
+                            <Text style={styles.viewButtonText}>Reba</Text>
+                          </WalkthroughableTouchable>
+                        </CopilotStep>
+                      ) : (
+                        <TouchableOpacity
+                          style={styles.viewButton}
+                          onPress={() => openRecommendations(item.courseId)}
+                        >
+                          <Text style={styles.viewButtonText}>Reba</Text>
+                        </TouchableOpacity>
+                      )}
                     </View>
                   </View>
-                  <View style={styles.courseFooter}>
-                    <View style={styles.tag}>
-                      <Text style={styles.tagText}>Ubutumwa</Text>
-                    </View>
-                    <TouchableOpacity
-                      style={styles.viewButton}
-                      onPress={() => openRecommendations(item.courseId)}
-                    >
-                      <Text style={styles.viewButtonText}>Reba</Text>
-                    </TouchableOpacity>
+                )}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                onScroll={handleScroll}
+                scrollEventThrottle={16}
+                snapToInterval={screenWidth - 20 + 10}
+                decelerationRate="fast"
+                style={styles.courseScrollView}
+              />
+
+              <View style={{paddingHorizontal: 8}}>
+                <View style={styles.dotsContainer}>
+                  {certificates.map((course, index) => {
+                    const dotSize = Math.max(4, 16 - certificates.length * 0.1);
+                    return (
+                      <TouchableOpacity
+                        key={course.id}
+                        onPress={() => scrollToCourse(index)}
+                        style={styles.dotTouchable}
+                      >
+                        <View
+                          style={[
+                            styles.dot,
+                            { width: dotSize, height: dotSize, borderRadius: dotSize / 2 },
+                            index === activeCourseIndex ? styles.dotActive : styles.dotInactive
+                          ]}
+                        />
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+                <Text style={styles.sectionTitle}>Imyitwarire</Text>
+                <View style={styles.statsGrid}>
+                  <View style={styles.statCard}>
+                    <Text style={styles.statValue}>20</Text>
+                    <Text style={styles.statLabel}>Inshuro wize</Text>
+                  </View>
+                  <View style={styles.statCard}>
+                    <Text style={styles.statValue}>{certificates[activeCourseIndex]?.test || 0}</Text>
+                    <Text style={styles.statLabel}>Igeragezwa</Text>
+                  </View>
+                  <View style={styles.statCard}>
+                    <Text style={styles.statValue}>{certificates[activeCourseIndex]?.attempt || 0}</Text>
+                    <Text style={styles.statLabel}>Gusubiramo</Text>
+                  </View>
+                  <View style={styles.statCard}>
+                    <Text style={styles.statValue}>{certificates[activeCourseIndex]?.finalExamMarks || 0}</Text>
+                    <Text style={styles.statLabel}>Amanota</Text>
                   </View>
                 </View>
-              )}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              onScroll={handleScroll}
-              scrollEventThrottle={16}
-              snapToInterval={screenWidth - 20 + 10}
-              decelerationRate="fast"
-              style={styles.courseScrollView}
-            />
+              </View>
+            </WalkthroughableView>
+          </CopilotStep>
 
-            <View style={{paddingHorizontal: 8}}>
-              <View style={styles.dotsContainer}>
-              {certificates.map((course, index) => {
-                const dotSize = Math.max(4, 16 - certificates.length * 0.1);
-                return (
-                  <TouchableOpacity
-                    key={course.id}
-                    onPress={() => scrollToCourse(index)}
-                    style={styles.dotTouchable}
-                  >
-                    <View
-                      style={[
-                        styles.dot,
-                        { width: dotSize, height: dotSize, borderRadius: dotSize / 2 },
-                        index === activeCourseIndex ? styles.dotActive : styles.dotInactive
-                      ]}
-                    />
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-            <Text style={styles.sectionTitle}>Imyitwarire</Text>
-            <View style={styles.statsGrid}>
-              <View style={styles.statCard}>
-                <Text style={styles.statValue}>20</Text>
-                <Text style={styles.statLabel}>Inshuro wize</Text>
-              </View>
-              <View style={styles.statCard}>
-                <Text style={styles.statValue}>{certificates[activeCourseIndex]?.test || 0}</Text>
-                <Text style={styles.statLabel}>Igeragezwa</Text>
-              </View>
-              <View style={styles.statCard}>
-                <Text style={styles.statValue}>{certificates[activeCourseIndex]?.attempt || 0}</Text>
-                <Text style={styles.statLabel}>Gusubiramo</Text>
-              </View>
-              <View style={styles.statCard}>
-                <Text style={styles.statValue}>{certificates[activeCourseIndex]?.finalExamMarks || 0}</Text>
-                <Text style={styles.statLabel}>Amanota</Text>
-              </View>
-            </View>
-            </View>
+          <Text style={styles.sectionTitle}>Impamyabumenyi</Text>
 
-          </View>
-
-            <Text style={styles.sectionTitle}>Impamyabumenyi</Text>
-          <View style={styles.section}>
-            <View style={{paddingHorizontal: 8}}>
-              {certificates.map((cert) => (
-                <CertificateCard
-                  key={cert.id}
-                  id={cert.id}
-                  courseId={cert.courseId}
-                  title={cert.title}
-                  image={cert.image}
-                  certificateUrl={cert.pdf}
-                  enrollmentDate={cert.enrollmentDate}
-                  completedAt={cert.completedAt}
-                  progress={cert.progress}
-                  slides={cert.slides}
-                  onRegenerate={async () => {
-                    await queryClient.invalidateQueries({ queryKey: ['MY_CERTIFICATES'] });
-                    await refetch();
-                  }}
-                />
-              ))}
-            </View>
-          </View>
+          {/* Step 3: Certificate PDF cards */}
+          <CopilotStep
+            text="Kanda ku karita kugira ngo urebe cyangwa ukurure impamyabumenyi yawe (PDF). Ushobora no kuyisaba igihe cyose."
+            order={3}
+            name="certificate-pdf"
+          >
+            <WalkthroughableView style={styles.section}>
+              <View style={{paddingHorizontal: 8}}>
+                {certificates.map((cert) => (
+                  <CertificateCard
+                    key={cert.id}
+                    id={cert.id}
+                    courseId={cert.courseId}
+                    title={cert.title}
+                    image={cert.image}
+                    certificateUrl={cert.pdf}
+                    enrollmentDate={cert.enrollmentDate}
+                    completedAt={cert.completedAt}
+                    progress={cert.progress}
+                    slides={cert.slides}
+                    onRegenerate={async () => {
+                      await queryClient.invalidateQueries({ queryKey: ['MY_CERTIFICATES'] });
+                      await refetch();
+                    }}
+                    tourAdvance={advancePdf}
+                  />
+                ))}
+              </View>
+            </WalkthroughableView>
+          </CopilotStep>
         </View>
       </ScrollView>
 
@@ -233,6 +322,28 @@ export default function CertificateScreen() {
         onClose={closeRecModal}
       />
     </View>
+  );
+}
+
+export default function CertificateScreen() {
+  return (
+    <CopilotProvider
+      tooltipComponent={MascotTooltip}
+      overlay="view"
+      backdropColor="rgba(0, 0, 0, 0.65)"
+      animationDuration={300}
+      stepNumberComponent={() => null}
+      arrowSize={10}
+      androidStatusBarVisible
+      labels={{
+        finish: 'Rangiza',
+        next: 'Ibikurikiraho',
+        previous: 'Inyuma',
+        skip: 'Simbuka',
+      }}
+    >
+      <CertificateScreenContent />
+    </CopilotProvider>
   );
 }
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,13 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { getPublishedRecordings, buildRecordingUrl, IMeetingRecording } from '@/services/recording.api';
 import VideoCard from '@/components/VideoViewer';
 import { formatRwDateShort } from '@/utils/format';
+import { useIsFocused } from '@react-navigation/native';
+import { CopilotProvider, CopilotStep, useCopilot } from 'react-native-copilot';
+import { WalkthroughableView } from '@/components/onboarding/walkthroughable';
+import MascotTooltip from '@/components/onboarding/MascotTooltip';
+import { TOUR_KEYS, onboardingService, scheduleTourStart } from '@/services/onboarding.service';
+import { useOnboarding } from '@/contexts/OnboardingContext';
+import { useTourStepAdvance } from '@/hooks/useTourStepAdvance';
 
 function RecordingCard({
   recording,
@@ -60,15 +67,59 @@ function RecordingCard({
   );
 }
 
-export default function WatchRecordingsScreen() {
+function WatchRecordingsScreenContent() {
   const router = useRouter();
   const { isDark, themeColors } = useTheme();
   const [selected, setSelected] = useState<IMeetingRecording | null>(null);
+  const { start, copilotEvents, stop, visible } = useCopilot();
+  const advanceWatchList = useTourStepAdvance('watch-list');
+  // start()'s identity is not stable across CopilotProvider re-renders (the
+  // library doesn't memoize its internal visibility setter, which start
+  // depends on) — reading it through a ref means a re-render before the
+  // scheduled tour fires doesn't cancel it via the effect's cleanup.
+  const startRef = useRef(start);
+  startRef.current = start;
+  const { markComplete } = useOnboarding();
+  const isFocused = useIsFocused();
+  // If the user navigates away (tapping the real highlighted element can
+  // itself trigger navigation, but this also covers back/tab-switch/etc.)
+  // while a tour is visible, its CopilotProvider can stay mounted (stack
+  // navigators often keep the previous screen alive) — without this, the
+  // tour's Modal renders in RN's top-level layer and keeps floating over
+  // whatever screen is now active. Close it on the focus transition.
+  const wasFocusedRef = useRef(isFocused);
+  useEffect(() => {
+    if (wasFocusedRef.current && !isFocused && visible) {
+      stop().catch(() => {});
+    }
+    wasFocusedRef.current = isFocused;
+  }, [isFocused, visible, stop]);
+  const autoStartAttemptedRef = useRef(false);
 
   const { data: recordings = [], isLoading, refetch, isRefreshing } = useQuery({
     queryKey: ['publishedRecordings'],
     queryFn: getPublishedRecordings,
   }) as any;
+
+  useEffect(() => {
+    let cancelSchedule: (() => void) | null = null;
+    let cancelled = false;
+    if (!isLoading && recordings.length > 0 && isFocused && !autoStartAttemptedRef.current) {
+      autoStartAttemptedRef.current = true;
+      void (async () => {
+        const done = await onboardingService.hasCompleted(TOUR_KEYS.RECORDINGS_WATCH);
+        if (cancelled) return;
+        if (!done) { cancelSchedule = scheduleTourStart(() => startRef.current()); }
+      })();
+    }
+    return () => { cancelled = true; cancelSchedule?.(); };
+  }, [isLoading, recordings.length, isFocused]);
+
+  useEffect(() => {
+    const handleStop = () => { markComplete(TOUR_KEYS.RECORDINGS_WATCH).catch(() => {}); };
+    copilotEvents.on('stop', handleStop);
+    return () => { copilotEvents.off('stop', handleStop); };
+  }, [copilotEvents, markComplete]);
 
   const videoUrl = selected ? buildRecordingUrl(selected.url) : '';
 
@@ -102,15 +153,33 @@ export default function WatchRecordingsScreen() {
             </Text>
           </View>
         ) : (
-          recordings.map((r: IMeetingRecording) => (
-            <RecordingCard
-              key={r.id}
-              recording={r}
-              onPress={() => setSelected(r)}
-              themeColors={themeColors}
-              isDark={isDark}
-            />
-          ))
+          recordings.map((r: IMeetingRecording, index: number) => {
+            const card = (
+              <RecordingCard
+                recording={r}
+                onPress={advanceWatchList(() => setSelected(r))}
+                themeColors={themeColors}
+                isDark={isDark}
+              />
+            );
+            // Only the first card is a tour target — spotlighting the whole
+            // list left too little room above/below the target for the
+            // tooltip to fit without being clipped. A single card gives it
+            // natural room to sit below.
+            if (index === 0) {
+              return (
+                <CopilotStep
+                  key={r.id}
+                  text="Hano hagaragara amasomo cyangwa inama byafashwe mbere. Kanda ku gakarita kureba video."
+                  order={1}
+                  name="watch-list"
+                >
+                  <WalkthroughableView>{card}</WalkthroughableView>
+                </CopilotStep>
+              );
+            }
+            return <React.Fragment key={r.id}>{card}</React.Fragment>;
+          })
         )}
       </ScrollView>
 
@@ -151,6 +220,23 @@ export default function WatchRecordingsScreen() {
         </SafeAreaView>
       </Modal>
     </SafeAreaView>
+  );
+}
+
+export default function WatchRecordingsScreen() {
+  return (
+    <CopilotProvider
+      tooltipComponent={MascotTooltip}
+      overlay="view"
+      backdropColor="rgba(0, 0, 0, 0.65)"
+      animationDuration={300}
+      stepNumberComponent={() => null}
+      arrowSize={10}
+      androidStatusBarVisible
+      labels={{ finish: 'Rangiza', next: 'Ibikurikiraho', previous: 'Inyuma', skip: 'Simbuka' }}
+    >
+      <WatchRecordingsScreenContent />
+    </CopilotProvider>
   );
 }
 
