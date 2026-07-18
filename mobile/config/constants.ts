@@ -10,6 +10,7 @@ type AppExtra = {
   backendBaseUrl?: string;
   apiBaseUrl?: string;
   narrationApiBaseUrl?: string;
+  recommendationsApiBaseUrl?: string;
   assetsBaseUrl?: string;
   weltelWebUrl?: string;
   uploadsVideosPath?: string;
@@ -47,36 +48,42 @@ function resolveApiBaseUrl(backendUrl: string): string {
 export const BACKEND_BASE_URL = resolveBackendUrl();
 export const API_BASE_URL = resolveApiBaseUrl(BACKEND_BASE_URL);
 
-function resolveNarrationApiBaseUrl(apiBaseUrl: string): string {
-  const explicit = readEnv(
-    'EXPO_PUBLIC_NARRATION_API_BASE_URL',
-    'narrationApiBaseUrl',
-  );
+function resolveOptionalApiOverride(
+  apiBaseUrl: string,
+  envName: string,
+  extraKey: keyof AppExtra,
+): string {
+  const explicit = readEnv(envName, extraKey);
   if (explicit) return explicit.replace(/\/$/, '');
-
-  // Hybrid dev: courses from apitest, read-aloud from local API + ml-service.
-  if (/apitest\.ebumenyi\.online|ebumenyi\.online/i.test(apiBaseUrl)) {
-    return 'http://localhost:9000/api';
-  }
-
   return apiBaseUrl;
 }
 
-/** Read-aloud runs on local API while courses may load from apitest. */
-export const NARRATION_API_BASE_URL = resolveNarrationApiBaseUrl(API_BASE_URL);
+export const NARRATION_API_BASE_URL = resolveOptionalApiOverride(
+  API_BASE_URL,
+  'EXPO_PUBLIC_NARRATION_API_BASE_URL',
+  'narrationApiBaseUrl',
+);
+
+export const RECOMMENDATIONS_API_BASE_URL = resolveOptionalApiOverride(
+  API_BASE_URL,
+  'EXPO_PUBLIC_RECOMMENDATIONS_API_BASE_URL',
+  'recommendationsApiBaseUrl',
+);
 
 export const ASSETS_BASE_URL =
   readEnv('EXPO_PUBLIC_ASSETS_BASE_URL', 'assetsBaseUrl') || BACKEND_BASE_URL;
 
-// API endpoint base URL
-export const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || "https://apitest.ebumenyi.online/api";
-
-// Assets and uploads base URL
-export const ASSETS_BASE_URL = process.env.EXPO_PUBLIC_ASSETS_BASE_URL || BACKEND_BASE_URL || "https://apitest.ebumenyi.online";
-
 export const UPLOADS_IMAGES_PATH =
   readEnv('EXPO_PUBLIC_UPLOADS_IMAGES_PATH', 'uploadsImagesPath') ||
   '/uploads/images';
+
+export const UPLOADS_VIDEOS_PATH =
+  readEnv('EXPO_PUBLIC_UPLOADS_VIDEOS_PATH', 'uploadsVideosPath') ||
+  '/uploads/videos';
+
+export const UPLOADS_DOCUMENTS_PATH =
+  readEnv('EXPO_PUBLIC_UPLOADS_DOCUMENTS_PATH', 'uploadsDocumentsPath') ||
+  '/uploads/documents';
 
 // WelTel in-app web destination
 export const WELTEL_WEB_URL = process.env.EXPO_PUBLIC_WELTEL_WEB_URL || 'https://rw-chw1.weltelhealth.net';

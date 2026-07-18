@@ -502,3 +502,31 @@ export function isPlatformCertificateTotalsQuestion(msg: string): boolean {
       (t.includes("received") || t.includes("issued") || t.includes("earned")))
   );
 }
+
+export function isDashboardStatisticsQuestion(msg: string): boolean {
+  const t = normalizeQuestionForMatch(msg);
+  if (t.includes("district") || t.includes("sector") || t.includes("per ")) {
+    return false;
+  }
+  if (
+    t.includes("enrolled in") ||
+    t.includes("in progress") ||
+    t.includes("haven't") ||
+    t.includes("have not")
+  ) {
+    return false;
+  }
+  if (t.includes("female") || t.includes("male") || t.includes("gender")) {
+    return false;
+  }
+  if (t.includes("certificate") && !/\bstudent/.test(t)) return false;
+  const howMany =
+    t.includes("how many") ||
+    t.includes("total number") ||
+    t.includes("number of");
+  const students =
+    t.includes("student") || t.includes("trainee") || t.includes("learner");
+  const courses = t.includes("course");
+  const completion = t.includes("completion rate");
+  return howMany && (students || courses || completion);
+}

@@ -630,58 +630,6 @@ function OneCourseScreenContent() {
     return () => { copilotEvents.off('stop', handleStop); };
   }, [copilotEvents]);
 
-  // Re-sync all progress state when the screen regains focus (returning from lesson/test screens).
-  // useFocusEffect fires on every focus event; skip the very first mount because the existing
-  // useEffects already handle initial load.
-  const hasMountedRef = useRef(false);
-  useFocusEffect(
-    useCallback(() => {
-      if (!hasMountedRef.current) {
-        hasMountedRef.current = true;
-        return;
-      }
-      if (!courseId) return;
-      const courseIdStr = Array.isArray(courseId) ? courseId[0] : courseId;
-
-      const refreshProgress = async () => {
-        try {
-          const response = await getStudentCourseProgressByCourseId(courseIdStr);
-          if (!response?.data) return;
-
-          // Refresh completed chapters
-          const serverCompleted = (response.data.chapterProgress ?? [])
-            .filter((ch: any) => ch.isCompleted)
-            .map((ch: any) => ch.chapterId);
-          for (const id of serverCompleted) {
-            await StorageService.markChapterCompleted(id);
-          }
-          const local = await StorageService.getCompletedChapters();
-          setCompletedChapters([...new Set([...serverCompleted, ...local])]);
-
-          // Refresh pre-test status
-          if (response.data.preTestStatus) {
-            setPreTestDone(Boolean(response.data.preTestStatus.attempted));
-          } else if (!course || !Array.isArray(course.preTests) || course.preTests.length === 0) {
-            setPreTestDone(true);
-          }
-
-          // Refresh final test / exam status
-          if (response.data.finalTestStatus) {
-            setFinalTestStatus({ ...response.data.finalTestStatus, associatedCourseId: courseIdStr });
-          }
-          if (response.data.finalExamStatus) {
-            setFinalExamStatus({ ...response.data.finalExamStatus, associatedCourseId: courseIdStr });
-          }
-        } catch (error) {
-          console.log('Error refreshing progress on focus:', error);
-        }
-        queryClient.invalidateQueries({ queryKey: ['COURSE'] });
-      };
-
-      refreshProgress();
-    }, [courseId, course, queryClient])
-  );
-
   // Handle review submission
   const handleReviewSubmit = async (reviewData: any) => {
     

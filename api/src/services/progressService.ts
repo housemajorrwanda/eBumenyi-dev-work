@@ -1636,13 +1636,15 @@ export class ProgressService {
       chapters,
     );
 
+    const nlpInput = {
+      studentFirstName,
+      courseTitle: course.title,
+      completedQuickly,
+      chapters,
+    };
+
     const { messages: conversationalMessages, generatedByNlp } =
-      await generateConversationalRecommendations({
-        studentFirstName,
-        courseTitle: course.title,
-        completedQuickly,
-        chapters,
-      });
+      await generateConversationalRecommendations(nlpInput);
 
     return {
       message: "Recommendations fetched",

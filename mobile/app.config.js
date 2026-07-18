@@ -26,6 +26,18 @@ const weltelWebUrl =
   appJson.expo.extra?.weltelWebUrl ||
   'https://rw-chw1.weltelhealth.net';
 
+const narrationApiBaseUrl = (
+  process.env.EXPO_PUBLIC_NARRATION_API_BASE_URL ||
+  appJson.expo.extra?.narrationApiBaseUrl ||
+  ''
+).replace(/\/$/, '');
+
+const recommendationsApiBaseUrl = (
+  process.env.EXPO_PUBLIC_RECOMMENDATIONS_API_BASE_URL ||
+  appJson.expo.extra?.recommendationsApiBaseUrl ||
+  ''
+).replace(/\/$/, '');
+
 module.exports = {
   expo: {
     ...appJson.expo,
@@ -35,6 +47,8 @@ module.exports = {
       apiBaseUrl,
       assetsBaseUrl,
       weltelWebUrl,
+      ...(narrationApiBaseUrl ? { narrationApiBaseUrl } : {}),
+      ...(recommendationsApiBaseUrl ? { recommendationsApiBaseUrl } : {}),
       uploadsVideosPath:
         process.env.EXPO_PUBLIC_UPLOADS_VIDEOS_PATH || '/uploads/videos',
       uploadsDocumentsPath:

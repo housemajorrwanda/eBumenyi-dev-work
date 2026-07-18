@@ -23,6 +23,7 @@ import {
   isNotStartedAnyCourseQuestion as isStaffNotStartedQuestion,
   isPlatformTestAggregatesQuestion as isStaffPlatformTestAggregatesQuestion,
   isTestPerformanceDemographicsQuestion as isStaffTestPerformanceDemographicsQuestion,
+  isDashboardStatisticsQuestion as isStaffDashboardStatisticsQuestion,
 } from "./chatQuestionMatchers";
 
 /** Max LLM rounds with tool calls per user message. Lower = faster; raise via CHAT_MAX_TOOL_ROUNDS if answers need more steps. */
@@ -44,6 +45,12 @@ export const LLM_UNREACHABLE_MESSAGE =
 
 function isRateLimitError(e: unknown): boolean {
   return e instanceof Error && e.message.includes("429");
+}
+
+function isLlmTimeoutError(e: unknown): boolean {
+  return (
+    e instanceof Error && e.message.includes("LLM request timed out")
+  );
 }
 
 function isLlmConnectionError(e: unknown): boolean {
@@ -95,6 +102,24 @@ function isGreetingOrSmallTalk(message: string): boolean {
     "good day",
   ];
   return greetings.includes(t) || t.length <= 2;
+}
+
+function usesRemoteLlm(): boolean {
+  const base = process.env.LLM_BASE_URL || "";
+  return base.includes("groq.com") || base.includes("railway.app");
+}
+
+function systemPromptForChat(ctx: ChatContext, userMessage: string): string {
+  if (isGreetingOrSmallTalk(userMessage)) {
+    return "You are a friendly assistant for a CHW training platform. Reply with one short warm sentence.";
+  }
+  if (usesRemoteLlm()) {
+    const role = ctx.isStaff
+      ? "an admin/instructor with platform analytics tools"
+      : "a CHW trainee with access only to their own progress and certificates";
+    return `You are a helpful assistant for a CHW training platform. The user is ${role}. Call tools when needed; only report facts returned by tools. Never show SQL, code, or invented numbers. Be warm and concise.`;
+  }
+  return systemPrompt(ctx);
 }
 
 function systemPrompt(ctx: ChatContext): string {
@@ -888,6 +913,40 @@ function formatTopPerformingCoursesReply(toolJson: string): string | null {
   }
 }
 
+function formatDashboardStatisticsReply(toolJson: string): string | null {
+  try {
+    const d = JSON.parse(toolJson) as {
+      error?: unknown;
+      totalStudents?: { value?: number };
+      totalCourses?: { value?: number };
+      completionRate?: { value?: number };
+    };
+    if (typeof d.error === "string") {
+      if (d.error === "Forbidden") return null;
+      return d.error;
+    }
+    const parts: string[] = [];
+    const students = d.totalStudents?.value;
+    const courses = d.totalCourses?.value;
+    const completion = d.completionRate?.value;
+    if (typeof students === "number") {
+      parts.push(
+        `${students} student${students === 1 ? "" : "s"} on the platform`,
+      );
+    }
+    if (typeof courses === "number") {
+      parts.push(`${courses} course${courses === 1 ? "" : "s"}`);
+    }
+    if (typeof completion === "number") {
+      parts.push(`overall completion rate is ${completion}%`);
+    }
+    if (parts.length === 0) return null;
+    return `${parts.join(", ")}.`;
+  } catch {
+    return null;
+  }
+}
+
 function formatPlatformCertificateTotalsReply(toolJson: string): string | null {
   try {
     const d = JSON.parse(toolJson) as {
@@ -1153,13 +1212,18 @@ export async function chatWithTools(
   const allTools = getToolsForContext(ctx);
   const useTools = isGreetingOrSmallTalk(userMessage) ? [] : allTools;
   const messages: ChatMessage[] = [
-    { role: "system", content: systemPrompt(ctx) },
+    { role: "system", content: systemPromptForChat(ctx, userMessage) },
     ...history.map(toChatMessage).filter((m): m is ChatMessage => m !== null),
     { role: "user", content: userMessage },
   ];
 
   try {
     if (!isGreetingOrSmallTalk(userMessage) && ctx.isStaff) {
+      if (isStaffDashboardStatisticsQuestion(userMessage)) {
+        const r = await runTool("get_dashboard_statistics", {}, ctx);
+        const f = formatDashboardStatisticsReply(r);
+        if (f) return f;
+      }
       if (isStaffNotStartedQuestion(userMessage)) {
         const r = await runTool("get_students_not_started", {}, ctx);
         const f = formatNotStartedReply(r);
@@ -1799,7 +1863,9 @@ export async function chatWithTools(
     }
   } catch (e) {
     if (isRateLimitError(e)) return RATE_LIMIT_MESSAGE;
-    if (isLlmConnectionError(e)) return LLM_UNREACHABLE_MESSAGE;
+    if (isLlmTimeoutError(e) || isLlmConnectionError(e)) {
+      return LLM_UNREACHABLE_MESSAGE;
+    }
     throw e;
   }
 

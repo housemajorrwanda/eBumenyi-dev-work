@@ -15,7 +15,7 @@ MODEL="${OLLAMA_MODEL:-llama3.2}"
 ollama serve &
 SERVER_PID=$!
 
-echo "Waiting for Ollama to start on ${OLLAMA_HOST}..."
+echo "Waiting for Ollama on ${OLLAMA_HOST}..."
 for _ in $(seq 1 60); do
   if curl -sf "http://127.0.0.1:${PORT}/api/tags" >/dev/null 2>&1; then
     break
@@ -31,14 +31,13 @@ fi
 echo "Pulling model: ${MODEL}"
 ollama pull "${MODEL}"
 
-echo "Warming up ${MODEL} (loads weights into RAM; needs ~8GB on Railway)..."
+echo "Warming up ${MODEL}..."
 if ! curl -sf -m 600 -X POST "http://127.0.0.1:${PORT}/api/generate" \
   -H "Content-Type: application/json" \
   -d "{\"model\":\"${MODEL}\",\"prompt\":\"ok\",\"stream\":false}" >/dev/null; then
-  echo "Model warmup failed — inference did not respond within 10 minutes." >&2
-  echo "On Railway: set llm-service to at least 8 GB RAM and mount a volume at /root/.ollama." >&2
+  echo "Model warmup failed (inference did not respond within 10 minutes)." >&2
   exit 1
 fi
 
-echo "Ollama ready — model ${MODEL} loaded and warmed up"
+echo "Ollama ready — ${MODEL}"
 wait "${SERVER_PID}"

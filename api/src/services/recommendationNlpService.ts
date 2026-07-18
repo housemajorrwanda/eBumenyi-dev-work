@@ -1,5 +1,3 @@
-import { chat } from "./llmAdapter";
-
 export type RecReason =
   | "no_attempt"
   | "below_pass"
@@ -42,30 +40,6 @@ type RecommendationNlpInput = {
   completedQuickly: boolean;
   chapters: RecommendationChapterInput[];
 };
-
-const SYSTEM_PROMPT = `You are a warm, supportive learning coach on the eBumenyi CHW training platform.
-Write ONLY in Kinyarwanda (Ikinyarwanda). Sound natural and conversational — like a helpful colleague, not a report.
-
-Rules:
-- Use ONLY the facts provided in the user message. Never invent scores, chapter titles, or reasons.
-- Address the trainee by their first name when given.
-- Be encouraging but honest when performance was weak.
-- Keep each message short (1–3 sentences).
-- Return valid JSON only — no markdown, no code fences.
-
-JSON shape:
-{
-  "messages": [
-    { "kind": "intro", "content": "..." },
-    { "kind": "chapter", "chapterNumber": 1, "content": "..." },
-    { "kind": "closing", "content": "..." }
-  ]
-}
-
-Use "kind": "intro" once at the start.
-Use "kind": "chapter" once per recommended chapter (chapterNumber must match the input).
-Use "kind": "closing" once at the end with brief encouragement.
-If there are no chapters to recommend, only return intro + closing (no chapter messages).`;
 
 function firstNameFrom(fullNames: string): string {
   const trimmed = fullNames.trim();
@@ -128,7 +102,7 @@ function buildFallbackMessages(input: RecommendationNlpInput): ConversationalMes
       : `Muraho ${name}! Nasanze ibitabo byawe bya «${courseTitle}» — mfite inama nke zishobora kugufasha gukomeza neza.`,
   });
 
-  chapters.forEach((ch, index) => {
+  chapters.forEach((ch) => {
     const why = reasonPhraseRw(
       ch.reasons,
       ch.attemptCount,
@@ -156,149 +130,18 @@ function buildFallbackMessages(input: RecommendationNlpInput): ConversationalMes
   return messages;
 }
 
-type LlmMessageKind = "intro" | "chapter" | "closing";
-
-type LlmMessagePayload = {
-  kind: LlmMessageKind;
-  content?: string;
-  chapterNumber?: number;
-};
-
-function parseLlmJson(raw: string): LlmMessagePayload[] | null {
-  const trimmed = raw.trim();
-  const jsonMatch = trimmed.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) return null;
-  try {
-    const parsed = JSON.parse(jsonMatch[0]) as { messages?: LlmMessagePayload[] };
-    if (!Array.isArray(parsed.messages) || parsed.messages.length === 0) return null;
-    const valid = parsed.messages.every(
-      (m) =>
-        m &&
-        typeof m === "object" &&
-        (m.kind === "intro" || m.kind === "chapter" || m.kind === "closing") &&
-        typeof m.content === "string" &&
-        m.content.trim().length > 0,
-    );
-    return valid ? parsed.messages : null;
-  } catch {
-    return null;
-  }
-}
-
-function mapLlmToMessages(
-  llmMessages: LlmMessagePayload[],
-  input: RecommendationNlpInput,
-): ConversationalMessage[] | null {
-  const chapterByNumber = new Map(
-    input.chapters.map((c) => [c.chapterNumber, c]),
-  );
-  const result: ConversationalMessage[] = [];
-  let chapterIdx = 0;
-
-  for (let i = 0; i < llmMessages.length; i++) {
-    const m = llmMessages[i];
-    const content = m.content!.trim();
-
-    if (m.kind === "intro") {
-      result.push({ id: "intro", role: "assistant", content });
-      continue;
-    }
-
-    if (m.kind === "chapter") {
-      const num = m.chapterNumber;
-      const ch =
-        (num != null ? chapterByNumber.get(num) : undefined) ??
-        input.chapters[chapterIdx];
-      if (!ch) continue;
-      chapterIdx += 1;
-      result.push({
-        id: `chapter-${ch.chapterId}`,
-        role: "assistant",
-        content,
-        chapterId: ch.chapterId,
-        sectionId: ch.sectionId,
-        actionLabel: "Jya ku cyiciro",
-        severity: ch.severity,
-      });
-      continue;
-    }
-
-    if (m.kind === "closing") {
-      result.push({
-        id: "closing",
-        role: "assistant",
-        content,
-        actionLabel: input.chapters.length > 0 ? "Jya ku isomo" : "Jya ku isomo",
-      });
-    }
-  }
-
-  if (result.length === 0) return null;
-
-  const hasClosing = result.some((m) => m.id === "closing");
-  if (!hasClosing) {
-    result.push({
-      id: "closing",
-      role: "assistant",
-      content: "Komeza utyo — niba ukeneye gusubiramo, kanda hepfo ujye ku isomo.",
-      actionLabel: "Jya ku isomo",
-    });
-  }
-
-  return result;
-}
-
-function buildLlmUserPrompt(input: RecommendationNlpInput): string {
-  const chapterLines = input.chapters.map((c) => {
-    const reasons = c.reasons.join(", ") || "review";
-    const marks =
-      c.attemptCount > 0
-        ? `attempts=${c.attemptCount}, bestMarks=${c.bestMarks}, passMark=${c.marksToPass}`
-        : "no mid-test attempt yet";
-    return `- Chapter ${c.chapterNumber}: "${c.chapterTitle}" | severity=${c.severity} | ${marks} | reasons=${reasons}`;
-  });
-
-  return [
-    `Trainee first name: ${input.studentFirstName}`,
-    `Course: "${input.courseTitle}"`,
-    `Completed quickly (rushed): ${input.completedQuickly}`,
-    `Recommended chapters (${input.chapters.length}):`,
-    chapterLines.length ? chapterLines.join("\n") : "(none — good performance)",
-    "",
-    "Write conversational Kinyarwanda messages as JSON.",
-  ].join("\n");
-}
-
 export function extractStudentFirstName(fullNames: string | null | undefined): string {
   return firstNameFrom(fullNames ?? "");
+}
+
+export function buildTemplateConversationalRecommendations(
+  input: RecommendationNlpInput,
+): ConversationalRecommendationResult {
+  return { messages: buildFallbackMessages(input), generatedByNlp: false };
 }
 
 export async function generateConversationalRecommendations(
   input: RecommendationNlpInput,
 ): Promise<ConversationalRecommendationResult> {
-  const fallback = buildFallbackMessages(input);
-
-  try {
-    const response = await chat([
-      { role: "system", content: SYSTEM_PROMPT },
-      { role: "user", content: buildLlmUserPrompt(input) },
-    ]);
-
-    if ("content" in response && response.content) {
-      const llmMessages = parseLlmJson(response.content);
-      if (llmMessages) {
-        const mapped = mapLlmToMessages(llmMessages, input);
-        if (mapped && mapped.length > 0) {
-          return { messages: mapped, generatedByNlp: true };
-        }
-      }
-    }
-  } catch (err) {
-    console.warn(
-      "[recommendationNlp] LLM unavailable, using template fallback:",
-      err instanceof Error ? err.message : err,
-    );
-  }
-
-  return { messages: fallback, generatedByNlp: false };
+  return buildTemplateConversationalRecommendations(input);
 }

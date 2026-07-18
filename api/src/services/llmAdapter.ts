@@ -1,21 +1,30 @@
-const BASE_URL = process.env.LLM_BASE_URL || "http://localhost:11434/v1";
-const MODEL = process.env.LLM_MODEL || "llama3.2";
-const API_KEY = process.env.LLM_API_KEY?.trim();
-
-function isGroqHost(): boolean {
-  return BASE_URL.includes("groq.com");
+function llmConfig() {
+  return {
+    baseUrl: process.env.LLM_BASE_URL || "http://localhost:11434/v1",
+    model: process.env.LLM_MODEL || "llama3.2",
+    apiKey: process.env.LLM_API_KEY?.trim(),
+    timeoutMs: Number(process.env.LLM_TIMEOUT_MS) || 20000,
+  };
 }
 
-function disableToolValidationForProvider(): boolean {
+function isGroqHost(baseUrl: string): boolean {
+  return baseUrl.includes("groq.com");
+}
+
+function isOllamaHost(baseUrl: string): boolean {
+  return !isGroqHost(baseUrl);
+}
+
+function disableToolValidationForProvider(baseUrl: string): boolean {
   const v = process.env.LLM_DISABLE_TOOL_VALIDATION?.trim().toLowerCase();
   if (v === "true") return true;
   if (v === "false") return false;
-  return isGroqHost();
+  return isGroqHost(baseUrl);
 }
 
-function llmHeaders(): HeadersInit {
+function llmHeaders(apiKey?: string): HeadersInit {
   const h: Record<string, string> = { "Content-Type": "application/json" };
-  if (API_KEY) h.Authorization = `Bearer ${API_KEY}`;
+  if (apiKey) h.Authorization = `Bearer ${apiKey}`;
   return h;
 }
 
@@ -66,7 +75,7 @@ export function normalizeToolCallNameAndArgs(
   argsStr: string,
 ): { name: string; arguments: string } {
   const n = name.trim();
-  const a = argsStr?.trim() || "{}" || "{}";
+  const a = argsStr?.trim() || "{}";
   const bracketIdx = n.indexOf(" [");
   if (bracketIdx > 0 && n.endsWith("]")) {
     const baseName = n.slice(0, bracketIdx).trim();
@@ -122,14 +131,6 @@ function parseToolCall(
 const MAX_RETRIES = 3;
 const RETRY_BASE_MS = 2000;
 
-/**
- * Hard cap on how long we wait for the LLM before giving up. Without this a
- * slow/unresponsive endpoint keeps the fetch open indefinitely, which leaves
- * callers (e.g. post-course recommendations) hanging forever. On timeout we
- * throw so callers fall back to their template responses.
- */
-const REQUEST_TIMEOUT_MS = Number(process.env.LLM_TIMEOUT_MS) || 20000;
-
 async function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -155,10 +156,65 @@ async function fetchWithTimeout(
   }
 }
 
+async function chatOllamaStreamContent(
+  baseUrl: string,
+  apiKey: string | undefined,
+  body: Record<string, unknown>,
+  timeoutMs: number,
+): Promise<string> {
+  const res = await fetchWithTimeout(
+    `${baseUrl}/chat/completions`,
+    {
+      method: "POST",
+      headers: llmHeaders(apiKey),
+      body: JSON.stringify({ ...body, stream: true }),
+    },
+    timeoutMs,
+  );
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`LLM request failed: ${res.status} ${err}`);
+  }
+  if (!res.body) throw new Error("LLM stream returned no body");
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let content = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith("data:")) continue;
+      const payload = trimmed.slice(5).trim();
+      if (payload === "[DONE]") continue;
+      try {
+        const chunk = JSON.parse(payload) as {
+          choices?: Array<{ delta?: { content?: string } }>;
+        };
+        const piece = chunk.choices?.[0]?.delta?.content;
+        if (piece) content += piece;
+      } catch {
+        /* ignore malformed SSE chunks */
+      }
+    }
+  }
+
+  return content.trim();
+}
+
 export async function chat(
   messages: ChatMessage[],
   tools?: ToolDef[],
+  options?: { timeoutMs?: number },
 ): Promise<LLMResponse> {
+  const { baseUrl, model, apiKey, timeoutMs: defaultTimeoutMs } = llmConfig();
+  const timeoutMs = options?.timeoutMs ?? defaultTimeoutMs;
   const toolNudge: ChatMessage = {
     role: "system",
     content:
@@ -169,15 +225,15 @@ export async function chat(
   let attemptedToolNudge = false;
 
   const body: Record<string, unknown> = {
-    model: MODEL,
+    model,
     stream: false,
   };
   if (tools?.length) {
     body.tools = tools;
-    if (isGroqHost()) {
+    if (isGroqHost(baseUrl)) {
       body.tool_choice = "auto";
       body.parallel_tool_calls = false;
-      if (disableToolValidationForProvider()) {
+      if (disableToolValidationForProvider(baseUrl)) {
         body.disable_tool_validation = true;
       }
       const t = process.env.LLM_TEMPERATURE;
@@ -194,14 +250,31 @@ export async function chat(
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     body.messages = messagesForRequest;
 
+    const useOllamaStream =
+      isOllamaHost(baseUrl) && !tools?.length && attempt === 0;
+    if (useOllamaStream) {
+      try {
+        const content = await chatOllamaStreamContent(
+          baseUrl,
+          apiKey,
+          body,
+          timeoutMs,
+        );
+        return { content };
+      } catch (err) {
+        lastError = err instanceof Error ? err : new Error(String(err));
+        throw lastError;
+      }
+    }
+
     const res = await fetchWithTimeout(
-      `${BASE_URL}/chat/completions`,
+      `${baseUrl}/chat/completions`,
       {
         method: "POST",
-        headers: llmHeaders(),
+        headers: llmHeaders(apiKey),
         body: JSON.stringify(body),
       },
-      REQUEST_TIMEOUT_MS,
+      timeoutMs,
     );
 
     if (res.status === 429) {

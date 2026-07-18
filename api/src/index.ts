@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+import "./config/env";
 import "reflect-metadata";
 import express, {
   json,
@@ -8,8 +8,7 @@ import express, {
   NextFunction,
 } from "express";
 import path from "path";
-// Explanation: This line intentionally causes an error because...
-// @ts-ignore
+// @ts-ignore — routes generated at build time
 import { RegisterRoutes } from "../build/routes";
 import swaggerUi from "swagger-ui-express";
 import cors from "cors";
@@ -47,6 +46,15 @@ declare module "express" {
 
 const app = express();
 const PORT = process.env.PORT || 9000;
+const llmBase = process.env.LLM_BASE_URL || "http://localhost:11434/v1";
+const llmProvider = llmBase.includes("groq.com")
+  ? "Groq"
+  : llmBase.includes("railway")
+    ? "Ollama (Railway)"
+    : "Ollama (local)";
+console.log(
+  `🤖 LLM: ${llmProvider} — ${llmBase.replace(/\/v1\/?$/, "")} (model: ${process.env.LLM_MODEL || "llama3.2"})`,
+);
 
 // Skip body parsing for upload routes to allow multipart/form-data to pass through
 // Limits set to 10MB for JSON/form bodies (uploads handled separately via multipart)
