@@ -38,9 +38,9 @@ export async function requestSlideNarration(
   context?: SlideNarrationContext,
   voice?: NarrationVoice,
 ): Promise<SlideNarrationResult> {
-  const response = await narrationClient.post(
+  const response = await narrationClient.post<{ data: SlideNarrationResult }>(
     `/slides/${slideId}/narrate?page=${page}`,
     { ...(context ?? {}), voice },
   );
-  return response.data.data as SlideNarrationResult;
+  return response.data.data;
 }

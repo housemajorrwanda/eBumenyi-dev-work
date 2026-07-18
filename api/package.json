@@ -13,6 +13,7 @@
     "migrate": "pnpm exec prisma migrate dev",
     "migrate:deploy": "pnpm exec prisma migrate deploy",
     "seed": "ts-node ./prisma/seeds/index.ts",
+    "seed:recommendations-test": "psql \"$DATABASE_URL\" -f ./scripts/seed-local-recommendations-test.sql",
     "backfill:section-numbers": "ts-node ./scripts/backfill-section-numbers.ts",
     "update:user-language-rw": "bash ./scripts/update-user-language-rw.sh",
     "reset": "pnpm exec prisma migrate reset",

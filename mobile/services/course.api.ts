@@ -1,5 +1,6 @@
-import { ICourseResponse, IOneCourseResponse, IStudentStatisticsResponse, ITestResponse, TAttempTestResponse, CreateAttempTestDto, IChapterResponse, IAttemptsResponse, IProgressResponse, ICourseWorkspaceResponse, CreateCourseReviewDto, TCourseReviewResponse, CreateSectionReviewDto, TSectionReviewResponse, CreateChapterReviewDto, TChapterReviewResponse, IDocumentsByCourseResponse, IStudentsByCourseResponse, IMySectionReviewItem, IMyChapterReviewItem, IPostCourseRecommendationsResponse } from "@/types";
+import { ICourseResponse, IOneCourseResponse, IStudentStatisticsResponse, ITestResponse, TAttempTestResponse, CreateAttempTestDto, IChapterResponse, IAttemptsResponse, IProgressResponse, ICourseWorkspaceResponse, CreateCourseReviewDto, TCourseReviewResponse, CreateSectionReviewDto, TSectionReviewResponse, CreateChapterReviewDto, TChapterReviewResponse, IDocumentsByCourseResponse, IStudentsByCourseResponse, IMySectionReviewItem, IMyChapterReviewItem } from "@/types";
 import httpClient from "./httpClient";
+export { getPostCourseRecommendations } from "./recommendations.api";
 
 
 export const getStudentCourseStats = async (): Promise<IStudentStatisticsResponse> => {
@@ -73,15 +74,6 @@ export const getCourseWorkspace = async (
   const query = chapterId ? `?chapterId=${encodeURIComponent(chapterId)}` : '';
   const response = await httpClient.get(`/progress/student/course/${courseId}/workspace${query}`);
   return (response as any).data as ICourseWorkspaceResponse;
-};
-
-export const getPostCourseRecommendations = async (
-  courseId: string,
-): Promise<IPostCourseRecommendationsResponse> => {
-  const response = await httpClient.get(
-    `/progress/student/course/${courseId}/recommendations`,
-  );
-  return (response as any).data as IPostCourseRecommendationsResponse;
 };
 
 export const addCoursereview = async (data: CreateCourseReviewDto): Promise<TCourseReviewResponse> => {
