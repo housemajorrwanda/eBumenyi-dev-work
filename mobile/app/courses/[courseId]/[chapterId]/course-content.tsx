@@ -12,7 +12,6 @@ import { useCourseWorkspace, normalizeCourseId, invalidateCourseProgressQueries 
 import { findChapterInCourse } from '@/utils/courseWorkspace';
 import { useQueryClient } from '@tanstack/react-query';
 import Footer from '@/components/Footer';
-import { LoadingSpinner } from '@/components/LoadingSpinner';
 import CoursePagerView, { CoursePagerViewRef } from '@/components/common/CoursePagerView';
 import TopToolbar from '@/components/common/TopToolbar';
 import BottomToolBar from '@/components/common/BottomToolBar';
