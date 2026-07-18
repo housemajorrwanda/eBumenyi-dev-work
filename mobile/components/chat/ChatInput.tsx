@@ -35,6 +35,9 @@ import { Waveform, UpdateFrequency } from '@simform_solutions/react-native-audio
 import type { IWaveformRef } from '@simform_solutions/react-native-audio-waveform';
 import { uploadChatFile } from '@/services/messaging.api';
 import { useAudioPlayerContext } from '@/contexts/AudioPlayerContext';
+import { CopilotStep } from 'react-native-copilot';
+import { WalkthroughableTouchable } from '@/components/onboarding/walkthroughable';
+import { useTourStepAdvance } from '@/hooks/useTourStepAdvance';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type RecordingMode = 'idle' | 'locked';
@@ -49,6 +52,15 @@ interface ChatInputProps {
   onStartTyping?: () => void;
   onStopTyping?: () => void;
   onEmojiPickerToggle?: (open: boolean) => void;
+  // Only set true on screens that mount ChatInput inside a CopilotProvider.
+  // CopilotStep internally calls useCopilot() which throws without a provider,
+  // so this must remain false on all other screens that render ChatInput.
+  tourEnabled?: boolean;
+  // For screens that wrap this whole component in their OWN CopilotStep
+  // (e.g. community/[id].tsx's "feed-input") instead of using tourEnabled's
+  // internal chat-media/chat-voice steps — wraps the Send button so tapping
+  // it advances/dismisses that outer step. See hooks/useTourStepAdvance.ts.
+  tourAdvance?: (handler: () => void) => () => void;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -71,6 +83,8 @@ export const ChatInput = forwardRef<TextInput, ChatInputProps>(
       onStartTyping,
       onStopTyping,
       onEmojiPickerToggle,
+      tourEnabled = false,
+      tourAdvance,
     }: ChatInputProps,
     ref,
   ) {
@@ -97,6 +111,9 @@ export const ChatInput = forwardRef<TextInput, ChatInputProps>(
 
     const { width } = useWindowDimensions();
     const rs = getResponsiveStyles(width);
+
+    const advanceMedia = useTourStepAdvance('chat-media');
+    const advanceVoice = useTourStepAdvance('chat-voice');
 
     // ── Sync initialMessage (edit mode) ───────────────────────────────────
     useEffect(() => { setMessage(initialMessage); }, [initialMessage]);
@@ -445,29 +462,69 @@ export const ChatInput = forwardRef<TextInput, ChatInputProps>(
                   }}
                 />
 
-                <TouchableOpacity
-                  style={styles.iconButton}
-                  onPress={() => !isUploading && setShowAttachSheet(true)}
-                  activeOpacity={0.7}
-                  disabled={recordingMode !== 'idle'}
-                >
-                  {isUploading ? (
-                    <ActivityIndicator size="small" color="#4D81D2" />
-                  ) : (
-                    <Paperclip size={rs.iconSize} color={showAttachSheet ? '#4D81D2' : '#8696A0'} />
-                  )}
-                </TouchableOpacity>
+                {tourEnabled ? (
+                  <CopilotStep
+                    text="Kanda hano kongeraho ifoto, video, dosiye cyangwa ijwi mu biganiro."
+                    order={1}
+                    name="chat-media"
+                  >
+                    <WalkthroughableTouchable
+                      style={styles.iconButton}
+                      onPress={advanceMedia(() => !isUploading && setShowAttachSheet(true))}
+                      activeOpacity={0.7}
+                      disabled={recordingMode !== 'idle'}
+                    >
+                      {isUploading ? (
+                        <ActivityIndicator size="small" color="#4D81D2" />
+                      ) : (
+                        <Paperclip size={rs.iconSize} color={showAttachSheet ? '#4D81D2' : '#8696A0'} />
+                      )}
+                    </WalkthroughableTouchable>
+                  </CopilotStep>
+                ) : (
+                  <TouchableOpacity
+                    style={styles.iconButton}
+                    onPress={() => !isUploading && setShowAttachSheet(true)}
+                    activeOpacity={0.7}
+                    disabled={recordingMode !== 'idle'}
+                  >
+                    {isUploading ? (
+                      <ActivityIndicator size="small" color="#4D81D2" />
+                    ) : (
+                      <Paperclip size={rs.iconSize} color={showAttachSheet ? '#4D81D2' : '#8696A0'} />
+                    )}
+                  </TouchableOpacity>
+                )}
               </View>
 
               {/* Send button (text) or Mic button (gesture) */}
               {message.trim() && recordingMode === 'idle' ? (
                 <TouchableOpacity
                   style={[styles.actionBtn, { width: rs.buttonSize, height: rs.buttonSize }, styles.actionBtnActive]}
-                  onPress={handleSend}
+                  onPress={tourAdvance ? tourAdvance(handleSend) : handleSend}
                   disabled={disabled}
                 >
                   <Send size={rs.sendIconSize} color="#fff" />
                 </TouchableOpacity>
+              ) : tourEnabled ? (
+                <CopilotStep
+                  text="Kanda hano gutangira gufata ijwi. Nusoza gufata ubutumwa bwawe hano, buto izahinduka kohereza."
+                  order={2}
+                  name="chat-voice"
+                >
+                  <WalkthroughableTouchable
+                    style={[styles.actionBtn, { width: rs.buttonSize, height: rs.buttonSize }]}
+                    onPress={advanceVoice(handleMicPress)}
+                    disabled={isUploading}
+                    activeOpacity={0.7}
+                  >
+                    {isUploading ? (
+                      <ActivityIndicator size="small" color="#4D81D2" />
+                    ) : (
+                      <Mic size={rs.micIconSize} color="#8696A0" />
+                    )}
+                  </WalkthroughableTouchable>
+                </CopilotStep>
               ) : (
                 <TouchableOpacity
                   style={[styles.actionBtn, { width: rs.buttonSize, height: rs.buttonSize }]}

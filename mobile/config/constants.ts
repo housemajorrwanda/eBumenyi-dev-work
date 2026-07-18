@@ -1,8 +1,6 @@
 /**
  * Centralized constants for API and asset URLs.
- * Values come from EXPO_PUBLIC_* env vars (inlined at build time) with
- * app.config.js / app.json extra as fallback so production APKs never crash
- * on the splash screen when env vars are missing.
+ * Values come from EXPO_PUBLIC_* env vars with app.config.js / app.json extra as fallback.
  */
 import Constants from 'expo-constants';
 
@@ -29,9 +27,6 @@ function readEnv(name: string, extraKey: keyof AppExtra): string | undefined {
 function resolveBackendUrl(): string {
   const url = readEnv('EXPO_PUBLIC_BACKEND_BASE_URL', 'backendBaseUrl');
   if (!url) {
-    console.warn(
-      '[config] EXPO_PUBLIC_BACKEND_BASE_URL missing — using app extra fallback',
-    );
     return 'https://apitest.ebumenyi.online';
   }
   return url.replace(/\/$/, '');
@@ -85,8 +80,10 @@ export const UPLOADS_DOCUMENTS_PATH =
   readEnv('EXPO_PUBLIC_UPLOADS_DOCUMENTS_PATH', 'uploadsDocumentsPath') ||
   '/uploads/documents';
 
-// WelTel in-app web destination
-export const WELTEL_WEB_URL = process.env.EXPO_PUBLIC_WELTEL_WEB_URL || 'https://rw-chw1.weltelhealth.net';
+export const WELTEL_WEB_URL =
+  readEnv('EXPO_PUBLIC_WELTEL_WEB_URL', 'weltelWebUrl') ||
+  'https://rw-chw1.weltelhealth.net';
 
-// Meeting server base URL
-export const MEETING_BASE_URL = (process.env.EXPO_PUBLIC_MEETING_BASE_URL || 'https://meeting.ebumenyi.online').replace(/\/$/, '');
+export const MEETING_BASE_URL = (
+  process.env.EXPO_PUBLIC_MEETING_BASE_URL || 'https://meeting.ebumenyi.online'
+).replace(/\/$/, '');

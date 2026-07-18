@@ -16,6 +16,7 @@ import { CircleCheck as CheckCircle, Video, ClipboardCheck, RotateCcw } from 'lu
 import { assets } from '@/theme';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useFocusEffect } from 'expo-router';
+import { useIsFocused } from '@react-navigation/native';
 import type { ICourse, IChapter, ISection, IMySectionReviewItem, ICertificate } from '@/types';
 import { getStudentCourseStats, addCoursereview, 
   // addSectionreview,
@@ -35,9 +36,10 @@ import * as Sharing from 'expo-sharing';
 
 import StorageService from '@/services/storage.service';
 import CourseReviewCard from '@/components/CourseReviewCard';
-import { onboardingService, TOUR_KEYS } from '@/services/onboarding.service';
+import { onboardingService, TOUR_KEYS, scheduleTourStart } from '@/services/onboarding.service';
 import { CopilotProvider, CopilotStep, useCopilot } from 'react-native-copilot';
 import { WalkthroughableView } from '@/components/onboarding/walkthroughable';
+import { useTourStepAdvance } from '@/hooks/useTourStepAdvance';
 import MascotTooltip from '@/components/onboarding/MascotTooltip';
 // import SectionReviewCard from '@/components/SectionReviewCard';
 import calculateTimeSpent from '@/utils/format';
@@ -212,7 +214,30 @@ function OneCourseScreenContent() {
   const router = useMeetingRouter();
   const { courseId, sectionId, recommended } = useLocalSearchParams();
   const courseIdStr = normalizeCourseId(courseId as string | string[] | undefined);
-  const { start, copilotEvents } = useCopilot();
+  const { start, copilotEvents, stop, visible } = useCopilot();
+  const advanceTabs = useTourStepAdvance('course-tabs');
+  const advanceChapters = useTourStepAdvance('course-chapters');
+  // start()'s identity is not stable across CopilotProvider re-renders (the
+  // library doesn't memoize its internal visibility setter, which start
+  // depends on) — reading it through a ref means a re-render before the
+  // scheduled tour fires doesn't cancel it via the effect's cleanup.
+  const startRef = useRef(start);
+  startRef.current = start;
+  const isFocused = useIsFocused();
+  // If the user navigates away (tapping the real highlighted element can
+  // itself trigger navigation, but this also covers back/tab-switch/etc.)
+  // while a tour is visible, its CopilotProvider can stay mounted (stack
+  // navigators often keep the previous screen alive) — without this, the
+  // tour's Modal renders in RN's top-level layer and keeps floating over
+  // whatever screen is now active. Close it on the focus transition.
+  const wasFocusedRef = useRef(isFocused);
+  useEffect(() => {
+    if (wasFocusedRef.current && !isFocused && visible) {
+      stop().catch(() => {});
+    }
+    wasFocusedRef.current = isFocused;
+  }, [isFocused, visible, stop]);
+  const autoStartAttemptedRef = useRef(false);
   const { recommendedChaptersMap } = useCourseRecommendations(
     courseId as string | undefined,
     recommended as string | string[] | undefined,
@@ -608,18 +633,30 @@ function OneCourseScreenContent() {
     }, [courseIdStr, refetchWorkspace, queryClient])
   );
 
-  // Start course tour once, after course data has loaded.
-  // Timeout is returned for cleanup so React Strict Mode's double-effect doesn't fire start() twice.
+  // Start course tour once per screen session, after course data has loaded.
+  // Gated on `isFocused` and guarded by `autoStartAttemptedRef` so the effect
+  // can't re-fire mid-tour and reset the user back to the first step — see
+  // app/(tabs)/training.tsx for the reference implementation of this pattern.
   useEffect(() => {
-    if (!course) return;
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    onboardingService.hasCompleted(TOUR_KEYS.COURSE).then((done) => {
-      if (!done) {
-        timer = setTimeout(() => start(), 600);
-      }
-    }).catch(() => {});
-    return () => { if (timer) clearTimeout(timer); };
-  }, [course]);
+    let cancelSchedule: (() => void) | null = null;
+    let cancelled = false;
+
+    if (course && isFocused && !autoStartAttemptedRef.current) {
+      autoStartAttemptedRef.current = true;
+      void (async () => {
+        const done = await onboardingService.hasCompleted(TOUR_KEYS.COURSE);
+        if (cancelled) return;
+        if (!done) {
+          cancelSchedule = scheduleTourStart(() => startRef.current());
+        }
+      })();
+    }
+
+    return () => {
+      cancelled = true;
+      cancelSchedule?.();
+    };
+  }, [course, isFocused]);
 
   // Mark course tour complete when copilot stops
   useEffect(() => {
@@ -910,7 +947,7 @@ function OneCourseScreenContent() {
 
           {/* Course Tabs */}
           <CopilotStep
-            text="Izi ni ibyiciro by'isomo: isuzumabumenyi ribanziriza, ibyigwa, n'isuzuma rya nyuma. Tangira na 📋 mbere y'isomo!"
+            text="Ibi ni ibyiciro by'isomo: isuzumabumenyi ribanziriza, ibyigwa, n'isuzuma rya nyuma. Tangira na 📋 mbere y'isomo!"
             order={2}
             name="course-tabs"
           >
@@ -924,7 +961,7 @@ function OneCourseScreenContent() {
                    styles.sectionNumberCircle,
                    selectedCourse === 'pre-test' && styles.sectionNumberCircleActive
                  ]}
-                 onPress={() => setSelectedCourse('pre-test')}
+                 onPress={advanceTabs(() => setSelectedCourse('pre-test'))}
                >
                 <ClipboardCheck size={14} color={selectedCourse === 'pre-test' ? '#FFFFFF' : '#D97706'} />
                </TouchableOpacity>
@@ -938,7 +975,7 @@ function OneCourseScreenContent() {
                      styles.sectionNumberCircle,
                      selectedCourse === tab.id && styles.sectionNumberCircleActive,
                    ]}
-                   onPress={() => setSelectedCourse(tab.id)}
+                   onPress={advanceTabs(() => setSelectedCourse(tab.id))}
                  >
                    <Text style={[
                      styles.sectionNumber,
@@ -959,7 +996,7 @@ function OneCourseScreenContent() {
                    styles.sectionNumberCircle,
                    selectedCourse === 'final-test' && styles.sectionNumberCircleActive
                  ]}
-                 onPress={() => setSelectedCourse('final-test')}
+                 onPress={advanceTabs(() => setSelectedCourse('final-test'))}
                >
                 <ClipboardCheck size={14} color={selectedCourse === 'final-test' ? '#FFFFFF' : '#10B981'} />
                </TouchableOpacity>
@@ -973,7 +1010,7 @@ function OneCourseScreenContent() {
                    styles.sectionNumberCircle,
                    selectedCourse === 'final-exam' && styles.sectionNumberCircleActive
                  ]}
-                 onPress={() => setSelectedCourse('final-exam')}
+                 onPress={advanceTabs(() => setSelectedCourse('final-exam'))}
                >
                 <ClipboardCheck size={14} color={selectedCourse === 'final-exam' ? '#FFFFFF' : '#8B5CF6'} />
                </TouchableOpacity>
@@ -1001,12 +1038,7 @@ function OneCourseScreenContent() {
         </View>
 
         {/* Course Modules */}
-        <CopilotStep
-          text="Kanda ku giciro kugira ngo utangire kwiga. Ibyigwa bifungurwa bihinnye bihinnye — urangize kimwe kugira ngo ukurikiraho gifunguke!"
-          order={3}
-          name="course-chapters"
-        >
-          <WalkthroughableView style={styles.modulesList}>
+        <View style={styles.modulesList}>
           {/* Pre-Test Card: only when pre-test section is selected */}
           {selectedCourse === 'pre-test' && course && Array.isArray(course.preTests) && course.preTests.length > 0 && course.preTests[0] && (
             <TouchableOpacity
@@ -1250,7 +1282,7 @@ function OneCourseScreenContent() {
             const chapterNumber = idxInSection + 1;
             const recommendedSeverity = recommendedChaptersMap.get(module.id);
             const recStyle = recommendedSeverity ? SEVERITY_BADGE[recommendedSeverity] : null;
-            return (
+            const card = (
               <TouchableOpacity
                 key={module.id}
                 style={[
@@ -1260,7 +1292,7 @@ function OneCourseScreenContent() {
                 ]}
                 activeOpacity={0.8}
                 disabled={!(enabled || isCompleted)}
-                onPress={async () => {
+                onPress={advanceChapters(async () => {
                   if (!courseId) {
                     Alert.alert('Error', 'Course id missing');
                     return;
@@ -1275,7 +1307,7 @@ function OneCourseScreenContent() {
                     return;
                   }
                   router.push(`/courses/${courseId}/${module.id}/course-content?page=1`);
-                }}
+                })}
               >
                 <View style={styles.moduleContent}>
                   <View style={styles.moduleIcon}>
@@ -1316,9 +1348,24 @@ function OneCourseScreenContent() {
                 <EmojiBurst active={Boolean(isCompleted)} />
               </TouchableOpacity>
             );
+            // Only the first chapter card is a tour target — spotlighting
+            // the whole chapter list left too little room for the tooltip
+            // to fit without being clipped.
+            if (index === 0) {
+              return (
+                <CopilotStep
+                  key={module.id}
+                  text="Kanda ku giciro kugira ngo utangire kwiga. Ibyigwa bifungurwa bihinnye  — urangize kimwe kugira ngo igikurikiraho gifunguke!"
+                  order={3}
+                  name="course-chapters"
+                >
+                  <WalkthroughableView>{card}</WalkthroughableView>
+                </CopilotStep>
+              );
+            }
+            return card;
           })}
-          </WalkthroughableView>
-        </CopilotStep>
+          </View>
       </ScrollView>
       <Footer
         activeTab="training"
@@ -1383,10 +1430,18 @@ export default function OneCourseScreen() {
   return (
     <CopilotProvider
       tooltipComponent={MascotTooltip}
-      overlay="svg"
+      overlay="view"
       backdropColor="rgba(0, 0, 0, 0.65)"
       animationDuration={300}
       stepNumberComponent={() => null}
+      arrowSize={10}
+      androidStatusBarVisible
+      labels={{
+        finish: 'Rangiza',
+        next: 'Ibikurikiraho',
+        previous: 'Inyuma',
+        skip: 'Simbuka',
+      }}
     >
       <OneCourseScreenContent />
     </CopilotProvider>

@@ -1,14 +1,26 @@
 /**
- * Calendar Reminder Scheduler
+ * Calendar Event-Start Notification Scheduler
+ *
+ * The ringing alarm (loud, native, device-local) now fires at each event's
+ * reminder offset time — that's scheduled entirely on the client
+ * (NativeAlarmScheduler) using CalendarEvent.reminderMinutesBefore, and does
+ * not involve the backend at all.
+ *
+ * This scheduler's job is the OTHER half: send a plain push/socket
+ * notification once, exactly when the event starts (startAt), regardless of
+ * whether the event has any reminder offsets configured.
  *
  * Architecture:
- * - 1-minute polling cron: Reliable reminder delivery (works on all databases)
- * - Deduplication: FiredReminder table (unique per event/user/fireAt/offset)
+ * - 1-minute polling cron: reliable delivery (works on all databases)
+ * - Deduplication: FiredReminder table (unique per event/user/fireAt/offset,
+ *   offset is always the sentinel 0 here since there's one firing per event)
  *   coordinates all replicas — only the first insert sends notify + push
  *
  * Performance:
- * - Requires database index: calendarEvent(startAt, reminderMinutesBefore)
- * - Queries only 24-hour window to limit database load
+ * - Uses database index: calendarEvent(startAt, reminderMinutesBefore) — the
+ *   leading `startAt` column still serves this query even though it no
+ *   longer filters on reminderMinutesBefore
+ * - Queries only a narrow (now - 90s, now] window to limit database load
  * - Fetches only necessary fields via Prisma select
  */
 
@@ -60,16 +72,18 @@ export class ReminderScheduler {
     }
 
     this.cronJob = cron.schedule("* * * * *", async () => {
-      await this.checkDueReminders();
+      await this.checkEventStartNotifications();
     });
     console.log("⏰ 1-minute reminder cron started");
   }
 
   /**
-   * Find events with a reminder fire time in (now - 90s, now].
+   * Find events whose startAt falls in (now - 90s, now] and notify once per
+   * event — regardless of whether reminderMinutesBefore is configured, since
+   * every event should get a start notification.
    * FiredReminder ensures only one delivery per user across replicas and cron ticks.
    */
-  private static async checkDueReminders(): Promise<void> {
+  private static async checkEventStartNotifications(): Promise<void> {
     try {
       const now = new Date();
       const windowStart = new Date(now.getTime() - DUE_LOOKBACK_MS);
@@ -77,16 +91,14 @@ export class ReminderScheduler {
       const events = await prisma.calendarEvent.findMany({
         where: {
           startAt: {
-            gt: now,
-            lte: new Date(now.getTime() + 24 * 60 * 60 * 1000),
+            gt: windowStart,
+            lte: now,
           },
-          reminderMinutesBefore: { isEmpty: false },
         },
         select: {
           id: true,
           title: true,
           startAt: true,
-          reminderMinutesBefore: true,
           type: true,
           meetingType: true,
           priority: true,
@@ -99,21 +111,13 @@ export class ReminderScheduler {
       });
 
       for (const event of events) {
-        for (const minutes of event.reminderMinutesBefore) {
-          const fireAt = new Date(
-            event.startAt.getTime() - minutes * 60 * 1000,
-          );
-
-          if (fireAt > windowStart && fireAt <= now) {
-            console.log(
-              `[ReminderScheduler] Due reminder: "${event.title}" (${minutes}min before) fires at ${fireAt.toISOString()}`,
-            );
-            await this.fireReminderForEvent(event, minutes, fireAt);
-          }
-        }
+        console.log(
+          `[ReminderScheduler] Event starting now: "${event.title}" at ${event.startAt.toISOString()}`,
+        );
+        await this.fireEventStartNotification(event, event.startAt);
       }
     } catch (error) {
-      console.error("[ReminderScheduler] Error in checkDueReminders:", error);
+      console.error("[ReminderScheduler] Error in checkEventStartNotifications:", error);
     }
   }
 
@@ -148,9 +152,15 @@ export class ReminderScheduler {
     }
   }
 
-  private static async fireReminderForEvent(
+  /**
+   * `minutesBefore: 0` is a sentinel meaning "fired exactly at event start" —
+   * safe because real reminder offsets are always >= 5 (see
+   * EventFormModal's reminderOptions on the client).
+   */
+  private static readonly START_NOTIFICATION_SENTINEL = 0;
+
+  private static async fireEventStartNotification(
     event: any,
-    minutesBefore: number,
     fireAt: Date,
   ): Promise<void> {
     if (!this.io) {
@@ -158,8 +168,8 @@ export class ReminderScheduler {
       return;
     }
 
-    const notificationTitle = "Ukwibutsa";
-    const notificationBody = `Igikorwa «${event.title}» gitangira mu minota ${minutesBefore}.`;
+    const notificationTitle = "Igikorwa gitangiye";
+    const notificationBody = `Igikorwa «${event.title}» gitangiye ubu.`;
 
     const metadata = {
       eventType: event.type as CalendarEventType,
@@ -167,7 +177,6 @@ export class ReminderScheduler {
       startTime: event.startAt,
       location: event.location,
       priority: event.priority as EventPriority,
-      reminderOffsetMinutes: minutesBefore,
       timezone: event.timezone,
     } as Record<string, unknown>;
 
@@ -177,16 +186,13 @@ export class ReminderScheduler {
       recipientIds.add(p.userId);
     }
 
-    // Dedup key includes offset so 45/30/15 min reminders never collide
-    const dedupEntityId = `${event.id}:${minutesBefore}`;
-
     for (const userId of recipientIds) {
       try {
         const claimed = await this.claimReminderDelivery(
           event.id,
           userId,
           fireAt,
-          minutesBefore,
+          this.START_NOTIFICATION_SENTINEL,
         );
         if (!claimed) {
           continue;
@@ -199,7 +205,7 @@ export class ReminderScheduler {
           "warning",
           `/calendar/${event.id}`,
           "calendar_reminder",
-          dedupEntityId,
+          event.id,
           metadata,
           { dedupAt: fireAt },
         );
@@ -230,12 +236,11 @@ export class ReminderScheduler {
           data: {
             eventType: event.type,
             startTime: event.startAt.toISOString(),
-            reminderOffsetMinutes: String(minutesBefore),
           },
         });
 
         console.log(
-          `[ReminderScheduler] Notified user ${userId} for event: "${event.title}" (${minutesBefore}min)`,
+          `[ReminderScheduler] Notified user ${userId} that event started: "${event.title}"`,
         );
       } catch (err) {
         console.error(

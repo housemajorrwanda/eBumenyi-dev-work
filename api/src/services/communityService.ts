@@ -9,6 +9,33 @@ const communityMemberUserInclude = {
   },
 } as const;
 
+interface FlatComment {
+  id: string;
+  parentId: string | null;
+  [key: string]: unknown;
+}
+
+/**
+ * Turns a flat list of comments (each carrying its own parentId) into a real nested tree,
+ * at any depth — a reply to a reply to a reply still ends up correctly nested under its
+ * actual parent, not silently dropped like a fixed-depth Prisma `include` would do.
+ */
+function buildCommentTree<T extends FlatComment>(
+  flatComments: T[],
+): (T & { replies: unknown[] })[] {
+  const byParent = new Map<string | null, T[]>();
+  for (const comment of flatComments) {
+    const key = comment.parentId ?? null;
+    if (!byParent.has(key)) byParent.set(key, []);
+    byParent.get(key)!.push(comment);
+  }
+  const attach = (comment: T): T & { replies: unknown[] } => ({
+    ...comment,
+    replies: (byParent.get(comment.id) || []).map(attach),
+  });
+  return (byParent.get(null) || []).map(attach);
+}
+
 export class CommunityService {
   /**
    * Removes member rows whose user no longer exists.
@@ -97,6 +124,13 @@ export class CommunityService {
         },
         members: {
           include: communityMemberUserInclude,
+        },
+        lastPost: {
+          include: {
+            author: {
+              select: { id: true, fullNames: true, photo: true },
+            },
+          },
         },
       },
       orderBy: {
@@ -372,21 +406,6 @@ export class CommunityService {
             author: { select: { id: true, fullNames: true, photo: true } },
           },
         },
-        comments: {
-          where: { parentId: null },
-          include: {
-            user: {
-              select: { id: true, fullNames: true, photo: true },
-            },
-            replies: {
-              include: {
-                user: {
-                  select: { id: true, fullNames: true, photo: true },
-                },
-              },
-            },
-          },
-        },
       },
       orderBy: {
         timestamp: "desc",
@@ -395,11 +414,40 @@ export class CommunityService {
       skip: offset,
     });
 
-    // Transform posts to include sender (author) info
+    // Comments are fetched flat (all depths, not just one level of replies) and assembled
+    // into a real tree in application code — Prisma's `include` can only nest a fixed number
+    // of levels, which silently drops a reply-to-a-reply (depth 2+).
+    const postIds = dbPosts.map((post) => post.id);
+    const commentsByPostId = new Map<
+      string,
+      ReturnType<typeof buildCommentTree>
+    >();
+    if (postIds.length > 0) {
+      const flatComments = await prisma.communityPostComment.findMany({
+        where: { postId: { in: postIds } },
+        include: {
+          user: {
+            select: { id: true, fullNames: true, photo: true },
+          },
+        },
+        orderBy: { timestamp: "asc" },
+      });
+      const byPostId = new Map<string, typeof flatComments>();
+      for (const comment of flatComments) {
+        if (!byPostId.has(comment.postId)) byPostId.set(comment.postId, []);
+        byPostId.get(comment.postId)!.push(comment);
+      }
+      for (const [postId, comments] of byPostId) {
+        commentsByPostId.set(postId, buildCommentTree(comments));
+      }
+    }
+
+    // Transform posts to include sender (author) info and the assembled comment tree
     const posts = dbPosts.reverse().map((post) => ({
       ...post,
       sender: post.author,
       author: undefined, // Remove author field to avoid duplication
+      comments: commentsByPostId.get(post.id) || [],
     }));
 
     // Cache posts asynchronously for first page (non-blocking)
@@ -432,6 +480,82 @@ export class CommunityService {
     });
 
     return { data: posts, total };
+  }
+
+  /**
+   * Search community posts by title/content, across the full post history
+   * (not just the most-recently-loaded page).
+   */
+  public static async searchCommunityPosts(
+    communityId: string,
+    userId: string,
+    q: string,
+    limit = 20,
+    offset = 0,
+  ) {
+    // Verify user has access to community (is member or community is public)
+    const community = await prisma.community.findFirst({
+      where: {
+        id: communityId,
+        OR: [{ isPublic: true }, { members: { some: { userId } } }],
+      },
+    });
+
+    if (!community) {
+      throw new AppError("Community not found or access denied", 404);
+    }
+
+    const where = {
+      communityId,
+      isDeleted: false,
+      OR: [
+        { title: { contains: q, mode: "insensitive" as const } },
+        { content: { contains: q, mode: "insensitive" as const } },
+      ],
+    };
+
+    const [dbPosts, total] = await Promise.all([
+      prisma.communityPost.findMany({
+        where,
+        include: {
+          author: {
+            select: { id: true, fullNames: true, photo: true },
+          },
+          likes: {
+            where: { userId },
+            select: { id: true },
+          },
+          savedBy: {
+            where: { userId },
+            select: { id: true },
+          },
+        },
+        orderBy: { timestamp: "desc" },
+        take: limit,
+        skip: offset,
+      }),
+      prisma.communityPost.count({ where }),
+    ]);
+
+    const data = await Promise.all(
+      dbPosts.map(async (post) => {
+        const offsetInConversation = await prisma.communityPost.count({
+          where: {
+            communityId,
+            isDeleted: false,
+            timestamp: { gt: post.timestamp },
+          },
+        });
+        return {
+          ...post,
+          sender: post.author,
+          author: undefined,
+          offsetInConversation,
+        };
+      }),
+    );
+
+    return { data, total };
   }
 
   /**
@@ -1613,7 +1737,9 @@ export class CommunityService {
   ) {
     const original = await prisma.communityPost.findUnique({
       where: { id: postId },
-      include: { author: { select: { id: true, fullNames: true, photo: true } } },
+      include: {
+        author: { select: { id: true, fullNames: true, photo: true } },
+      },
     });
     if (!original) throw new AppError("Ubutumwa butabonetse", 404);
 

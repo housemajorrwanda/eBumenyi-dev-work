@@ -27,6 +27,14 @@ import {
   loadNarrationVoice,
   NarrationVoice,
 } from '@/services/narrationVoice';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { useIsFocused } from '@react-navigation/native';
+import { CopilotProvider, CopilotStep, useCopilot } from 'react-native-copilot';
+import { WalkthroughableView, WalkthroughableTouchable } from '@/components/onboarding/walkthroughable';
+import MascotTooltip from '@/components/onboarding/MascotTooltip';
+import { TOUR_KEYS, onboardingService, scheduleTourStart } from '@/services/onboarding.service';
+import { useOnboarding } from '@/contexts/OnboardingContext';
+import { useTourStepAdvance } from '@/hooks/useTourStepAdvance';
 
 interface QuestionnaireAnswer {
   selectedOption?: number;
@@ -38,7 +46,7 @@ interface QuestionnaireAnswer {
   questionText?: string;
 }
 
-export default function CourseContentScreen() {
+function CourseContentScreenContent() {
   const { courseId, chapterId, slideId } = useLocalSearchParams<{ courseId: string, chapterId: string, slideId?: string }>();
   const courseIdStr = normalizeCourseId(courseId);
   const chapterIdStr = normalizeCourseId(chapterId);
@@ -46,6 +54,31 @@ export default function CourseContentScreen() {
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
   const [currentPage, setCurrentPage] = useState<number>(0);
+  const { start, copilotEvents, stop, visible } = useCopilot();
+  // start()'s identity is not stable across CopilotProvider re-renders (the
+  // library doesn't memoize its internal visibility setter, which start
+  // depends on) — reading it through a ref means a re-render before the
+  // scheduled tour fires doesn't cancel it via the effect's cleanup.
+  const startRef = useRef(start);
+  startRef.current = start;
+  const { markComplete } = useOnboarding();
+  const advancePin = useTourStepAdvance('lesson-pin');
+  const advanceToolbar = useTourStepAdvance('lesson-toolbar');
+  const isFocused = useIsFocused();
+  // If the user navigates away (tapping the real highlighted element can
+  // itself trigger navigation, but this also covers back/tab-switch/etc.)
+  // while a tour is visible, its CopilotProvider can stay mounted (stack
+  // navigators often keep the previous screen alive) — without this, the
+  // tour's Modal renders in RN's top-level layer and keeps floating over
+  // whatever screen is now active. Close it on the focus transition.
+  const wasFocusedRef = useRef(isFocused);
+  useEffect(() => {
+    if (wasFocusedRef.current && !isFocused && visible) {
+      stop().catch(() => {});
+    }
+    wasFocusedRef.current = isFocused;
+  }, [isFocused, visible, stop]);
+  const autoStartAttemptedRef = useRef(false);
 
   const { data: workspace, isLoading: workspaceLoading } = useCourseWorkspace(courseIdStr);
   const course = workspace?.course ?? null;
@@ -82,7 +115,6 @@ export default function CourseContentScreen() {
   // State to track current page within documents (PDFs, slides)
   const [documentPages, setDocumentPages] = useState<{ [slideId: string]: number }>({});
   const [documentTotalPages, setDocumentTotalPages] = useState<{ [slideId: string]: number }>({});
-
   const [narrationSession, setNarrationSession] = useState<{
     slideId: string;
     page: number;
@@ -795,6 +827,35 @@ export default function CourseContentScreen() {
     }
   };
 
+  // Auto-start the lesson tour once per screen session. See app/(tabs)/training.tsx
+  // for the reference implementation of this pattern.
+  useEffect(() => {
+    let cancelSchedule: (() => void) | null = null;
+    let cancelled = false;
+
+    if (!loading && chapter && transformedData.length > 0 && isFocused && !autoStartAttemptedRef.current) {
+      autoStartAttemptedRef.current = true;
+      void (async () => {
+        const done = await onboardingService.hasCompleted(TOUR_KEYS.LESSON);
+        if (cancelled) return;
+        if (!done) {
+          cancelSchedule = scheduleTourStart(() => startRef.current());
+        }
+      })();
+    }
+
+    return () => {
+      cancelled = true;
+      cancelSchedule?.();
+    };
+  }, [loading, chapter, transformedData.length, isFocused]);
+
+  useEffect(() => {
+    const handleStop = () => { markComplete(TOUR_KEYS.LESSON).catch(() => {}); };
+    copilotEvents.on('stop', handleStop);
+    return () => { copilotEvents.off('stop', handleStop); };
+  }, [copilotEvents, markComplete]);
+
   if (loading) return <LoadingSpinner />;
   if (!chapter) return <View style={{flex:1, justifyContent:'center', alignItems:'center'}}><Text>Chapter ntabwo ibonetse</Text></View>;
   if (transformedData.length === 0) return <View style={{flex:1, justifyContent:'center', alignItems:'center'}}><Text>Nta byatangajwe</Text></View>;
@@ -933,7 +994,12 @@ export default function CourseContentScreen() {
         }}
         slideId={currentItem?.id}
       />
-      <View style={styles.contentArea}>
+      <CopilotStep
+        text="Nyuza urutoki iburyo cyangwa ibumoso kugira ngo ujye ku rupapuro rukurikira cyangwa rubanza."
+        order={1}
+        name="lesson-pager"
+      >
+      <WalkthroughableView style={styles.contentArea}>
           <View style={{ flex: 1 }}>
             <CoursePagerView
               ref={pagerRef}
@@ -965,7 +1031,25 @@ export default function CourseContentScreen() {
                     />
                   )}
                   {item.type !== 'test-question' && item.type !== 'result-slide' && (
-                    <>
+                    idx === currentPage ? (
+                      <CopilotStep
+                        text="Kanda hano kugira ngo ubike (pin) iyi mpapuro, uzayibone nyuma muburyo bworoshye."
+                        order={2}
+                        name="lesson-pin"
+                      >
+                        <WalkthroughableTouchable
+                          style={styles.pinButton}
+                          onPress={advancePin(() => handlePinSlide(item.id))}
+                        >
+                          {slidesPinStatus[item.id] ? (
+                            <PinOff color="#F59E0B" size={16} />
+                          ) : (
+                            <Pin color="#333" size={16} />
+                          )}
+                        </WalkthroughableTouchable>
+                      </CopilotStep>
+                    ) : (
+                      <>
                       <TouchableOpacity
                         style={styles.pinButton}
                         onPress={() => handlePinSlide(item.id)}
@@ -993,22 +1077,29 @@ export default function CourseContentScreen() {
                         />
                       </TouchableOpacity>
                     </>
+                    )
                   )}
                 </View>
               ))}
             </CoursePagerView>
           </View>
-      </View>
-      <View style={{ position: 'relative', zIndex: 20, elevation: 0, marginBottom: !isLandscape ? insets.bottom : 0 }}>
-        <BottomToolBar 
+      </WalkthroughableView>
+      </CopilotStep>
+      <CopilotStep
+        text="Aha hagaragara uburyo bwo kujya imbere cyangwa inyuma mu masomo, no guhindura uko ibyapa bigaragara."
+        order={3}
+        name="lesson-toolbar"
+      >
+      <WalkthroughableView style={{ position: 'relative', zIndex: 20, elevation: 0, marginBottom: !isLandscape ? insets.bottom : 0 }}>
+        <BottomToolBar
           currentPage={currentPage + 1}
           totalPages={transformedData.length}
-          onNext={buttonConfig.onPress}
-          onPrev={isTestQuestion ? handlePrevQuestion : handlePrevious}
-          onZoomIn={handleZoomIn}
-          onZoomOut={handleZoomOut}
-          reset={handleReset}
-          onToggleOrientation={handleToggleOrientation}
+          onNext={advanceToolbar(buttonConfig.onPress)}
+          onPrev={advanceToolbar(isTestQuestion ? handlePrevQuestion : handlePrevious)}
+          onZoomIn={advanceToolbar(handleZoomIn)}
+          onZoomOut={advanceToolbar(handleZoomOut)}
+          reset={advanceToolbar(handleReset)}
+          onToggleOrientation={advanceToolbar(handleToggleOrientation)}
           isLandscape={isLandscape}
           showQuestionnaire={isTestQuestion}
           canSubmitQuestionnaire={false}
@@ -1020,7 +1111,8 @@ export default function CourseContentScreen() {
           nextButtonText={buttonConfig.text}
           feedbackModalOpen={feedbackModalOpen}
         />
-      </View>
+      </WalkthroughableView>
+      </CopilotStep>
       {narrationSession && (
         <SlideNarratorHost
           slideId={narrationSession.slideId}
@@ -1066,6 +1158,28 @@ export default function CourseContentScreen() {
         </Modal>
       )}
     </View>
+  );
+}
+
+export default function CourseContentScreen() {
+  return (
+    <CopilotProvider
+      tooltipComponent={MascotTooltip}
+      overlay="view"
+      backdropColor="rgba(0, 0, 0, 0.65)"
+      animationDuration={300}
+      stepNumberComponent={() => null}
+      arrowSize={10}
+      androidStatusBarVisible
+      labels={{
+        finish: 'Rangiza',
+        next: 'Ibikurikiraho',
+        previous: 'Inyuma',
+        skip: 'Simbuka',
+      }}
+    >
+      <CourseContentScreenContent />
+    </CopilotProvider>
   );
 }
 

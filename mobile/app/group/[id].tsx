@@ -25,13 +25,41 @@ import { useTypingIndicators } from '@/hooks/useTypingIndicators';
 import { useAuth } from '@/hooks/useAuth';
 import { useActiveConversation } from '@/hooks/useActiveConversation';
 import * as MessagingAPI from '@/services/messaging.api';
+import { useIsFocused } from '@react-navigation/native';
+import { CopilotProvider, useCopilot } from 'react-native-copilot';
+import MascotTooltip from '@/components/onboarding/MascotTooltip';
+import { TOUR_KEYS, onboardingService, scheduleTourStart } from '@/services/onboarding.service';
+import { useOnboarding } from '@/contexts/OnboardingContext';
 
-export default function GroupRoom() {
+function GroupRoomContent() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const flatListRef = useRef<FlatList>(null);
   const { user } = useAuth();
   const { setActiveConversation, clearActiveConversation } = useActiveConversation();
+  const { start, copilotEvents, stop, visible } = useCopilot();
+  // start()'s identity is not stable across CopilotProvider re-renders (the
+  // library doesn't memoize its internal visibility setter, which start
+  // depends on) — reading it through a ref means a re-render before the
+  // scheduled tour fires doesn't cancel it via the effect's cleanup.
+  const startRef = useRef(start);
+  startRef.current = start;
+  const { markComplete } = useOnboarding();
+  const isFocused = useIsFocused();
+  // If the user navigates away (tapping the real highlighted element can
+  // itself trigger navigation, but this also covers back/tab-switch/etc.)
+  // while a tour is visible, its CopilotProvider can stay mounted (stack
+  // navigators often keep the previous screen alive) — without this, the
+  // tour's Modal renders in RN's top-level layer and keeps floating over
+  // whatever screen is now active. Close it on the focus transition.
+  const wasFocusedRef = useRef(isFocused);
+  useEffect(() => {
+    if (wasFocusedRef.current && !isFocused && visible) {
+      stop().catch(() => {});
+    }
+    wasFocusedRef.current = isFocused;
+  }, [isFocused, visible, stop]);
+  const autoStartAttemptedRef = useRef(false);
   const { messages, isLoading, sendMessage, sendAttachment, editMessage, deleteMessage, toggleLike, markMessagesRead, isSending, hasNextPage, fetchNextPage, isFetchingNextPage } = useChat({
     chatId: id ?? null,
     type: 'group',
@@ -102,6 +130,26 @@ export default function GroupRoom() {
     deleteMessage(messageId);
   };
 
+  useEffect(() => {
+    let cancelSchedule: (() => void) | null = null;
+    let cancelled = false;
+    if (!isLoading && conversation && isFocused && !autoStartAttemptedRef.current) {
+      autoStartAttemptedRef.current = true;
+      void (async () => {
+        const done = await onboardingService.hasCompleted(TOUR_KEYS.GROUP_CHAT);
+        if (cancelled) return;
+        if (!done) { cancelSchedule = scheduleTourStart(() => startRef.current()); }
+      })();
+    }
+    return () => { cancelled = true; cancelSchedule?.(); };
+  }, [isLoading, conversation, isFocused]);
+
+  useEffect(() => {
+    const handleStop = () => { markComplete(TOUR_KEYS.GROUP_CHAT).catch(() => {}); };
+    copilotEvents.on('stop', handleStop);
+    return () => { copilotEvents.off('stop', handleStop); };
+  }, [copilotEvents, markComplete]);
+
   const handleSendMessage = (text: string) => {
     if (!text.trim()) {
       alert('Ntabutumwa wanditse');
@@ -140,7 +188,7 @@ export default function GroupRoom() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
-        <GroupHeader group={conversation} router={router} groupId={id || ''} />
+        <GroupHeader group={conversation} router={router} groupId={id || ''} tourEnabled />
 
         <View style={styles.messagesContainer}>
           {messages.length === 0 ? (
@@ -219,6 +267,23 @@ export default function GroupRoom() {
         chatType="group"
       />
     </SafeAreaView>
+  );
+}
+
+export default function GroupRoom() {
+  return (
+    <CopilotProvider
+      tooltipComponent={MascotTooltip}
+      overlay="view"
+      backdropColor="rgba(0, 0, 0, 0.65)"
+      animationDuration={300}
+      stepNumberComponent={() => null}
+      arrowSize={10}
+      androidStatusBarVisible
+      labels={{ finish: 'Rangiza', next: 'Ibikurikiraho', previous: 'Inyuma', skip: 'Simbuka' }}
+    >
+      <GroupRoomContent />
+    </CopilotProvider>
   );
 }
 

@@ -274,6 +274,102 @@ export class UnifiedExportController {
     });
   }
 
+  @Get("/dashboard/supervisor-response-rate")
+  @Security("jwt")
+  @Middlewares(
+    loggerMiddleware,
+    checkRole(
+      roles.ADMIN,
+      roles.STAFF,
+      roles.CHO,
+      roles.TRAINER,
+      roles.DEVELOPER,
+    ),
+  )
+  public getSupervisorResponseRate(
+    @Query() district?: string,
+    @Query() province?: string,
+    @Query() gender?: string,
+    @Query() year?: string,
+    @Query() month?: string,
+    @Query() role?: string,
+    @Query() hospitalId?: string,
+  ) {
+    return CourseService.getSupervisorResponseRate({
+      district,
+      province,
+      gender,
+      year,
+      month,
+      role,
+      hospitalId,
+    });
+  }
+
+  @Get("/dashboard/certification-analytics")
+  @Security("jwt")
+  @Middlewares(
+    loggerMiddleware,
+    checkRole(
+      roles.ADMIN,
+      roles.STAFF,
+      roles.CHO,
+      roles.TRAINER,
+      roles.DEVELOPER,
+    ),
+  )
+  public getCertificationAnalytics(
+    @Query() district?: string,
+    @Query() province?: string,
+    @Query() gender?: string,
+    @Query() year?: string,
+    @Query() month?: string,
+    @Query() role?: string,
+    @Query() hospitalId?: string,
+  ) {
+    return CourseService.getCertificationAnalytics({
+      district,
+      province,
+      gender,
+      year,
+      month,
+      role,
+      hospitalId,
+    });
+  }
+
+  @Get("/dashboard/monthly-active-trends")
+  @Security("jwt")
+  @Middlewares(
+    loggerMiddleware,
+    checkRole(
+      roles.ADMIN,
+      roles.STAFF,
+      roles.CHO,
+      roles.TRAINER,
+      roles.DEVELOPER,
+    ),
+  )
+  public getMonthlyActiveTrends(
+    @Query() district?: string,
+    @Query() province?: string,
+    @Query() gender?: string,
+    @Query() year?: string,
+    @Query() month?: string,
+    @Query() role?: string,
+    @Query() hospitalId?: string,
+  ) {
+    return CourseService.getMonthlyActiveTrends({
+      district,
+      province,
+      gender,
+      year,
+      month,
+      role,
+      hospitalId,
+    });
+  }
+
   @Get("/reviews")
   @Security("jwt")
   @Middlewares(loggerMiddleware)

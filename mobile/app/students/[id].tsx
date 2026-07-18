@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -30,6 +30,13 @@ import {
 } from 'lucide-react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 import { getStudentById } from '@/services/students.api';
+import { useIsFocused } from '@react-navigation/native';
+import { CopilotProvider, CopilotStep, useCopilot } from 'react-native-copilot';
+import { WalkthroughableView } from '@/components/onboarding/walkthroughable';
+import MascotTooltip from '@/components/onboarding/MascotTooltip';
+import { TOUR_KEYS, onboardingService, scheduleTourStart } from '@/services/onboarding.service';
+import { useOnboarding } from '@/contexts/OnboardingContext';
+import { useTourStepAdvance } from '@/hooks/useTourStepAdvance';
 
 type Tab = 'overview' | 'courses' | 'tests' | 'reviews';
 
@@ -111,12 +118,36 @@ function translateRole(role: string): string {
   return role;
 }
 
-export default function StudentDetailScreen() {
+function StudentDetailScreenContent() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { isDark, themeColors } = useTheme();
   const [activeTab, setActiveTab] = useState<Tab>('overview');
   const [reviewFilter, setReviewFilter] = useState<string | null>('slide');
+  const { start, copilotEvents, stop, visible } = useCopilot();
+  const advanceTabs = useTourStepAdvance('student-tabs');
+  // start()'s identity is not stable across CopilotProvider re-renders (the
+  // library doesn't memoize its internal visibility setter, which start
+  // depends on) — reading it through a ref means a re-render before the
+  // scheduled tour fires doesn't cancel it via the effect's cleanup.
+  const startRef = useRef(start);
+  startRef.current = start;
+  const { markComplete } = useOnboarding();
+  const isFocused = useIsFocused();
+  // If the user navigates away (tapping the real highlighted element can
+  // itself trigger navigation, but this also covers back/tab-switch/etc.)
+  // while a tour is visible, its CopilotProvider can stay mounted (stack
+  // navigators often keep the previous screen alive) — without this, the
+  // tour's Modal renders in RN's top-level layer and keeps floating over
+  // whatever screen is now active. Close it on the focus transition.
+  const wasFocusedRef = useRef(isFocused);
+  useEffect(() => {
+    if (wasFocusedRef.current && !isFocused && visible) {
+      stop().catch(() => {});
+    }
+    wasFocusedRef.current = isFocused;
+  }, [isFocused, visible, stop]);
+  const autoStartAttemptedRef = useRef(false);
 
   const bg = isDark ? '#111827' : '#f8fafc';
   const cardBg = isDark ? '#1f2937' : '#ffffff';
@@ -135,6 +166,26 @@ export default function StudentDetailScreen() {
   const attempts: any[] = data?.testAttempts?.detailedAttempts ?? [];
   const completedCount = courses.filter((c: any) => c.isCompleted).length;
   const overallPct = parseInt(data?.courseProgress?.overallProgress ?? '0', 10);
+
+  useEffect(() => {
+    let cancelSchedule: (() => void) | null = null;
+    let cancelled = false;
+    if (!isLoading && !isError && data && isFocused && !autoStartAttemptedRef.current) {
+      autoStartAttemptedRef.current = true;
+      void (async () => {
+        const done = await onboardingService.hasCompleted(TOUR_KEYS.STUDENT_DETAIL);
+        if (cancelled) return;
+        if (!done) { cancelSchedule = scheduleTourStart(() => startRef.current()); }
+      })();
+    }
+    return () => { cancelled = true; cancelSchedule?.(); };
+  }, [isLoading, isError, data, isFocused]);
+
+  useEffect(() => {
+    const handleStop = () => { markComplete(TOUR_KEYS.STUDENT_DETAIL).catch(() => {}); };
+    copilotEvents.on('stop', handleStop);
+    return () => { copilotEvents.off('stop', handleStop); };
+  }, [copilotEvents, markComplete]);
 
   const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: 'overview', label: 'Incamake', icon: <Activity size={15} color={activeTab === 'overview' ? '#fff' : textMuted} /> },
@@ -170,7 +221,12 @@ export default function StudentDetailScreen() {
         ) : (
           <>
             {/* Profile card — always visible */}
-            <View style={[styles.profileCard, { backgroundColor: cardBg, borderBottomColor: borderColor }]}>
+            <CopilotStep
+              text="Hano ubona amakuru y'umunyamuryango: izina, telefoni, ahantu atuye n'akamaro ke."
+              order={1}
+              name="student-profile"
+            >
+            <WalkthroughableView style={[styles.profileCard, { backgroundColor: cardBg, borderBottomColor: borderColor }]}>
               <View style={styles.profileRow}>
                 <Avatar name={info?.fullName ?? ''} photo={info?.photo} />
                 <View style={styles.profileInfo}>
@@ -207,10 +263,16 @@ export default function StudentDetailScreen() {
                   </View>
                 ) : null}
               </View>
-            </View>
+            </WalkthroughableView>
+            </CopilotStep>
 
             {/* Tab bar */}
-            <View style={[styles.tabBar, { backgroundColor: cardBg, borderBottomColor: borderColor }]}>
+            <CopilotStep
+              text="Kanda kuri ibibyiciro  kureba amasomo, ibizamini, ibitekerezo n'incamake y'aho ageze."
+              order={2}
+              name="student-tabs"
+            >
+            <WalkthroughableView style={[styles.tabBar, { backgroundColor: cardBg, borderBottomColor: borderColor }]}>
               {tabs.map((tab) => (
                 <TouchableOpacity
                   key={tab.id}
@@ -218,7 +280,7 @@ export default function StudentDetailScreen() {
                     styles.tabItem,
                     activeTab === tab.id && { backgroundColor: themeColors.primary },
                   ]}
-                  onPress={() => setActiveTab(tab.id)}
+                  onPress={advanceTabs(() => setActiveTab(tab.id))}
                   activeOpacity={0.8}
                 >
                   {tab.icon}
@@ -230,7 +292,8 @@ export default function StudentDetailScreen() {
                   </Text>
                 </TouchableOpacity>
               ))}
-            </View>
+            </WalkthroughableView>
+            </CopilotStep>
 
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
 
@@ -238,7 +301,12 @@ export default function StudentDetailScreen() {
               {activeTab === 'overview' && (
                 <>
                   {/* Stats chips */}
-                  <View style={[styles.section, { backgroundColor: cardBg, borderColor }]}>
+                  <CopilotStep
+                    text="Aha hagaragara imibare y'amasomo yagizemo, ibizamini byakorezwe n'uruhare yagize muri rusange."
+                    order={3}
+                    name="student-overview"
+                  >
+                  <WalkthroughableView style={[styles.section, { backgroundColor: cardBg, borderColor }]}>
                     <Text style={[styles.sectionTitle, { color: textPrimary }]}>Incamake rusange</Text>
                     <View style={styles.reviewCountRow}>
                       {[
@@ -298,7 +366,8 @@ export default function StudentDetailScreen() {
                         </View>
                       ))}
                     </View>
-                  </View>
+                  </WalkthroughableView>
+                  </CopilotStep>
 
                   {/* Recent test attempts */}
                   {attempts.length > 0 && (
@@ -622,6 +691,23 @@ export default function StudentDetailScreen() {
         )}
       </View>
     </SafeAreaView>
+  );
+}
+
+export default function StudentDetailScreen() {
+  return (
+    <CopilotProvider
+      tooltipComponent={MascotTooltip}
+      overlay="view"
+      backdropColor="rgba(0, 0, 0, 0.65)"
+      animationDuration={300}
+      stepNumberComponent={() => null}
+      arrowSize={10}
+      androidStatusBarVisible
+      labels={{ finish: 'Rangiza', next: 'Ibikurikiraho', previous: 'Inyuma', skip: 'Simbuka' }}
+    >
+      <StudentDetailScreenContent />
+    </CopilotProvider>
   );
 }
 

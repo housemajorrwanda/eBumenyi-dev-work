@@ -14,6 +14,7 @@ import {
 } from "tsoa";
 import { Request as ExpressRequest } from "express";
 import { DirectChatService } from "../services/directChatService";
+import { ConversationMuteService } from "../services/conversationMuteService";
 import { checkRole } from "../middlewares";
 import { roles } from "../utils/roles";
 import { loggerMiddleware } from "../utils/loggers/loggingMiddleware";
@@ -132,6 +133,38 @@ export class DirectChatController {
     return DirectChatService.getDirectChatMessages(
       chatId,
       userId,
+      limit,
+      offset,
+    );
+  }
+  /**
+   * Search messages in a direct chat by content, across full history
+   * GET /direct-chats/{chatId}/messages/search?q=&limit=50&offset=0
+   */
+  @Get("/{chatId}/messages/search")
+  @Middlewares(
+    loggerMiddleware,
+    checkRole(
+      roles.ADMIN,
+      roles.STAFF,
+      roles.CHO,
+      roles.TRAINER,
+      roles.TRAINEE,
+      roles.DEVELOPER,
+    ),
+  )
+  public async searchDirectChatMessages(
+    @Request() req: ExpressRequest,
+    @Path() chatId: string,
+    @Query() q: string,
+    @Query() limit: number = 20,
+    @Query() offset: number = 0,
+  ) {
+    const userId = req.user?.id as string;
+    return DirectChatService.searchDirectChatMessages(
+      chatId,
+      userId,
+      q,
       limit,
       offset,
     );
@@ -298,6 +331,36 @@ export class DirectChatController {
     const userId = req.user?.id as string;
     return DirectChatService.updateDirectChat(chatId, userId, body);
   }
+
+  /**
+   * Mute or unmute a direct chat for the current user
+   */
+  @Put("/{chatId}/mute")
+  @Middlewares(
+    loggerMiddleware,
+    checkRole(
+      roles.ADMIN,
+      roles.STAFF,
+      roles.CHO,
+      roles.TRAINER,
+      roles.TRAINEE,
+      roles.DEVELOPER,
+    ),
+  )
+  public async muteDirectChat(
+    @Request() req: ExpressRequest,
+    @Path() chatId: string,
+    @Body() body: { muted: boolean },
+  ) {
+    const userId = req.user?.id as string;
+    return ConversationMuteService.setMute(
+      userId,
+      "direct",
+      chatId,
+      body.muted,
+    );
+  }
+
   /**
    * Get a specific direct chat with message history
    */

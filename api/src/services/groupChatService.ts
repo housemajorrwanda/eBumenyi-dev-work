@@ -72,6 +72,13 @@ export class GroupChatService {
             },
           },
         },
+        lastMessage: {
+          include: {
+            sender: {
+              select: { id: true, fullNames: true, photo: true },
+            },
+          },
+        },
       },
       orderBy: {
         updatedAt: "desc",
@@ -1306,5 +1313,61 @@ export class GroupChatService {
       data: messages.reverse(),
       total: messages.length,
     };
+  }
+
+  /**
+   * Search messages in a group chat by content, across the full conversation
+   * history (not just the most-recently-loaded page).
+   */
+  public static async searchGroupMessages(
+    groupId: string,
+    userId: string,
+    q: string,
+    limit: number = 20,
+    offset: number = 0,
+  ) {
+    // Verify user is a participant
+    const participant = await prisma.groupChatParticipant.findFirst({
+      where: { groupId, userId },
+    });
+
+    if (!participant) {
+      throw new AppError("User is not a member of this group", 403);
+    }
+
+    const where = {
+      groupId,
+      content: { contains: q, mode: "insensitive" as const },
+    };
+
+    const [messages, total] = await Promise.all([
+      prisma.groupMessage.findMany({
+        where,
+        include: {
+          sender: {
+            select: { id: true, fullNames: true, photo: true },
+          },
+          likes: {
+            where: { userId },
+            select: { id: true },
+          },
+        },
+        orderBy: { timestamp: "desc" },
+        take: limit,
+        skip: offset,
+      }),
+      prisma.groupMessage.count({ where }),
+    ]);
+
+    const data = await Promise.all(
+      messages.map(async (msg) => {
+        const offsetInConversation = await prisma.groupMessage.count({
+          where: { groupId, timestamp: { gt: msg.timestamp } },
+        });
+        return { ...msg, offsetInConversation };
+      }),
+    );
+
+    return { data, total };
   }
 }

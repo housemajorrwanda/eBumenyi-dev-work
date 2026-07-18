@@ -1,35 +1,44 @@
+import { InteractionManager } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import httpClient from './httpClient';
+import {
+  TOUR_KEYS,
+  TourKey,
+  localKey,
+  ALL_KNOWN_KEYS,
+  hasCompletedLocal,
+  markCompleteLocal,
+  clearLocalOnboarding,
+} from './onboardingLocal';
 
-export const TOUR_KEYS = {
-  APP: 'app',
-  COURSE: 'course',
-  TRAINING: 'training',
-} as const;
+export { TOUR_KEYS };
+export type { TourKey };
 
-export type TourKey = (typeof TOUR_KEYS)[keyof typeof TOUR_KEYS];
+const TOUR_START_TRAILING_DELAY = 150;
 
-const localKey = (tourKey: string) => `onboarding_${tourKey}`;
-
-// All tour keys the app knows about — used to remove stale keys after a DB reset
-const ALL_KNOWN_KEYS = Object.values(TOUR_KEYS) as string[];
+// Waits for any in-flight screen-transition animation to finish, then adds a
+// short trailing delay so freshly-rendered content gets one layout pass to
+// settle before the copilot library measures its target. On screens with
+// nothing to wait for (no loader, no transition in flight) this resolves
+// almost immediately — replacing a flat 500ms setTimeout that was applied
+// uniformly regardless of whether there was anything to wait for, which read
+// as a sluggish tour specifically on screens with no loading state of their own.
+export function scheduleTourStart(start: () => void): () => void {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const handle = InteractionManager.runAfterInteractions(() => {
+    timer = setTimeout(start, TOUR_START_TRAILING_DELAY);
+  });
+  return () => {
+    handle.cancel();
+    if (timer) clearTimeout(timer);
+  };
+}
 
 export const onboardingService = {
-  async hasCompleted(tourKey: string): Promise<boolean> {
-    try {
-      const val = await AsyncStorage.getItem(localKey(tourKey));
-      return val !== null;
-    } catch {
-      return false;
-    }
-  },
+  hasCompleted: hasCompletedLocal,
 
   async markComplete(tourKey: string): Promise<void> {
-    try {
-      await AsyncStorage.setItem(localKey(tourKey), '1');
-    } catch {
-      // Local write failed — not fatal, backend sync will still attempt
-    }
+    await markCompleteLocal(tourKey);
     // Fire and forget — don't block UI on network
     httpClient
       .post('/onboarding/complete', { tourKey })
@@ -41,6 +50,7 @@ export const onboardingService = {
   async syncFromBackend(): Promise<string[]> {
     const response = await httpClient.get<{ data: { completedTours: string[] } }>('/onboarding');
     const completedTours: string[] = (response as any)?.data?.data?.completedTours ?? [];
+    console.log('[onboarding] syncFromBackend — server completedTours:', completedTours);
 
     // Write completed tours locally
     await Promise.all(completedTours.map((key) => AsyncStorage.setItem(localKey(key), '1')));
@@ -51,4 +61,6 @@ export const onboardingService = {
 
     return completedTours;
   },
+
+  clearLocal: clearLocalOnboarding,
 };

@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import { DeviceEventEmitter } from 'react-native';
 import { AUTH_CHANGED_EVENT } from '@/hooks/useAuth';
+import { clearLocalOnboarding } from '@/services/onboardingLocal';
 
 const ACCESS_TOKEN_KEY = 'accessToken';
 const USER_DATA_KEY = 'userData';
@@ -43,6 +44,9 @@ export async function persistAuthSession(data: {
 
 export async function clearAuthSession(): Promise<void> {
   await AsyncStorage.multiRemove([ACCESS_TOKEN_KEY, USER_DATA_KEY, ROLE_KEY]);
+  // Local onboarding-tour state is per-device, not per-user — without this, the next
+  // user to log in on this device inherits the previous user's completed tours.
+  await clearLocalOnboarding().catch(() => {});
 
   if (Platform.OS === 'web' && typeof window !== 'undefined') {
     window.localStorage.removeItem(ACCESS_TOKEN_KEY);

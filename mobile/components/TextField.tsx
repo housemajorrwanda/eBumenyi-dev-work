@@ -125,11 +125,14 @@ export default function TextField({ label, value, onChangeText, placeholder, sec
             </TouchableOpacity>
           )}
         </View>
-        {/* show error text when provided as string */}
-        {/* {typeof error === 'string' && error.length ? (
-          <Text style={styles.errorText}>{error}</Text>
-        ) : null} */}
       </View>
+
+      {/* Sibling of inputWrapper, not a child — a child here would grow
+          inputWrapper's height and shift iconLeft's absolute centering
+          (top:0, bottom:0, justifyContent:'center') down with it. */}
+      {typeof error === 'string' && error.length ? (
+        <Text style={styles.errorText}>{error}</Text>
+      ) : null}
     </View>
   );
 }

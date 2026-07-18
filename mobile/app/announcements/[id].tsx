@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,12 @@ import { ChevronLeft, Megaphone, Calendar, User } from 'lucide-react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useQuery } from '@tanstack/react-query';
 import httpClient from '@/services/httpClient';
+import { useIsFocused } from '@react-navigation/native';
+import { CopilotProvider, CopilotStep, useCopilot } from 'react-native-copilot';
+import { WalkthroughableView } from '@/components/onboarding/walkthroughable';
+import MascotTooltip from '@/components/onboarding/MascotTooltip';
+import { TOUR_KEYS, onboardingService, scheduleTourStart } from '@/services/onboarding.service';
+import { useOnboarding } from '@/contexts/OnboardingContext';
 
 interface Announcement {
   id: string;
@@ -45,7 +51,7 @@ const getAnnouncementById = async (id: string): Promise<Announcement> => {
   return response.data.data;
 };
 
-export default function AnnouncementDetailScreen() {
+function AnnouncementDetailScreenContent() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -56,6 +62,50 @@ export default function AnnouncementDetailScreen() {
     queryFn: () => getAnnouncementById(id!),
     enabled: !!id,
   });
+
+  const { start, copilotEvents, stop, visible } = useCopilot();
+  // start()'s identity is not stable across CopilotProvider re-renders (the
+  // library doesn't memoize its internal visibility setter, which start
+  // depends on) — reading it through a ref means a re-render before the
+  // scheduled tour fires doesn't cancel it via the effect's cleanup.
+  const startRef = useRef(start);
+  startRef.current = start;
+  const { markComplete } = useOnboarding();
+  const isFocused = useIsFocused();
+  // If the user navigates away (tapping the real highlighted element can
+  // itself trigger navigation, but this also covers back/tab-switch/etc.)
+  // while a tour is visible, its CopilotProvider can stay mounted (stack
+  // navigators often keep the previous screen alive) — without this, the
+  // tour's Modal renders in RN's top-level layer and keeps floating over
+  // whatever screen is now active. Close it on the focus transition.
+  const wasFocusedRef = useRef(isFocused);
+  useEffect(() => {
+    if (wasFocusedRef.current && !isFocused && visible) {
+      stop().catch(() => {});
+    }
+    wasFocusedRef.current = isFocused;
+  }, [isFocused, visible, stop]);
+  const autoStartAttemptedRef = useRef(false);
+
+  useEffect(() => {
+    let cancelSchedule: (() => void) | null = null;
+    let cancelled = false;
+    if (!isLoading && !!announcement && isFocused && !autoStartAttemptedRef.current) {
+      autoStartAttemptedRef.current = true;
+      void (async () => {
+        const done = await onboardingService.hasCompleted(TOUR_KEYS.ANNOUNCEMENT);
+        if (cancelled) return;
+        if (!done) { cancelSchedule = scheduleTourStart(() => startRef.current()); }
+      })();
+    }
+    return () => { cancelled = true; cancelSchedule?.(); };
+  }, [isLoading, announcement, isFocused]);
+
+  useEffect(() => {
+    const handleStop = () => { markComplete(TOUR_KEYS.ANNOUNCEMENT).catch(() => {}); };
+    copilotEvents.on('stop', handleStop);
+    return () => { copilotEvents.off('stop', handleStop); };
+  }, [copilotEvents, markComplete]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -143,22 +193,33 @@ export default function AnnouncementDetailScreen() {
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Hero Section */}
-        <View style={styles.heroSection}>
-          <View style={styles.heroTypeRow}>
-            <View style={[styles.heroIconContainer, { backgroundColor: priorityColor }]}>
-              <Megaphone size={20} color="#ffffff" />
+        <CopilotStep
+          text="Hano hagaragara ubutumwa bwanditseho: izina, ingereka n'ingingo y'ingenzi."
+          order={1}
+          name="announcement-hero"
+        >
+          <WalkthroughableView style={styles.heroSection}>
+            <View style={styles.heroTypeRow}>
+              <View style={[styles.heroIconContainer, { backgroundColor: priorityColor }]}>
+                <Megaphone size={20} color="#ffffff" />
+              </View>
+              <View style={[styles.priorityBadge, { backgroundColor: `${priorityColor}22` }]}>
+                <Text style={[styles.priorityText, { color: priorityColor }]}>
+                  {announcement.priority?.toUpperCase() || 'MEDIUM'}
+                </Text>
+              </View>
             </View>
-            <View style={[styles.priorityBadge, { backgroundColor: `${priorityColor}22` }]}>
-              <Text style={[styles.priorityText, { color: priorityColor }]}>
-                {announcement.priority?.toUpperCase() || 'MEDIUM'}
-              </Text>
-            </View>
-          </View>
-          <Text style={styles.heroTitle}>{announcement.title}</Text>
-        </View>
+            <Text style={styles.heroTitle}>{announcement.title}</Text>
+          </WalkthroughableView>
+        </CopilotStep>
 
         {/* Metadata Card */}
-        <View style={[styles.metadataCard, {
+        <CopilotStep
+          text="Hano ubona uwo ubutumwa bwoherejwe na we, n'itariki bwatangiriweho, n'uwo bugenewe."
+          order={2}
+          name="announcement-meta"
+        >
+        <WalkthroughableView style={[styles.metadataCard, {
           backgroundColor: isDark ? '#1e3a8a' : '#eff6ff',
           borderColor: `${themeColors.primary}40`
         }]}>
@@ -179,7 +240,8 @@ export default function AnnouncementDetailScreen() {
               </View>
             </>
           )}
-        </View>
+        </WalkthroughableView>
+        </CopilotStep>
 
         {/* Body Content */}
         <View style={[styles.bodyCard, {
@@ -211,6 +273,23 @@ export default function AnnouncementDetailScreen() {
         </View>
       </ScrollView>
     </View>
+  );
+}
+
+export default function AnnouncementDetailScreen() {
+  return (
+    <CopilotProvider
+      tooltipComponent={MascotTooltip}
+      overlay="view"
+      backdropColor="rgba(0, 0, 0, 0.65)"
+      animationDuration={300}
+      stepNumberComponent={() => null}
+      arrowSize={10}
+      androidStatusBarVisible
+      labels={{ finish: 'Rangiza', next: 'Ibikurikiraho', previous: 'Inyuma', skip: 'Simbuka' }}
+    >
+      <AnnouncementDetailScreenContent />
+    </CopilotProvider>
   );
 }
 

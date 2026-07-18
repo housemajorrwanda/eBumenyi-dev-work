@@ -2,15 +2,20 @@ import { View, Text, StyleSheet, TouchableOpacity, useWindowDimensions } from 'r
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, Users, MoreVertical } from 'lucide-react-native';
 import { IConversation } from '@/types';
+import { CopilotStep } from 'react-native-copilot';
+import { WalkthroughableTouchable } from '@/components/onboarding/walkthroughable';
+import { useTourStepAdvance } from '@/hooks/useTourStepAdvance';
 
 interface GroupHeaderProps {
   group: IConversation;
   router: any;
   groupId: string;
   onSettingsPress?: () => void;
+  // Only set true when rendered inside a CopilotProvider (i.e. group/[id].tsx tour).
+  tourEnabled?: boolean;
 }
 
-export function GroupHeader({ group, router, groupId, onSettingsPress }: GroupHeaderProps) {
+export function GroupHeader({ group, router, groupId, onSettingsPress, tourEnabled = false }: GroupHeaderProps) {
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const responsiveStyles = getResponsiveHeaderStyles(width);
@@ -20,33 +25,78 @@ export function GroupHeader({ group, router, groupId, onSettingsPress }: GroupHe
   // Use backend-calculated displayName
   const groupName = group?.displayName || group?.name || '----';
 
+  const advanceInfo = useTourStepAdvance('group-info');
+  const advanceMembers = useTourStepAdvance('group-members');
+
   return (
     <View style={[styles.header, { paddingTop: insets.top, paddingHorizontal: responsiveStyles.paddingHorizontal, paddingVertical: responsiveStyles.paddingVertical }]}>
       <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
         <ArrowLeft size={responsiveStyles.backIconSize} color="#FFFFFF" />
       </TouchableOpacity>
 
-      <TouchableOpacity
-        style={styles.headerInfo}
-        onPress={() => router.push(`/group/${groupId}/info`)}>
-        <View style={styles.headerTextContainer}>
-          <Text style={[styles.headerName, { fontSize: responsiveStyles.headerNameSize }]}>
-            {groupName}
-          </Text>
-          <View style={styles.memberRow}>
-            <Users size={responsiveStyles.headerStatusSize} color="#D1F4CC" />
-            <Text style={[styles.headerStatus, { fontSize: responsiveStyles.headerStatusSize }]}>
-              {participantCount}
+      {tourEnabled ? (
+        <CopilotStep
+          text="Hano ugaragara izina ry'itsinda n'umubare w'abanyamuryango. Kanda kugira ngo urebe amakuru y'itsinda."
+          order={1}
+          name="group-info"
+        >
+          <WalkthroughableTouchable
+            style={styles.headerInfo}
+            onPress={advanceInfo(() => router.push(`/group/${groupId}/info`))}
+          >
+            <View style={styles.headerTextContainer}>
+              <Text style={[styles.headerName, { fontSize: responsiveStyles.headerNameSize }]}>
+                {groupName}
+              </Text>
+              <View style={styles.memberRow}>
+                <Users size={responsiveStyles.headerStatusSize} color="#D1F4CC" />
+                <Text style={[styles.headerStatus, { fontSize: responsiveStyles.headerStatusSize }]}>
+                  {participantCount}
+                </Text>
+              </View>
+            </View>
+          </WalkthroughableTouchable>
+        </CopilotStep>
+      ) : (
+        <TouchableOpacity
+          style={styles.headerInfo}
+          onPress={() => router.push(`/group/${groupId}/info`)}
+        >
+          <View style={styles.headerTextContainer}>
+            <Text style={[styles.headerName, { fontSize: responsiveStyles.headerNameSize }]}>
+              {groupName}
             </Text>
+            <View style={styles.memberRow}>
+              <Users size={responsiveStyles.headerStatusSize} color="#D1F4CC" />
+              <Text style={[styles.headerStatus, { fontSize: responsiveStyles.headerStatusSize }]}>
+                {participantCount}
+              </Text>
+            </View>
           </View>
-        </View>
-      </TouchableOpacity>
+        </TouchableOpacity>
+      )}
 
-      <TouchableOpacity
-        style={styles.headerButton}
-        onPress={() => router.push(`/group/${groupId}/info`)}>
-        <MoreVertical size={responsiveStyles.backIconSize} color="#FFFFFF" />
-      </TouchableOpacity>
+      {tourEnabled ? (
+        <CopilotStep
+          text="Kanda hano kureba urutonde rw'abanyamuryango bose no guhindura igenamiterere ry'itsinda."
+          order={2}
+          name="group-members"
+        >
+          <WalkthroughableTouchable
+            style={styles.headerButton}
+            onPress={advanceMembers(() => router.push(`/group/${groupId}/info`))}
+          >
+            <MoreVertical size={responsiveStyles.backIconSize} color="#FFFFFF" />
+          </WalkthroughableTouchable>
+        </CopilotStep>
+      ) : (
+        <TouchableOpacity
+          style={styles.headerButton}
+          onPress={() => router.push(`/group/${groupId}/info`)}
+        >
+          <MoreVertical size={responsiveStyles.backIconSize} color="#FFFFFF" />
+        </TouchableOpacity>
+      )}
     </View>
   );
 }

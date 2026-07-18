@@ -72,7 +72,11 @@ export default function CommunityInfoScreen() {
   };
 
   const handleSaveName = async () => {
-    if (!communityName.trim() || !id) return;
+    if (!id) return;
+    if (!communityName.trim()) {
+      Alert.alert('Ikosa', 'Izina ntirishobora kuba ubusa');
+      return;
+    }
     setIsSavingName(true);
     try {
       await MessagingAPI.updateCommunity(id, { name: communityName.trim() });

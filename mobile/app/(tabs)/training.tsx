@@ -1,6 +1,7 @@
-import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
+﻿import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { View, Text, ScrollView, StyleSheet, TextInput, Animated, Easing, RefreshControl, useWindowDimensions } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
+import { useIsFocused } from '@react-navigation/native';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useNotificationsContext } from '@/contexts/NotificationsContext';
 import Header from '@/components/Header';
@@ -15,7 +16,8 @@ import { CopilotProvider, CopilotStep, useCopilot } from 'react-native-copilot';
 import { WalkthroughableView } from '@/components/onboarding/walkthroughable';
 import MascotTooltip from '@/components/onboarding/MascotTooltip';
 import { useOnboarding } from '@/contexts/OnboardingContext';
-import { TOUR_KEYS } from '@/services/onboarding.service';
+import { TOUR_KEYS, onboardingService, scheduleTourStart } from '@/services/onboarding.service';
+import { useTourStepAdvance } from '@/hooks/useTourStepAdvance';
 
 // Simple debounce function
 const debounce = (func: Function, delay: number) => {
@@ -148,8 +150,36 @@ function TrainingScreenContent() {
   const { isDark } = useTheme();
   const queryClient = useQueryClient();
   const { notifications } = useNotificationsContext();
-  const { start, copilotEvents } = useCopilot();
-  const { hasCompleted, markComplete, syncReady, triggerSync } = useOnboarding();
+  const { start, copilotEvents, stop, visible } = useCopilot();
+  const advanceCourses = useTourStepAdvance('training-courses');
+  // start()'s identity is not stable across CopilotProvider re-renders (the
+  // library doesn't memoize its internal visibility setter, which start
+  // depends on) — reading it through a ref means a re-render before the
+  // scheduled tour fires doesn't cancel it via the effect's cleanup.
+  const startRef = useRef(start);
+  startRef.current = start;
+  const { markComplete, triggerSync } = useOnboarding();
+  const isFocused = useIsFocused();
+  // If the user navigates away (tapping the real highlighted element can
+  // itself trigger navigation, but this also covers back/tab-switch/etc.)
+  // while a tour is visible, its CopilotProvider can stay mounted (stack
+  // navigators often keep the previous screen alive) — without this, the
+  // tour's Modal renders in RN's top-level layer and keeps floating over
+  // whatever screen is now active. Close it on the focus transition.
+  const wasFocusedRef = useRef(isFocused);
+  useEffect(() => {
+    if (wasFocusedRef.current && !isFocused && visible) {
+      stop().catch(() => {});
+    }
+    wasFocusedRef.current = isFocused;
+  }, [isFocused, visible, stop]);
+  // Guards the auto-trigger effect below so it only ever attempts to start the
+  // tour ONCE per screen session — see the matching guard in app/(tabs)/index.tsx
+  // for why: without it, any re-run (e.g. isFocused blipping while the tour's
+  // own tooltip Modal opens, or `start` changing identity on step registration)
+  // would re-check "is the tour done?" (still false mid-tour) and call start()
+  // again, silently resetting the user back to the first step.
+  const autoStartAttemptedRef = useRef(false);
   const [searchData, setSearchData] = useState<ICourseResponse | null>(null);
   const [isValidatingToken, setIsValidatingToken] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -262,16 +292,37 @@ function TrainingScreenContent() {
     }
   };
 
-  // Start training tour once after data loads (guards against skeleton being spotlit)
+  // Start training tour once after data loads (guards against skeleton being spotlit).
+  // Reads completion state straight from local storage (same pattern as the home
+  // and course tours) instead of gating on OnboardingContext's `syncReady` — that
+  // gate depends on a chain of async steps and if any link stalls, the tour
+  // silently never fires. Also gated on `isFocused` since this tab can mount (and
+  // its effects fire) before the user has actually navigated into it.
   useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    if (!isValidatingToken && syncReady && !isCoursesLoading) {
-      if (!hasCompleted(TOUR_KEYS.TRAINING)) {
-        timer = setTimeout(() => start(), 500);
-      }
+    let cancelSchedule: (() => void) | null = null;
+    let cancelled = false;
+
+    if (
+      !isValidatingToken &&
+      !isCoursesLoading &&
+      isFocused &&
+      !autoStartAttemptedRef.current
+    ) {
+      autoStartAttemptedRef.current = true;
+      void (async () => {
+        const done = await onboardingService.hasCompleted(TOUR_KEYS.TRAINING);
+        if (cancelled) return;
+        if (!done) {
+          cancelSchedule = scheduleTourStart(() => startRef.current());
+        }
+      })();
     }
-    return () => { if (timer) clearTimeout(timer); };
-  }, [isValidatingToken, syncReady, isCoursesLoading]);
+
+    return () => {
+      cancelled = true;
+      cancelSchedule?.();
+    };
+  }, [isValidatingToken, isCoursesLoading, isFocused]);
 
   useEffect(() => {
     const handleStop = () => { markComplete(TOUR_KEYS.TRAINING).catch(() => {}); };
@@ -300,7 +351,7 @@ function TrainingScreenContent() {
       </View>
       {/* Search Input */}
       <CopilotStep
-        text="Andika hano izina ry'isomo ushaka. Gushakisha biroroshye no kuba byihuse!"
+        text="Andika hano izina ry'isomo ushaka. Gushakisha biroroshye kandi birihuse!"
         order={1}
         name="training-search"
       >
@@ -332,7 +383,7 @@ function TrainingScreenContent() {
       >
 
         <CopilotStep
-          text="Hano ubona amasomo yose ahariwe. Kanda ku isomo kugira ngo utangire kwiga!"
+          text="Hano ubona amasomo yose ahariwe. Umubare ugaragara ku ifoto y'isomo wagaragaza intera wagezeho. Kanda ku isomo kugira ngo utangire kwiga!"
           order={2}
           name="training-courses"
         >
@@ -353,7 +404,7 @@ function TrainingScreenContent() {
                     coverIcon: course.coverIcon,
                     title: course.title,
                   }}
-                  onPress={() => handleCoursePress(course, index)}
+                  onPress={advanceCourses(() => handleCoursePress(course, index))}
                   showCapIcon
                   progress={course?.progresses[0]?.progress}
                   width={'48%'}
@@ -371,10 +422,18 @@ export default function TrainingScreen() {
   return (
     <CopilotProvider
       tooltipComponent={MascotTooltip}
-      overlay="svg"
+      overlay="view"
       backdropColor="rgba(0, 0, 0, 0.65)"
       animationDuration={300}
       stepNumberComponent={() => null}
+      arrowSize={10}
+      androidStatusBarVisible
+      labels={{
+        finish: 'Rangiza',
+        next: 'Ibikurikiraho',
+        previous: 'Inyuma',
+        skip: 'Simbuka',
+      }}
     >
       <TrainingScreenContent />
     </CopilotProvider>

@@ -14,6 +14,7 @@ import {
 } from "tsoa";
 import { Request as ExpressRequest } from "express";
 import { CommunityService } from "../services/communityService";
+import { ConversationMuteService } from "../services/conversationMuteService";
 import { checkRole } from "../middlewares";
 import { roles } from "../utils/roles";
 import { loggerMiddleware } from "../utils/loggers/loggingMiddleware";
@@ -275,6 +276,35 @@ export class CommunityController {
   }
 
   /**
+   * Mute or unmute a community for the current user
+   */
+  @Put("/{communityId}/mute")
+  @Middlewares(
+    loggerMiddleware,
+    checkRole(
+      roles.ADMIN,
+      roles.STAFF,
+      roles.CHO,
+      roles.TRAINER,
+      roles.TRAINEE,
+      roles.DEVELOPER,
+    ),
+  )
+  public async muteCommunity(
+    @Request() req: ExpressRequest,
+    @Path() communityId: string,
+    @Body() body: { muted: boolean },
+  ) {
+    const userId = req.user?.id as string;
+    return ConversationMuteService.setMute(
+      userId,
+      "community",
+      communityId,
+      body.muted,
+    );
+  }
+
+  /**
    * Delete community
    */
   @Delete("/{communityId}")
@@ -489,6 +519,39 @@ export class CommunityController {
     return CommunityService.getCommunityPosts(
       communityId,
       userId,
+      limit,
+      offset,
+    );
+  }
+
+  /**
+   * Search community posts by title/content, across full history
+   * GET /communities/{communityId}/posts/search?q=&limit=20&offset=0
+   */
+  @Get("/{communityId}/posts/search")
+  @Middlewares(
+    loggerMiddleware,
+    checkRole(
+      roles.ADMIN,
+      roles.STAFF,
+      roles.CHO,
+      roles.TRAINER,
+      roles.TRAINEE,
+      roles.DEVELOPER,
+    ),
+  )
+  public async searchCommunityPosts(
+    @Request() req: ExpressRequest,
+    @Path() communityId: string,
+    @Query() q: string,
+    @Query() limit: number = 20,
+    @Query() offset: number = 0,
+  ) {
+    const userId = req.user?.id as string;
+    return CommunityService.searchCommunityPosts(
+      communityId,
+      userId,
+      q,
       limit,
       offset,
     );

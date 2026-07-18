@@ -20,7 +20,7 @@ import { NotificationService } from "./NotificationService";
 import { pushService } from "./pushService";
 import { roles } from "../utils/roles";
 
-const PROVINCE_DISTRICTS: Record<string, string[]> = {
+export const PROVINCE_DISTRICTS: Record<string, string[]> = {
   "Kigali City": ["Gasabo", "Kicukiro", "Nyarugenge"],
   Eastern: [
     "Bugesera",
@@ -70,7 +70,9 @@ export class CourseService {
     roles.CHO,
   ];
 
-  private static resolveAnalyticsDistrictList(filters?: AnalyticsFilters): string[] {
+  private static resolveAnalyticsDistrictList(
+    filters?: AnalyticsFilters,
+  ): string[] {
     if (filters?.district) return [filters.district];
     if (filters?.province) return PROVINCE_DISTRICTS[filters.province] ?? [];
     return [];
@@ -123,7 +125,9 @@ export class CourseService {
     roleFilter?: string[],
   ): Promise<number> {
     const targetRoles = (
-      roleFilter?.length ? roleFilter : CourseService.DEFAULT_COURSE_NOTIFY_ROLES
+      roleFilter?.length
+        ? roleFilter
+        : CourseService.DEFAULT_COURSE_NOTIFY_ROLES
     ) as Array<(typeof roles)[keyof typeof roles]>;
 
     const users = await prisma.user.findMany({
@@ -140,9 +144,7 @@ export class CourseService {
     if (!users.length) return 0;
 
     const title =
-      eventType === "created"
-        ? "Isomo rishya ryongeweho"
-        : "Isomo ryavuguruwe";
+      eventType === "created" ? "Isomo rishya ryongeweho" : "Isomo ryavuguruwe";
     const message =
       eventType === "created"
         ? `Isomo rishya "${courseTitle}" ryongeweho. Reba usome!`
@@ -226,7 +228,10 @@ export class CourseService {
       roleNames.includes(roles.CHO as never);
 
     if (!canNotify) {
-      throw new AppError("You are not allowed to notify users for this course", 403);
+      throw new AppError(
+        "You are not allowed to notify users for this course",
+        403,
+      );
     }
 
     if (!course.pendingNotificationType) {
@@ -1130,10 +1135,7 @@ export class CourseService {
       },
     );
     // Mark pending notification — creator releases manually from the web UI
-    await CourseService.markCoursePendingNotification(
-      prisma,
-      result.course.id,
-    );
+    await CourseService.markCoursePendingNotification(prisma, result.course.id);
     const refreshed = await prisma.course.findUnique({
       where: { id: result.course.id },
     });
@@ -1772,7 +1774,9 @@ export class CourseService {
           data.sections,
         );
         await CourseService.markCoursePendingNotification(tx, course.id);
-        const refreshed = await tx.course.findUnique({ where: { id: course.id } });
+        const refreshed = await tx.course.findUnique({
+          where: { id: course.id },
+        });
         return { course: refreshed ?? course };
       },
       {
@@ -2299,11 +2303,16 @@ export class CourseService {
       previousAvgCompletionRate,
     );
 
-    // 4. Certificates Issued (completed courses) with trend
-    const certificatesIssued = completedProgresses;
+    // 4. Certificates Issued (real count from the Certificate table) with trend
+    const certificatesIssued = await prisma.certificate.count({
+      where: progressWhere,
+    });
+    const previousCertificatesIssued = await prisma.certificate.count({
+      where: { ...progressWhere, createdAt: { lt: thirtyDaysAgo } },
+    });
     const certificatesTrend = CourseService.calculateTrend(
-      completedProgresses,
-      previousCompletedProgresses,
+      certificatesIssued,
+      previousCertificatesIssued,
     );
 
     // 5. Top Performing Courses (by completion rate)
@@ -2323,6 +2332,15 @@ export class CourseService {
       },
     });
 
+    const certificateCountsByCourse = await prisma.certificate.groupBy({
+      by: ["courseId"],
+      where: progressWhere,
+      _count: { id: true },
+    });
+    const certifiedCountMap = new Map(
+      certificateCountsByCourse.map((c) => [c.courseId, c._count.id]),
+    );
+
     const topPerformingCourses = coursesWithMetrics
       .map((course) => {
         const totalEnrolled = course._count.progresses;
@@ -2340,6 +2358,7 @@ export class CourseService {
           inProgress,
           completed,
           rate: completionRate,
+          certified: certifiedCountMap.get(course.id) ?? 0,
         };
       })
       .filter((course) => course.enrolled > 0) // Only include courses with enrollments
@@ -2434,7 +2453,10 @@ export class CourseService {
       ? { student: { user: userFilter } }
       : {};
     if (filters?.role) {
-      progressWhere.student = { ...(progressWhere.student ?? {}), role: filters.role };
+      progressWhere.student = {
+        ...(progressWhere.student ?? {}),
+        role: filters.role,
+      };
     }
 
     const thirtyDaysAgo = new Date();
@@ -2495,22 +2517,158 @@ export class CourseService {
       previousActiveStudents,
     );
 
-    // 3. Average Study Time (based on slide progress and course progress)
-    const studyTimeData = await prisma.slideProgress.aggregate({
-      where: { updatedAt: { gte: thirtyDaysAgo } },
-      _count: { id: true },
+    // 3. Average Study Time — computed per course (real session data where it
+    // exists, an activity-count estimate elsewhere), then rolled up into the
+    // aggregate so the top-line number and the per-course list can never
+    // disagree with each other.
+    const studentFilterForRelation: any = {};
+    if (hasUserFilter) studentFilterForRelation.user = userFilter;
+    if (filters?.role) studentFilterForRelation.role = filters.role;
+    const hasStudentFilterForRelation =
+      Object.keys(studentFilterForRelation).length > 0;
+
+    // 3a. Active (studentId, courseId) pairs from CourseProgress (courseId is direct).
+    const courseProgressRows = await prisma.courseProgress.findMany({
+      where: { ...progressWhere, updatedAt: { gte: thirtyDaysAgo } },
+      select: { studentId: true, courseId: true },
     });
 
-    const courseProgressData = await prisma.courseProgress.aggregate({
-      where: { updatedAt: { gte: thirtyDaysAgo } },
-      _count: { id: true },
+    // 3b. Active (studentId, slideId) pairs from SlideProgress, resolved to
+    // courseId via Slide -> Chapter -> Section (SlideProgress has no direct
+    // courseId, and relationMode="prisma" means there's no FK to raw-SQL join on).
+    const slideProgressRows = await prisma.slideProgress.findMany({
+      where: {
+        updatedAt: { gte: thirtyDaysAgo },
+        ...(hasStudentFilterForRelation
+          ? { student: studentFilterForRelation }
+          : {}),
+      },
+      select: { studentId: true, slideId: true },
     });
+    const slideIds = Array.from(
+      new Set(slideProgressRows.map((r) => r.slideId)),
+    );
+    const slideCourseRows =
+      slideIds.length > 0
+        ? await prisma.slide.findMany({
+            where: { id: { in: slideIds } },
+            select: {
+              id: true,
+              chapter: { select: { section: { select: { courseId: true } } } },
+            },
+          })
+        : [];
+    const slideToCourse = new Map(
+      slideCourseRows.map((s) => [s.id, s.chapter.section.courseId]),
+    );
 
-    // Estimate average study time (5 min per slide + 30 min per course progress update)
-    const estimatedTotalHours =
-      (studyTimeData._count.id * 5 + courseProgressData._count.id * 30) / 60;
-    const avgStudyTime =
-      activeStudents > 0 ? estimatedTotalHours / activeStudents : 0;
+    const courseActiveStudents = new Map<string, Set<string>>();
+    const courseProgressCounts = new Map<string, number>();
+    const courseSlideCounts = new Map<string, number>();
+    const addActiveStudent = (courseId: string, studentId: string) => {
+      const set = courseActiveStudents.get(courseId) ?? new Set<string>();
+      set.add(studentId);
+      courseActiveStudents.set(courseId, set);
+    };
+    for (const r of courseProgressRows) {
+      addActiveStudent(r.courseId, r.studentId);
+      courseProgressCounts.set(
+        r.courseId,
+        (courseProgressCounts.get(r.courseId) ?? 0) + 1,
+      );
+    }
+    for (const r of slideProgressRows) {
+      const courseId = slideToCourse.get(r.slideId);
+      if (!courseId) continue;
+      addActiveStudent(courseId, r.studentId);
+      courseSlideCounts.set(
+        courseId,
+        (courseSlideCounts.get(courseId) ?? 0) + 1,
+      );
+    }
+
+    // 3c. Real session-duration data (UserSession heartbeats), grouped per course.
+    const realSessions = await prisma.userSession.findMany({
+      where: {
+        startedAt: { gte: thirtyDaysAgo },
+        ...(hasUserFilter ? { user: userFilter } : {}),
+      },
+      select: { startedAt: true, lastSeenAt: true, courseId: true },
+    });
+    const sessionsByCourse = new Map<string, number[]>();
+    for (const s of realSessions) {
+      if (!s.courseId) continue;
+      const hours =
+        (s.lastSeenAt.getTime() - s.startedAt.getTime()) / (1000 * 60 * 60);
+      const arr = sessionsByCourse.get(s.courseId) ?? [];
+      arr.push(hours);
+      sessionsByCourse.set(s.courseId, arr);
+    }
+
+    // 3d. Build one entry per active course: real average where sessions
+    // exist, otherwise the same 5min/slide + 30min/progress-update estimate
+    // used historically, just scoped to that course instead of globally.
+    const activeCourseIds = new Set<string>([
+      ...courseActiveStudents.keys(),
+      ...sessionsByCourse.keys(),
+    ]);
+    let avgStudyTimeByCourse: {
+      courseId: string;
+      courseTitle: string;
+      avgHours: number;
+      source: "live" | "estimated";
+      activeStudents: number;
+    }[] = [];
+    if (activeCourseIds.size > 0) {
+      const courseIds = Array.from(activeCourseIds);
+      const coursesForNames = await prisma.course.findMany({
+        where: { id: { in: courseIds } },
+        select: { id: true, title: true },
+      });
+      const titleMap = new Map(coursesForNames.map((c) => [c.id, c.title]));
+      avgStudyTimeByCourse = courseIds.map((courseId) => {
+        const activeStudentsInCourse =
+          courseActiveStudents.get(courseId)?.size ?? 0;
+        const realHoursArr = sessionsByCourse.get(courseId) ?? [];
+        let avgHours: number;
+        let source: "live" | "estimated";
+        if (realHoursArr.length > 0) {
+          avgHours =
+            realHoursArr.reduce((s, v) => s + v, 0) / realHoursArr.length;
+          source = "live";
+        } else {
+          const estimatedHours =
+            (courseSlideCounts.get(courseId) ?? 0) * (5 / 60) +
+            (courseProgressCounts.get(courseId) ?? 0) * (30 / 60);
+          avgHours =
+            activeStudentsInCourse > 0
+              ? estimatedHours / activeStudentsInCourse
+              : 0;
+          source = "estimated";
+        }
+        return {
+          courseId,
+          courseTitle: titleMap.get(courseId) ?? "Unknown course",
+          avgHours: Math.round(avgHours * 10) / 10,
+          source,
+          activeStudents: activeStudentsInCourse,
+        };
+      });
+      avgStudyTimeByCourse.sort((a, b) => b.avgHours - a.avgHours);
+    }
+
+    // 3e. Aggregate = weighted average of the per-course numbers above, so
+    // this can never contradict what the per-course list shows.
+    const totalWeightedHours = avgStudyTimeByCourse.reduce(
+      (sum, c) => sum + c.avgHours * c.activeStudents,
+      0,
+    );
+    const totalWeight = avgStudyTimeByCourse.reduce(
+      (sum, c) => sum + c.activeStudents,
+      0,
+    );
+    const avgStudyTime = totalWeight > 0 ? totalWeightedHours / totalWeight : 0;
+    const anyLiveCourse = avgStudyTimeByCourse.some((c) => c.source === "live");
 
     // Previous period calculation
     const previousStudyTimeData = await prisma.slideProgress.aggregate({
@@ -2779,7 +2937,9 @@ export class CourseService {
           value: Math.round(avgStudyTime * 10) / 10,
           trend: studyTimeTrend,
           unit: "hours",
+          isEstimate: !anyLiveCourse,
         },
+        avgStudyTimeByCourse,
         completionRate: {
           value: Math.round(completionRate * 10) / 10,
           trend: completionRateTrend,
@@ -3555,7 +3715,10 @@ export class CourseService {
             id: true,
             attempts: {
               where: { isCompleted: true, marks: { gt: 0 }, ...attemptWhere },
-              select: { marks: true },
+              select: {
+                marks: true,
+                student: { select: { user: { select: { district: true } } } },
+              },
             },
           },
         },
@@ -3564,7 +3727,10 @@ export class CourseService {
             id: true,
             attempts: {
               where: { isCompleted: true, marks: { gt: 0 }, ...attemptWhere },
-              select: { marks: true },
+              select: {
+                marks: true,
+                student: { select: { user: { select: { district: true } } } },
+              },
             },
           },
         },
@@ -3649,6 +3815,62 @@ export class CourseService {
           ) / 10
         : 0;
 
+    // --- Per-district breakdown ---
+    const districtPre = new Map<string, number[]>();
+    const districtFinal = new Map<string, number[]>();
+    for (const course of courses) {
+      for (const pt of course.preTests) {
+        for (const a of pt.attempts) {
+          const d = a.student.user.district ?? "Ntizwi";
+          if (!districtPre.has(d)) districtPre.set(d, []);
+          districtPre.get(d)!.push(a.marks);
+        }
+      }
+      for (const ft of course.finalTest) {
+        for (const a of ft.attempts) {
+          const d = a.student.user.district ?? "Ntizwi";
+          if (!districtFinal.has(d)) districtFinal.set(d, []);
+          districtFinal.get(d)!.push(a.marks);
+        }
+      }
+    }
+    const allDistricts = new Set([
+      ...districtPre.keys(),
+      ...districtFinal.keys(),
+    ]);
+    const avg = (arr: number[]) =>
+      arr.length > 0
+        ? Math.round((arr.reduce((s, v) => s + v, 0) / arr.length) * 10) / 10
+        : null;
+    const byDistrict = Array.from(allDistricts)
+      .map((district) => {
+        const preArr = districtPre.get(district) ?? [];
+        const finalArr = districtFinal.get(district) ?? [];
+        const meanPreTest = avg(preArr);
+        const meanFinalTest = avg(finalArr);
+        const knowledgeGain =
+          meanPreTest !== null && meanFinalTest !== null && meanPreTest > 0
+            ? Math.round(
+                ((meanFinalTest - meanPreTest) / meanPreTest) * 100 * 10,
+              ) / 10
+            : null;
+        return {
+          district,
+          meanPreTest,
+          meanFinalTest,
+          knowledgeGain,
+          preTestAttempts: preArr.length,
+          finalTestAttempts: finalArr.length,
+        };
+      })
+      .sort(
+        (a, b) =>
+          b.preTestAttempts +
+          b.finalTestAttempts -
+          (a.preTestAttempts + a.finalTestAttempts),
+      )
+      .slice(0, 20);
+
     return {
       message: "Test score analytics fetched successfully",
       statusCode: 200,
@@ -3657,6 +3879,7 @@ export class CourseService {
         overallMeanFinalTest,
         overallKnowledgeGain,
         byCourse: courseScores,
+        byDistrict,
       },
     };
   }
@@ -3680,81 +3903,124 @@ export class CourseService {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    // Count messages by type
-    const [directCount, groupCount, communityCount] = await Promise.all([
-      prisma.directMessage.count({ where: dmWhere }),
-      prisma.groupMessage.count({ where: gmWhere }),
-      prisma.communityPost.count({ where: cpWhere }),
-    ]);
+    // Who counts as a "supervisor" for classifying CHW-to-supervisor vs peer-to-peer
+    const supervisorRoles = await prisma.userRole.findMany({
+      where: { name: { in: ["CHO", "TRAINER"] } },
+      select: { userId: true },
+    });
+    const supervisorIds = new Set(supervisorRoles.map((r) => r.userId));
 
-    // Count active this month
-    const [directThisMonth, groupThisMonth, communityThisMonth] =
+    // Pull direct + group messages once (with just enough to classify + timestamp),
+    // then bucket by relationship role and by month in JS — avoids N extra queries.
+    const [directMsgs, groupMsgs, communityCount, communityThisMonth] =
       await Promise.all([
-        prisma.directMessage.count({
-          where: {
-            ...dmWhere,
-            timestamp: { gte: thirtyDaysAgo },
+        prisma.directMessage.findMany({
+          where: dmWhere,
+          select: {
+            timestamp: true,
+            chat: { select: { userId1: true, userId2: true } },
           },
         }),
-        prisma.groupMessage.count({
-          where: {
-            ...gmWhere,
-            timestamp: { gte: thirtyDaysAgo },
+        prisma.groupMessage.findMany({
+          where: gmWhere,
+          select: {
+            timestamp: true,
+            group: { select: { participants: { select: { userId: true } } } },
           },
         }),
+        prisma.communityPost.count({ where: cpWhere }),
         prisma.communityPost.count({
-          where: {
-            ...cpWhere,
-            timestamp: { gte: thirtyDaysAgo },
-          },
+          where: { ...cpWhere, timestamp: { gte: thirtyDaysAgo } },
         }),
       ]);
 
-    const totalCommunications = directCount + groupCount + communityCount;
-    const totalThisMonth =
-      directThisMonth + groupThisMonth + communityThisMonth;
+    const monthBucket = (d: Date) =>
+      d.toLocaleString("default", { month: "short", year: "numeric" });
 
-    // Monthly trend for last 6 months
+    let peerToPeerCount = 0;
+    let peerToPeerThisMonth = 0;
+    let chwToSupervisorCount = 0;
+    let chwToSupervisorThisMonth = 0;
+    const trendMap = new Map<
+      string,
+      { peerToPeer: number; chwToSupervisor: number; community: number }
+    >();
+
+    for (const m of directMsgs) {
+      const involvesSupervisor =
+        supervisorIds.has(m.chat.userId1) || supervisorIds.has(m.chat.userId2);
+      const isThisMonth = m.timestamp >= thirtyDaysAgo;
+      const bucket = trendMap.get(monthBucket(m.timestamp)) ?? {
+        peerToPeer: 0,
+        chwToSupervisor: 0,
+        community: 0,
+      };
+      if (involvesSupervisor) {
+        chwToSupervisorCount += 1;
+        if (isThisMonth) chwToSupervisorThisMonth += 1;
+        bucket.chwToSupervisor += 1;
+      } else {
+        peerToPeerCount += 1;
+        if (isThisMonth) peerToPeerThisMonth += 1;
+        bucket.peerToPeer += 1;
+      }
+      trendMap.set(monthBucket(m.timestamp), bucket);
+    }
+
+    for (const m of groupMsgs) {
+      const involvesSupervisor = m.group.participants.some((p) =>
+        supervisorIds.has(p.userId),
+      );
+      const isThisMonth = m.timestamp >= thirtyDaysAgo;
+      const bucket = trendMap.get(monthBucket(m.timestamp)) ?? {
+        peerToPeer: 0,
+        chwToSupervisor: 0,
+        community: 0,
+      };
+      if (involvesSupervisor) {
+        chwToSupervisorCount += 1;
+        if (isThisMonth) chwToSupervisorThisMonth += 1;
+        bucket.chwToSupervisor += 1;
+      } else {
+        peerToPeerCount += 1;
+        if (isThisMonth) peerToPeerThisMonth += 1;
+        bucket.peerToPeer += 1;
+      }
+      trendMap.set(monthBucket(m.timestamp), bucket);
+    }
+
+    const totalCommunications =
+      peerToPeerCount + chwToSupervisorCount + communityCount;
+    const totalThisMonth =
+      peerToPeerThisMonth + chwToSupervisorThisMonth + communityThisMonth;
+
+    // Monthly trend for last 6 months (community counted per-month separately,
+    // since it isn't reclassified — merged in below)
     const monthlyTrend = [];
     for (let i = 5; i >= 0; i--) {
       const monthStart = new Date();
       monthStart.setMonth(monthStart.getMonth() - i);
       monthStart.setDate(1);
       monthStart.setHours(0, 0, 0, 0);
-
       const monthEnd = new Date(monthStart);
       monthEnd.setMonth(monthEnd.getMonth() + 1);
+      const label = monthBucket(monthStart);
 
-      const [d, g, c] = await Promise.all([
-        prisma.directMessage.count({
-          where: {
-            ...dmWhere,
-            timestamp: { gte: monthStart, lt: monthEnd },
-          },
-        }),
-        prisma.groupMessage.count({
-          where: {
-            ...gmWhere,
-            timestamp: { gte: monthStart, lt: monthEnd },
-          },
-        }),
-        prisma.communityPost.count({
-          where: {
-            ...cpWhere,
-            timestamp: { gte: monthStart, lt: monthEnd },
-          },
-        }),
-      ]);
+      const c = await prisma.communityPost.count({
+        where: { ...cpWhere, timestamp: { gte: monthStart, lt: monthEnd } },
+      });
+      const bucket = trendMap.get(label) ?? {
+        peerToPeer: 0,
+        chwToSupervisor: 0,
+        community: 0,
+      };
 
       monthlyTrend.push({
-        month: monthStart.toLocaleString("default", {
-          month: "short",
-          year: "numeric",
-        }),
-        direct: d,
-        group: g,
+        month: label,
+        peerToPeer: bucket.peerToPeer,
+        chwToSupervisor: bucket.chwToSupervisor,
         community: c,
-        total: d + g + c,
+        total: bucket.peerToPeer + bucket.chwToSupervisor + c,
       });
     }
 
@@ -3766,16 +4032,16 @@ export class CourseService {
         thisMonth: totalThisMonth,
         byType: [
           {
-            type: "peer",
-            label: "Ubuganiro bwa kabiri",
-            count: directCount,
-            thisMonth: directThisMonth,
+            type: "peerToPeer",
+            label: "Peer-to-peer",
+            count: peerToPeerCount,
+            thisMonth: peerToPeerThisMonth,
           },
           {
-            type: "group",
-            label: "Itsinda",
-            count: groupCount,
-            thisMonth: groupThisMonth,
+            type: "chwToSupervisor",
+            label: "CHW ↔ Supervisor",
+            count: chwToSupervisorCount,
+            thisMonth: chwToSupervisorThisMonth,
           },
           {
             type: "community",
@@ -3785,6 +4051,118 @@ export class CourseService {
           },
         ],
         monthlyTrend,
+      },
+    };
+  }
+
+  /**
+   * Supervisor response rate — a PROXY metric estimated from direct-message
+   * reply times between CHWs and supervisors (CHO/TRAINER), not a formal
+   * "this needs a response" tracked construct (none exists in the schema).
+   */
+  public static async getSupervisorResponseRate(filters?: AnalyticsFilters) {
+    const { studentWhere } = CourseService.buildAnalyticsStudentScope(filters);
+
+    const supervisorRoles = await prisma.userRole.findMany({
+      where: { name: { in: ["CHO", "TRAINER"] } },
+      select: { userId: true },
+    });
+    const supervisorIds = new Set(supervisorRoles.map((r) => r.userId));
+
+    const chwStudents = await prisma.student.findMany({
+      where: studentWhere,
+      select: { userId: true },
+    });
+    const chwIds = new Set(chwStudents.map((s) => s.userId));
+
+    const emptyResult = {
+      totalChwMessages: 0,
+      respondedCount: 0,
+      responseRate: 0,
+      avgResponseHours: null as number | null,
+      within24hRate: 0,
+      note: "Estimated from message reply times between CHWs and supervisors (CHO/Trainer) in direct chats.",
+    };
+
+    if (chwIds.size === 0 || supervisorIds.size === 0) {
+      return {
+        message: "Supervisor response rate fetched successfully",
+        statusCode: 200,
+        data: emptyResult,
+      };
+    }
+
+    const chats = await prisma.directChat.findMany({
+      where: {
+        OR: [
+          {
+            userId1: { in: Array.from(chwIds) },
+            userId2: { in: Array.from(supervisorIds) },
+          },
+          {
+            userId2: { in: Array.from(chwIds) },
+            userId1: { in: Array.from(supervisorIds) },
+          },
+        ],
+      },
+      select: {
+        messages: {
+          where: { isDeleted: false },
+          orderBy: { timestamp: "asc" },
+          select: { senderId: true, timestamp: true },
+        },
+      },
+    });
+
+    let totalChwMessages = 0;
+    let respondedCount = 0;
+    let respondedWithin24h = 0;
+    let totalResponseMs = 0;
+
+    for (const chat of chats) {
+      const msgs = chat.messages;
+      for (let i = 0; i < msgs.length; i++) {
+        const msg = msgs[i];
+        if (!chwIds.has(msg.senderId)) continue;
+        totalChwMessages += 1;
+        for (let j = i + 1; j < msgs.length; j++) {
+          if (supervisorIds.has(msgs[j].senderId)) {
+            const diffMs =
+              msgs[j].timestamp.getTime() - msg.timestamp.getTime();
+            totalResponseMs += diffMs;
+            respondedCount += 1;
+            if (diffMs <= 24 * 60 * 60 * 1000) respondedWithin24h += 1;
+            break;
+          }
+        }
+      }
+    }
+
+    const avgResponseHours =
+      respondedCount > 0
+        ? Math.round(
+            (totalResponseMs / respondedCount / (1000 * 60 * 60)) * 10,
+          ) / 10
+        : null;
+    const responseRate =
+      totalChwMessages > 0
+        ? Math.round((respondedCount / totalChwMessages) * 100)
+        : 0;
+    const within24hRate =
+      totalChwMessages > 0
+        ? Math.round((respondedWithin24h / totalChwMessages) * 100)
+        : 0;
+
+    return {
+      message: "Supervisor response rate fetched successfully",
+      statusCode: 200,
+      data: {
+        totalChwMessages,
+        respondedCount,
+        responseRate,
+        avgResponseHours,
+        within24hRate,
+        note: emptyResult.note,
       },
     };
   }
@@ -3945,6 +4323,54 @@ export class CourseService {
         };
       });
 
+    // --- Combined cross-tab: District × Gender × Age Group, with active-status breakdown ---
+    const combinedMap = new Map<
+      string,
+      {
+        district: string;
+        gender: string;
+        ageGroup: string;
+        total: number;
+        active: number;
+        inactive: number;
+        suspended: number;
+        graduated: number;
+      }
+    >();
+    for (const s of students) {
+      const district = s.user.district ?? "Ntizwi";
+      const rawGender = s.user.gender;
+      const gender = rawGender
+        ? rawGender.charAt(0).toUpperCase() + rawGender.slice(1).toLowerCase()
+        : "Ntizwi";
+      const ageGroup = getAgeGroup(s.user.birthdate);
+      const key = `${district}||${gender}||${ageGroup}`;
+      const existing = combinedMap.get(key) ?? {
+        district,
+        gender,
+        ageGroup,
+        total: 0,
+        active: 0,
+        inactive: 0,
+        suspended: 0,
+        graduated: 0,
+      };
+      existing.total += 1;
+      if (s.status === "ACTIVE") existing.active += 1;
+      else if (s.status === "INACTIVE") existing.inactive += 1;
+      else if (s.status === "SUSPENDED") existing.suspended += 1;
+      else if (s.status === "GRADUATED") existing.graduated += 1;
+      combinedMap.set(key, existing);
+    }
+    const combined = Array.from(combinedMap.values())
+      .map((row) => ({
+        ...row,
+        activeRate:
+          row.total > 0 ? Math.round((row.active / row.total) * 100) : 0,
+      }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 100); // cap payload size — sparse combinations beyond this are rarely useful
+
     return {
       message: "Demographics analytics fetched successfully",
       statusCode: 200,
@@ -3953,15 +4379,156 @@ export class CourseService {
         byDistrict,
         byGender,
         byAgeGroup,
+        combined,
+      },
+    };
+  }
+
+  /**
+   * Certification rate — total, per course, per district, per health facility.
+   * "Rate" always means % of students in scope with >=1 certificate for the
+   * relevant grouping, matching the definition already used by
+   * getDemographicsAnalytics's certificationRate — one consistent definition
+   * across the app instead of the old completedProgresses-based proxy.
+   */
+  public static async getCertificationAnalytics(filters?: AnalyticsFilters) {
+    const { studentWhere, progressWhere } =
+      CourseService.buildAnalyticsStudentScope(filters);
+
+    // --- Total ---
+    const totalStudents = await prisma.student.count({ where: studentWhere });
+    const certifiedStudents = await prisma.student.count({
+      where: { ...studentWhere, certificates: { some: {} } },
+    });
+    const totalIssued = await prisma.certificate.count({
+      where: progressWhere,
+    });
+    const totalRate =
+      totalStudents > 0
+        ? Math.round((certifiedStudents / totalStudents) * 100)
+        : 0;
+
+    // --- By course ---
+    const courses = await prisma.course.findMany({
+      select: {
+        id: true,
+        title: true,
+        _count: { select: { progresses: { where: progressWhere } } },
+      },
+    });
+    const certsByCourse = await prisma.certificate.groupBy({
+      by: ["courseId"],
+      where: progressWhere,
+      _count: { id: true },
+    });
+    const certsByCourseMap = new Map(
+      certsByCourse.map((c) => [c.courseId, c._count.id]),
+    );
+    const byCourse = courses
+      .map((c) => {
+        const eligible = c._count.progresses;
+        const issued = certsByCourseMap.get(c.id) ?? 0;
+        return {
+          courseId: c.id,
+          courseTitle: c.title,
+          eligible,
+          issued,
+          rate: eligible > 0 ? Math.round((issued / eligible) * 100) : 0,
+        };
+      })
+      .filter((c) => c.eligible > 0)
+      .sort((a, b) => b.issued - a.issued);
+
+    // --- By district ---
+    const studentsForGrouping = await prisma.student.findMany({
+      where: studentWhere,
+      select: {
+        user: {
+          select: {
+            district: true,
+            hospitalId: true,
+            hospital: { select: { name: true } },
+          },
+        },
+        certificates: { select: { id: true } },
+      },
+    });
+
+    const districtMap = new Map<string, { total: number; certified: number }>();
+    for (const s of studentsForGrouping) {
+      const district = s.user.district ?? "Ntizwi";
+      const existing = districtMap.get(district) ?? { total: 0, certified: 0 };
+      existing.total += 1;
+      if (s.certificates.length > 0) existing.certified += 1;
+      districtMap.set(district, existing);
+    }
+    const byDistrict = Array.from(districtMap.entries())
+      .map(([district, d]) => ({
+        district,
+        eligible: d.total,
+        issued: d.certified,
+        rate: d.total > 0 ? Math.round((d.certified / d.total) * 100) : 0,
+      }))
+      .sort((a, b) => b.issued - a.issued)
+      .slice(0, 20);
+
+    // --- By health facility (hospital) ---
+    const facilityMap = new Map<
+      string,
+      { name: string; total: number; certified: number }
+    >();
+    for (const s of studentsForGrouping) {
+      const hospitalId = s.user.hospitalId ?? "unknown";
+      const hospitalName = s.user.hospital?.name ?? "Unknown facility";
+      const existing = facilityMap.get(hospitalId) ?? {
+        name: hospitalName,
+        total: 0,
+        certified: 0,
+      };
+      existing.total += 1;
+      if (s.certificates.length > 0) existing.certified += 1;
+      facilityMap.set(hospitalId, existing);
+    }
+    const byFacility = Array.from(facilityMap.entries())
+      .map(([hospitalId, d]) => ({
+        hospitalId,
+        hospitalName: d.name,
+        eligible: d.total,
+        issued: d.certified,
+        rate: d.total > 0 ? Math.round((d.certified / d.total) * 100) : 0,
+      }))
+      .sort((a, b) => b.issued - a.issued)
+      .slice(0, 20);
+
+    return {
+      message: "Certification analytics fetched successfully",
+      statusCode: 200,
+      data: {
+        total: {
+          eligible: totalStudents,
+          issued: totalIssued,
+          certifiedStudents,
+          rate: totalRate,
+        },
+        byCourse,
+        byDistrict,
+        byFacility,
       },
     };
   }
 
   public static async getCHWDashboardStats(filters?: AnalyticsFilters) {
-    const { studentWhere, progressWhere, districtList } =
+    const { studentWhere, progressWhere, userFilter } =
       CourseService.buildAnalyticsStudentScope(filters);
     const baseStudentWhere = studentWhere;
     const baseProgressWhere = progressWhere;
+
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const chwStudentFilter: Record<string, unknown> = filters?.role
+      ? { role: filters.role }
+      : { isNot: null };
 
     const [
       // Card 1: CHW (student) counts by status
@@ -3982,6 +4549,19 @@ export class CourseService {
       totalSupervisors,
       maleSupervisors,
       femaleSupervisors,
+      // Login/activation — CHWs
+      chwActivated,
+      chwActivatedPrevious,
+      chwLoginEvents,
+      // Login/activation — Supervisors (CHO)
+      supervisorActivated,
+      supervisorActivatedPrevious,
+      supervisorLoginEvents,
+      // Whether any LoginEvent history older than 30 days exists at all —
+      // if not, "previous period" comparisons are meaningless (tracking
+      // hasn't been running long enough yet), so the trend arrow is
+      // suppressed rather than showing a misleading "+100%" cold-start spike.
+      historicalLoginEventCount,
     ] = await Promise.all([
       // Card 1
       prisma.student.count({ where: baseStudentWhere }),
@@ -4019,31 +4599,59 @@ export class CourseService {
       prisma.userRole.count({
         where: {
           name: "CHO",
-          ...(districtList.length > 0
-            ? { user: { district: { in: districtList } } }
-            : {}),
-          ...(filters?.gender ? { user: { gender: filters.gender } } : {}),
+          ...(Object.keys(userFilter).length > 0 ? { user: userFilter } : {}),
+        },
+      }),
+      prisma.userRole.count({
+        where: { name: "CHO", user: { ...userFilter, gender: "Male" } },
+      }),
+      prisma.userRole.count({
+        where: { name: "CHO", user: { ...userFilter, gender: "Female" } },
+      }),
+      // Login/activation — CHWs
+      prisma.student.count({
+        where: {
+          ...baseStudentWhere,
+          user: { ...userFilter, lastLoginAt: { not: null } },
+        },
+      }),
+      prisma.student.count({
+        where: {
+          ...baseStudentWhere,
+          user: {
+            ...userFilter,
+            loginEvents: { some: { createdAt: { lt: thirtyDaysAgo } } },
+          },
+        },
+      }),
+      prisma.loginEvent.count({
+        where: { user: { ...userFilter, student: chwStudentFilter } },
+      }),
+      // Login/activation — Supervisors (CHO)
+      prisma.userRole.count({
+        where: {
+          name: "CHO",
+          user: { ...userFilter, lastLoginAt: { not: null } },
         },
       }),
       prisma.userRole.count({
         where: {
           name: "CHO",
-          user:
-            districtList.length > 0
-              ? { gender: "Male", district: { in: districtList } }
-              : { gender: "Male" },
+          user: {
+            ...userFilter,
+            loginEvents: { some: { createdAt: { lt: thirtyDaysAgo } } },
+          },
         },
       }),
-      prisma.userRole.count({
+      prisma.loginEvent.count({
         where: {
-          name: "CHO",
-          user:
-            districtList.length > 0
-              ? { gender: "Female", district: { in: districtList } }
-              : { gender: "Female" },
+          user: { ...userFilter, userRoles: { some: { name: "CHO" } } },
         },
       }),
+      prisma.loginEvent.count({ where: { createdAt: { lt: thirtyDaysAgo } } }),
     ]);
+
+    const hasTrendBaseline = historicalLoginEventCount > 0;
 
     const completionRate =
       totalProgresses > 0
@@ -4063,6 +4671,15 @@ export class CourseService {
           inactive: inactiveCHWs,
           suspended: suspendedCHWs,
           graduated: graduatedCHWs,
+          activationRate:
+            totalCHWs > 0 ? Math.round((chwActivated / totalCHWs) * 100) : 0,
+          activationTrend: hasTrendBaseline
+            ? CourseService.calculateTrend(chwActivated, chwActivatedPrevious)
+            : null,
+          avgLogins:
+            totalCHWs > 0
+              ? Math.round((chwLoginEvents / totalCHWs) * 10) / 10
+              : 0,
         },
         completion: {
           rate: completionRate,
@@ -4082,8 +4699,89 @@ export class CourseService {
           male: maleSupervisors,
           female: femaleSupervisors,
           other: totalSupervisors - maleSupervisors - femaleSupervisors,
+          activationRate:
+            totalSupervisors > 0
+              ? Math.round((supervisorActivated / totalSupervisors) * 100)
+              : 0,
+          activationTrend: hasTrendBaseline
+            ? CourseService.calculateTrend(
+                supervisorActivated,
+                supervisorActivatedPrevious,
+              )
+            : null,
+          avgLogins:
+            totalSupervisors > 0
+              ? Math.round((supervisorLoginEvents / totalSupervisors) * 10) / 10
+              : 0,
         },
       },
+    };
+  }
+
+  /**
+   * Monthly trend of active CHWs (had course-progress activity that month),
+   * scoped by the same district/gender/hospital/role filters as every other
+   * analytics query in this file.
+   */
+  public static async getMonthlyActiveTrends(filters?: AnalyticsFilters) {
+    const { studentWhere, userFilter } =
+      CourseService.buildAnalyticsStudentScope(filters);
+    const MONTHS = 6;
+
+    const activeCHWTrend: { month: string; activeCHWs: number }[] = [];
+    const activeUsersTrend: { month: string; activeUsers: number }[] = [];
+
+    for (let i = MONTHS - 1; i >= 0; i--) {
+      const monthStart = new Date();
+      monthStart.setMonth(monthStart.getMonth() - i);
+      monthStart.setDate(1);
+      monthStart.setHours(0, 0, 0, 0);
+      const monthEnd = new Date(monthStart);
+      monthEnd.setMonth(monthEnd.getMonth() + 1);
+      const monthLabel = monthStart.toLocaleString("default", {
+        month: "short",
+        year: "numeric",
+      });
+
+      const activeCHWs = await prisma.student.count({
+        where: {
+          ...studentWhere,
+          courseProgresses: {
+            some: { updatedAt: { gte: monthStart, lt: monthEnd } },
+          },
+        },
+      });
+      activeCHWTrend.push({ month: monthLabel, activeCHWs });
+
+      const studentActivityFilter: Record<string, unknown> = {
+        courseProgresses: {
+          some: { updatedAt: { gte: monthStart, lt: monthEnd } },
+        },
+      };
+      if (filters?.role) studentActivityFilter.role = filters.role;
+
+      const activeUsers = await prisma.user.count({
+        where: {
+          ...userFilter,
+          OR: [
+            { student: studentActivityFilter },
+            {
+              staff: {
+                courses: {
+                  some: { updatedAt: { gte: monthStart, lt: monthEnd } },
+                },
+              },
+            },
+          ],
+        },
+      });
+      activeUsersTrend.push({ month: monthLabel, activeUsers });
+    }
+
+    return {
+      message: "Monthly active trends fetched successfully",
+      statusCode: 200,
+      data: { activeCHWTrend, activeUsersTrend },
     };
   }
 
@@ -4253,7 +4951,16 @@ export class CourseService {
     });
 
     // ── Course Updates: latest courses created or updated ─────────
+    const courseWhere: Record<string, unknown> = {};
+    if (Object.keys(studentWhere).length > 0) {
+      courseWhere.progresses = { some: { student: studentWhere } };
+    }
+    if (Object.keys(yearMonthWhere).length > 0) {
+      courseWhere.updatedAt = yearMonthWhere;
+    }
+
     const courses = await prisma.course.findMany({
+      where: courseWhere,
       orderBy: { updatedAt: "desc" },
       take: LIMIT,
       include: {

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   View,
@@ -18,12 +18,19 @@ import {
   useSafeAreaInsets,
 } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { useIsFocused } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import Button from '@/components/Button';
 import { ChevronLeft, Upload, Search, Camera } from 'lucide-react-native';
 import { getAllUsersNopagination } from '@/services/users.api';
 import { createConversation } from '@/services/messaging.api';
 import { IUser } from '@/types';
+import { CopilotProvider, CopilotStep, useCopilot } from 'react-native-copilot';
+import { WalkthroughableView } from '@/components/onboarding/walkthroughable';
+import MascotTooltip from '@/components/onboarding/MascotTooltip';
+import { TOUR_KEYS, onboardingService, scheduleTourStart } from '@/services/onboarding.service';
+import { useOnboarding } from '@/contexts/OnboardingContext';
+import { useTourStepAdvance } from '@/hooks/useTourStepAdvance';
 
 const getRoleDisplayName = (role: string): string => {
   const roleMap: Record<string, string> = {
@@ -36,13 +43,38 @@ const getRoleDisplayName = (role: string): string => {
   return roleMap[role.toUpperCase()] || role;
 };
 
-export default function CreateGroupScreen() {
+function CreateGroupScreenContent() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [groupName, setGroupName] = useState('');
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
   const [groupPhoto, setGroupPhoto] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const { start, copilotEvents, stop, visible } = useCopilot();
+  const advanceName = useTourStepAdvance('create-group-name');
+  const advanceMembers = useTourStepAdvance('create-group-members');
+  // start()'s identity is not stable across CopilotProvider re-renders (the
+  // library doesn't memoize its internal visibility setter, which start
+  // depends on) — reading it through a ref means a re-render before the
+  // scheduled tour fires doesn't cancel it via the effect's cleanup.
+  const startRef = useRef(start);
+  startRef.current = start;
+  const { markComplete } = useOnboarding();
+  const isFocused = useIsFocused();
+  // If the user navigates away (tapping the real highlighted element can
+  // itself trigger navigation, but this also covers back/tab-switch/etc.)
+  // while a tour is visible, its CopilotProvider can stay mounted (stack
+  // navigators often keep the previous screen alive) — without this, the
+  // tour's Modal renders in RN's top-level layer and keeps floating over
+  // whatever screen is now active. Close it on the focus transition.
+  const wasFocusedRef = useRef(isFocused);
+  useEffect(() => {
+    if (wasFocusedRef.current && !isFocused && visible) {
+      stop().catch(() => {});
+    }
+    wasFocusedRef.current = isFocused;
+  }, [isFocused, visible, stop]);
+  const autoStartAttemptedRef = useRef(false);
   const [isCreating, setIsCreating] = useState(false);
 
   const {
@@ -163,33 +195,69 @@ export default function CreateGroupScreen() {
     user.fullNames.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
-  const renderMemberItem = ({ item }: { item: IUser }) => (
-    <TouchableOpacity
-      style={[
-        styles.memberItem,
-        selectedMembers.includes(item.id) && styles.memberItemSelected,
-      ]}
-      onPress={() => toggleMember(item.id)}
-    >
-      <Image
-        source={{ uri: item.photo || 'https://i.pravatar.cc/150?img=1' }}
-        style={styles.memberAvatar}
-      />
-      <View style={styles.memberInfo}>
-        <Text style={styles.memberName}>{item.fullNames}</Text>
-        <Text style={styles.memberStatus}>
-          {item.userRoles && item.userRoles.length > 0
-            ? getRoleDisplayName(item.userRoles[0].name)
-            : 'Umujyanama'}
-        </Text>
-      </View>
-      {selectedMembers.includes(item.id) && (
-        <View style={styles.checkmark}>
-          <Text style={styles.checkmarkText}>✓</Text>
+  const renderMemberItem = ({ item, index }: { item: IUser; index: number }) => {
+    const row = (
+      <TouchableOpacity
+        style={[
+          styles.memberItem,
+          selectedMembers.includes(item.id) && styles.memberItemSelected,
+        ]}
+        onPress={advanceMembers(() => toggleMember(item.id))}
+      >
+        <Image
+          source={{ uri: item.photo || 'https://i.pravatar.cc/150?img=1' }}
+          style={styles.memberAvatar}
+        />
+        <View style={styles.memberInfo}>
+          <Text style={styles.memberName}>{item.fullNames}</Text>
+          <Text style={styles.memberStatus}>
+            {item.userRoles && item.userRoles.length > 0
+              ? getRoleDisplayName(item.userRoles[0].name)
+              : 'Umujyanama'}
+          </Text>
         </View>
-      )}
-    </TouchableOpacity>
-  );
+        {selectedMembers.includes(item.id) && (
+          <View style={styles.checkmark}>
+            <Text style={styles.checkmarkText}>✓</Text>
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+    // Only the first member is a tour target — spotlighting the whole list
+    // left too little room for the tooltip to fit without being clipped.
+    if (index === 0) {
+      return (
+        <CopilotStep
+          text="Hitamo abanyamuryango ushaka kongera, hanyuma ukande 'Andika' kugira ngo urangize iki gikorwa."
+          order={2}
+          name="create-group-members"
+        >
+          <WalkthroughableView>{row}</WalkthroughableView>
+        </CopilotStep>
+      );
+    }
+    return row;
+  };
+
+  useEffect(() => {
+    let cancelSchedule: (() => void) | null = null;
+    let cancelled = false;
+    if (!isLoading && isFocused && !autoStartAttemptedRef.current) {
+      autoStartAttemptedRef.current = true;
+      void (async () => {
+        const done = await onboardingService.hasCompleted(TOUR_KEYS.CREATE_GROUP);
+        if (cancelled) return;
+        if (!done) { cancelSchedule = scheduleTourStart(() => startRef.current()); }
+      })();
+    }
+    return () => { cancelled = true; cancelSchedule?.(); };
+  }, [isLoading, isFocused]);
+
+  useEffect(() => {
+    const handleStop = () => { markComplete(TOUR_KEYS.CREATE_GROUP).catch(() => {}); };
+    copilotEvents.on('stop', handleStop);
+    return () => { copilotEvents.off('stop', handleStop); };
+  }, [copilotEvents, markComplete]);
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
@@ -202,10 +270,11 @@ export default function CreateGroupScreen() {
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.topRow}>
+        <CopilotStep text="Injiza izina ry'itsinda hano kandi wakongeraho ifoto niba ushaka." order={1} name="create-group-name">
+        <WalkthroughableView style={styles.topRow}>
           <TouchableOpacity
             style={styles.photoButton}
-            onPress={handlePhotoUpload}
+            onPress={advanceName(handlePhotoUpload)}
           >
             {groupPhoto ? (
               <Image source={{ uri: groupPhoto }} style={styles.photoSmall} />
@@ -223,7 +292,8 @@ export default function CreateGroupScreen() {
             placeholderTextColor="#d1d5db"
             style={styles.nameInput}
           />
-        </View>
+        </WalkthroughableView>
+        </CopilotStep>
 
         <View style={styles.searchContainer}>
           <Search size={16} color="#6b7280" />
@@ -280,6 +350,23 @@ export default function CreateGroupScreen() {
         </View>
       </View>
     </SafeAreaView>
+  );
+}
+
+export default function CreateGroupScreen() {
+  return (
+    <CopilotProvider
+      tooltipComponent={MascotTooltip}
+      overlay="view"
+      backdropColor="rgba(0, 0, 0, 0.65)"
+      animationDuration={300}
+      stepNumberComponent={() => null}
+      arrowSize={10}
+      androidStatusBarVisible
+      labels={{ finish: 'Rangiza', next: 'Ibikurikiraho', previous: 'Inyuma', skip: 'Simbuka' }}
+    >
+      <CreateGroupScreenContent />
+    </CopilotProvider>
   );
 }
 

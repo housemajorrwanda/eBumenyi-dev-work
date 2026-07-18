@@ -70,12 +70,26 @@ export function getCloudinaryDownloadUrl(
   // Extract everything after /upload/, decode URI encoding, strip version prefix vNNNN/
   const afterUpload = url.split("/upload/")[1];
   if (!afterUpload) return url;
-  const publicId = decodeURIComponent(afterUpload.replace(/^v\d+\//, ""));
+  let publicId = decodeURIComponent(afterUpload.replace(/^v\d+\//, ""));
+
+  // "raw" resources store the file extension as a literal part of the public_id, but
+  // "image"/"video" resources store the format separately — the extension seen in the
+  // delivery URL is auto-appended by Cloudinary, not part of the actual stored public_id.
+  // Leaving it in for image/video lookups makes the Admin API search for a public_id that
+  // doesn't exist, which 404s ("Resource not found") even though the asset is really there.
+  let format = "";
+  if (resourceType !== "raw") {
+    const lastDot = publicId.lastIndexOf(".");
+    if (lastDot > publicId.lastIndexOf("/")) {
+      format = publicId.slice(lastDot + 1);
+      publicId = publicId.slice(0, lastDot);
+    }
+  }
 
   // private_download_url generates https://api.cloudinary.com/v1_1/{cloud}/{type}/download?...
   // It includes api_key, timestamp, and HMAC signature — always accessible regardless of CDN policy.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (cloudinary.utils as any).private_download_url(publicId, "", {
+  return (cloudinary.utils as any).private_download_url(publicId, format, {
     resource_type: resourceType,
     attachment: false,
   });

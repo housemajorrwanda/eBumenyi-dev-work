@@ -12,6 +12,7 @@ import {
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useIsFocused } from '@react-navigation/native';
 import { IMessage, IConversation } from '@/types';
 import { MessageBubble } from '@/components/chat/MessageBubble';
 import { ChatInput } from '@/components/chat/ChatInput';
@@ -23,8 +24,12 @@ import { useTypingIndicators } from '@/hooks/useTypingIndicators';
 import { useAuth } from '@/hooks/useAuth';
 import { useActiveConversation } from '@/hooks/useActiveConversation';
 import * as MessagingAPI from '@/services/messaging.api';
+import { CopilotProvider, useCopilot } from 'react-native-copilot';
+import MascotTooltip from '@/components/onboarding/MascotTooltip';
+import { TOUR_KEYS, onboardingService, scheduleTourStart } from '@/services/onboarding.service';
+import { useOnboarding } from '@/contexts/OnboardingContext';
 
-export default function ChatRoom() {
+function ChatRoomContent() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const flatListRef = useRef<FlatList>(null);
@@ -65,10 +70,34 @@ export default function ChatRoom() {
     currentUserPhoto: user?.photo,
   });
 
+  const [refreshKey, setRefreshKey] = useState(0);
   const [editingMessage, setEditingMessage] = useState<IMessage | null>(null);
   const [editText, setEditText] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
+  const { start, copilotEvents, stop, visible } = useCopilot();
+  // start()'s identity is not stable across CopilotProvider re-renders (the
+  // library doesn't memoize its internal visibility setter, which start
+  // depends on) — reading it through a ref means a re-render before the
+  // scheduled tour fires doesn't cancel it via the effect's cleanup.
+  const startRef = useRef(start);
+  startRef.current = start;
+  const { markComplete } = useOnboarding();
+  const isFocused = useIsFocused();
+  // If the user navigates away (tapping the real highlighted element can
+  // itself trigger navigation, but this also covers back/tab-switch/etc.)
+  // while a tour is visible, its CopilotProvider can stay mounted (stack
+  // navigators often keep the previous screen alive) — without this, the
+  // tour's Modal renders in RN's top-level layer and keeps floating over
+  // whatever screen is now active. Close it on the focus transition.
+  const wasFocusedRef = useRef(isFocused);
+  useEffect(() => {
+    if (wasFocusedRef.current && !isFocused && visible) {
+      stop().catch(() => {});
+    }
+    wasFocusedRef.current = isFocused;
+  }, [isFocused, visible, stop]);
+  const autoStartAttemptedRef = useRef(false);
 
   // Extract conversation from API response { chat, messages }
   // Inject type:'direct' because the directChat DB model has no type column
@@ -138,21 +167,34 @@ export default function ChatRoom() {
     }
   }, [id, setActiveConversation, clearActiveConversation]);
 
-  // Track keyboard height on Android so only the input bar lifts — not the whole screen.
-  // (edgeToEdgeEnabled causes adjustPan which scrolls the whole window; we counter that by
-  // manually padding only the input bar up by the keyboard height.)
-  const [androidKeyboardHeight, setAndroidKeyboardHeight] = useState(0);
+  // Handle keyboard hide
   useEffect(() => {
-    if (Platform.OS !== 'android') return;
-    const show = Keyboard.addListener('keyboardDidShow', (e) => {
-      setAndroidKeyboardHeight(e.endCoordinates.height);
+    const keyboardHide = Keyboard.addListener('keyboardDidHide', () => {
+      setRefreshKey(prev => prev + 1);
     });
-    const hide = Keyboard.addListener('keyboardDidHide', () => {
-      setAndroidKeyboardHeight(0);
-    });
-    return () => { show.remove(); hide.remove(); };
+    return () => keyboardHide.remove();
   }, []);
 
+
+  useEffect(() => {
+    let cancelSchedule: (() => void) | null = null;
+    let cancelled = false;
+    if (!isLoading && conversation && isFocused && !autoStartAttemptedRef.current) {
+      autoStartAttemptedRef.current = true;
+      void (async () => {
+        const done = await onboardingService.hasCompleted(TOUR_KEYS.DIRECT_CHAT);
+        if (cancelled) return;
+        if (!done) { cancelSchedule = scheduleTourStart(() => startRef.current()); }
+      })();
+    }
+    return () => { cancelled = true; cancelSchedule?.(); };
+  }, [isLoading, conversation, isFocused]);
+
+  useEffect(() => {
+    const handleStop = () => { markComplete(TOUR_KEYS.DIRECT_CHAT).catch(() => {}); };
+    copilotEvents.on('stop', handleStop);
+    return () => { copilotEvents.off('stop', handleStop); };
+  }, [copilotEvents, markComplete]);
 
   if (isLoading || !conversation) {
     return (
@@ -171,13 +213,10 @@ export default function ChatRoom() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      {/* iOS: KeyboardAvoidingView handles it cleanly.
-          Android: edgeToEdgeEnabled causes adjustPan (whole screen scrolls).
-          Instead we track keyboard height manually and only lift the input bar. */}
+    <SafeAreaView style={styles.container} edges={['bottom']} key={refreshKey}>
       <KeyboardAvoidingView
         style={styles.keyboardAvoid}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
         <ChatHeader chat={conversation} router={router} />
@@ -227,19 +266,18 @@ export default function ChatRoom() {
           )}
         </View>
 
-        <View style={Platform.OS === 'android' ? { paddingBottom: androidKeyboardHeight } : undefined}>
-          <ChatInput
-            onSendMessage={handleSendMessage}
-            onSendAttachment={handleSendAttachment}
-            disabled={isSending}
-            initialMessage={editText}
-            isEditing={!!editingMessage}
-            onEditCancel={handleCancelEdit}
-            onStartTyping={startTyping}
-            onStopTyping={stopTyping}
-            onEmojiPickerToggle={setEmojiPickerOpen}
-          />
-        </View>
+        <ChatInput
+          onSendMessage={handleSendMessage}
+          onSendAttachment={handleSendAttachment}
+          disabled={isSending}
+          initialMessage={editText}
+          isEditing={!!editingMessage}
+          onEditCancel={handleCancelEdit}
+          onStartTyping={startTyping}
+          onStopTyping={stopTyping}
+          onEmojiPickerToggle={setEmojiPickerOpen}
+          tourEnabled
+        />
       </KeyboardAvoidingView>
 
       <MessageSearch
@@ -257,6 +295,23 @@ export default function ChatRoom() {
         chatType="direct"
       />
     </SafeAreaView>
+  );
+}
+
+export default function ChatRoom() {
+  return (
+    <CopilotProvider
+      tooltipComponent={MascotTooltip}
+      overlay="view"
+      backdropColor="rgba(0, 0, 0, 0.65)"
+      animationDuration={300}
+      stepNumberComponent={() => null}
+      arrowSize={10}
+      androidStatusBarVisible
+      labels={{ finish: 'Rangiza', next: 'Ibikurikiraho', previous: 'Inyuma', skip: 'Simbuka' }}
+    >
+      <ChatRoomContent />
+    </CopilotProvider>
   );
 }
 

@@ -36,7 +36,8 @@ interface AlarmRegistryEntry {
   uid: string;
   eventId: string;
   eventTitle: string;
-  eventTime: string; // ISO
+  eventTime: string; // ISO — the alarm's own fire time (reminder offset or snooze time)
+  variant: string; // offset in minutes as a string (e.g. "30"), or "snooze"
   scheduledAt: string;
 }
 
@@ -46,7 +47,7 @@ async function saveToRegistry(entry: AlarmRegistryEntry): Promise<void> {
   try {
     const raw = await AsyncStorage.getItem(ALARM_REGISTRY_KEY);
     const list: AlarmRegistryEntry[] = raw ? JSON.parse(raw) : [];
-    const filtered = list.filter(e => e.eventId !== entry.eventId);
+    const filtered = list.filter(e => e.uid !== entry.uid);
     filtered.push(entry);
     await AsyncStorage.setItem(ALARM_REGISTRY_KEY, JSON.stringify(filtered));
   } catch { /* best effort */ }
@@ -112,6 +113,7 @@ export const NativeAlarmScheduler = {
     targetDate: Date,
     eventId: string,
     eventTitle: string,
+    variant: string,
   ): Promise<string | null> {
     if (!eventId) {
       console.warn('[NativeAlarmScheduler] Skipping alarm — eventId is missing');
@@ -128,17 +130,25 @@ export const NativeAlarmScheduler = {
       return null;
     }
 
-    // Cancel any existing alarm for this event before scheduling a new one
-    await this.cancelAlarm(eventId);
+    const uid = `alarm_${eventId}_${variant}`;
 
-    const uid = `alarm_${eventId}`;
+    // Idempotently clear this specific offset's alarm before re-scheduling it —
+    // do NOT touch sibling offsets for the same event.
+    try {
+      await nativeRemoveAlarm(uid);
+    } catch { /* didn't exist — fine */ }
+
+    // This rings AHEAD of the event (at the reminder offset), not at the
+    // event's own start time — the copy must say "reminder", not "starting".
+    // Snooze reschedules 5 minutes out, so it reuses that same minute count.
+    const minutesLabel = variant === 'snooze' ? '5' : variant;
 
     try {
       await nativeScheduleAlarm({
         uid,
         day: targetDate,
-        title: '⏰ Igikorwa gitangiye',
-        description: eventTitle,
+        title: '⏰ Ukwibutsa',
+        description: `Igikorwa «${eventTitle}» gitangira mu minota ${minutesLabel}.`,
         active: true,
         // Native dismiss button — stops AlarmService sound
         showDismiss: true,
@@ -155,6 +165,7 @@ export const NativeAlarmScheduler = {
         eventId,
         eventTitle,
         eventTime: targetDate.toISOString(),
+        variant,
         scheduledAt: new Date().toISOString(),
       });
 
@@ -193,19 +204,52 @@ export const NativeAlarmScheduler = {
   },
 
   /**
-   * Cancel a scheduled alarm by event id.
+   * Cancel every scheduled alarm (all offsets/variants) for an event.
    */
   async cancelAlarm(eventId: string): Promise<void> {
     if (!eventId || String(eventId).startsWith('optimistic-')) return;
-    const uid = `alarm_${eventId}`;
+    const registry = await getRegistry();
+    const entries = registry.filter(e => e.eventId === eventId);
+    for (const entry of entries) {
+      try {
+        await nativeRemoveAlarm(entry.uid);
+      } catch {
+        // nativeRemoveAlarm throws if alarm doesn't exist — that's fine
+      }
+    }
+    await removeFromRegistry(eventId);
+    if (entries.length > 0) {
+      console.log(`[NativeAlarmScheduler] ✅ Cancelled ${entries.length} alarm(s) for event ${eventId}`);
+    }
+  },
+
+  /**
+   * Cancel a single alarm by its exact uid, leaving sibling offsets for the
+   * same event (if any) untouched. Used when dismissing one ringing alarm.
+   */
+  async cancelAlarmByUid(uid: string): Promise<void> {
     try {
       await nativeRemoveAlarm(uid);
-      await removeFromRegistry(eventId);
-      console.log(`[NativeAlarmScheduler] ✅ Cancelled — uid: ${uid}`);
-    } catch (err) {
-      // nativeRemoveAlarm throws if alarm doesn't exist — that's fine
-      await removeFromRegistry(eventId);
+    } catch {
+      // didn't exist — fine
     }
+    try {
+      const raw = await AsyncStorage.getItem(ALARM_REGISTRY_KEY);
+      if (!raw) return;
+      const list: AlarmRegistryEntry[] = JSON.parse(raw);
+      await AsyncStorage.setItem(
+        ALARM_REGISTRY_KEY,
+        JSON.stringify(list.filter(e => e.uid !== uid)),
+      );
+    } catch { /* best effort */ }
+  },
+
+  /**
+   * Look up which event a given native alarm uid belongs to.
+   */
+  async getEventIdForUid(uid: string): Promise<string | null> {
+    const registry = await getRegistry();
+    return registry.find(e => e.uid === uid)?.eventId ?? null;
   },
 
   /**
@@ -253,8 +297,12 @@ export const NativeAlarmScheduler = {
         return !hasNativeAlarm || isPast;
       });
       
+      if (stale.length > 0) {
+        const staleUids = new Set(stale.map(e => e.uid));
+        const remaining = registry.filter(e => !staleUids.has(e.uid));
+        await AsyncStorage.setItem(ALARM_REGISTRY_KEY, JSON.stringify(remaining));
+      }
       for (const entry of stale) {
-        await removeFromRegistry(entry.eventId);
         // Also try to cancel from native in case it exists
         try {
           await nativeRemoveAlarm(entry.uid);

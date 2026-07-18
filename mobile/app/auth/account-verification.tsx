@@ -16,6 +16,7 @@ export default function OTPVerificationScreen() {
 
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [, setLoading] = useState(false);
+  const [otpError, setOtpError] = useState<string | undefined>(undefined);
   const inputRefs = useRef<any[]>([]);
 
   // Auto-submit when all digits are filled
@@ -98,6 +99,7 @@ export default function OTPVerificationScreen() {
     const newOtp = [...otp];
     newOtp[index] = value;
     setOtp(newOtp);
+    if (otpError) setOtpError(undefined);
 
     if (value && index < 5) {
       inputRefs.current[index + 1]?.focus();
@@ -134,7 +136,11 @@ export default function OTPVerificationScreen() {
           await AsyncStorage.setItem('userPhone', stored);
       } catch (err) {
         handleResponse({ response: err })
-        router.push('/auth/login');
+        // Let the user retry the code in place instead of bouncing them
+        // back to login over a simple mistyped digit.
+        setOtpError(t('otp.invalid') || 'Invalid code');
+        setOtp(['', '', '', '', '', '']);
+        inputRefs.current[0]?.focus();
       } finally {
         setLoading(false);
       }
@@ -162,12 +168,12 @@ export default function OTPVerificationScreen() {
       </LinearGradient>
 
       <View style={{ paddingHorizontal: 20, paddingTop: 2, alignItems: 'center' }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 8, marginBottom: 40 }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 8, marginBottom: otpError ? 8 : 40 }}>
           {otp.map((digit, index) => (
             <TextInput
               key={index}
               ref={(ref) => { inputRefs.current[index] = ref ?? undefined; }}
-              style={{ width: 48, height: 48, borderRadius: 12, borderWidth: 2, fontSize: 18, textAlign: 'center', backgroundColor: isDark ? '#1f2937' : '#f9fafb', borderColor: digit ? themeColors.primary : (isDark ? '#374151' : '#d1d5db'), color: isDark ? '#ffffff' : '#111827', fontFamily: 'Inter-SemiBold' }}
+              style={{ width: 48, height: 48, borderRadius: 12, borderWidth: 2, fontSize: 18, textAlign: 'center', backgroundColor: isDark ? '#1f2937' : '#f9fafb', borderColor: otpError ? '#ef4444' : (digit ? themeColors.primary : (isDark ? '#374151' : '#d1d5db')), color: isDark ? '#ffffff' : '#111827', fontFamily: 'Inter-SemiBold' }}
               value={digit}
               onChangeText={(value) => handleOtpChange(value, index)}
               onKeyPress={(e) => handleOtpKeyPress(e, index)}
@@ -190,6 +196,9 @@ export default function OTPVerificationScreen() {
             />
           ))}
         </View>
+        {otpError ? (
+          <Text style={{ color: '#ef4444', fontSize: 13, marginBottom: 24, textAlign: 'center' }}>{otpError}</Text>
+        ) : null}
       </View>
     </ScrollView>
   );

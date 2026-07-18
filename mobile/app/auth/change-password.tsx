@@ -14,16 +14,21 @@ export default function ChangePasswordScreen() {
   const { t } = useLanguage();
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
+  const [passwordError, setPasswordError] = useState<string | undefined>(undefined);
+  const [confirmError, setConfirmError] = useState<string | undefined>(undefined);
 
   const topSpacer = Dimensions.get('window').height * 0.20;
 const formOffset = topSpacer / 4;
   const handleChange = () => {
+    setPasswordError(undefined);
+    setConfirmError(undefined);
     if (!password || !confirm) {
-      Alert.alert(t('error'), t('changePassword.subtitle'));
+      if (!password) setPasswordError(t('newPasswordRequired'));
+      if (!confirm) setConfirmError(t('confirmPasswordRequired'));
       return;
     }
     if (password !== confirm) {
-      Alert.alert(t('error'), t('changePassword.confirmPassword'));
+      setConfirmError(t('profile.passwordMismatch'));
       return;
     }
     // password changed - go to app
@@ -44,19 +49,21 @@ const formOffset = topSpacer / 4;
         <TextField
           label={t('changePassword.newPassword')}
           value={password}
-          onChangeText={setPassword}
+          onChangeText={(v) => { setPassword(v); setPasswordError(undefined); }}
           placeholder={t('changePassword.newPassword')}
           secureTextEntry
           icon={<Lock color={isDark ? '#d1d5db' : themeColors.primary70} size={20} />}
+          error={passwordError}
         />
 
         <TextField
           label={t('changePassword.confirmPassword')}
           value={confirm}
-          onChangeText={setConfirm}
+          onChangeText={(v) => { setConfirm(v); setConfirmError(undefined); }}
           placeholder={t('changePassword.confirmPassword')}
           secureTextEntry
            icon={<Lock color={isDark ? '#d1d5db' : themeColors.primary70} size={20} />}
+          error={confirmError}
         />
 
         <Button

@@ -18,17 +18,30 @@ import { getMe } from '@/services/auth';
 import { useNotificationsSocket } from '@/hooks/useNotificationsSocket';
 import { useModuleSwitcher } from '@/contexts/ModuleSwitcherContext';
 import { useAuth } from '@/hooks/useAuth';
+import { CopilotStep } from 'react-native-copilot';
+import { useTourStepAdvance } from '@/hooks/useTourStepAdvance';
+import { WalkthroughableTouchable } from '@/components/onboarding/walkthroughable';
 
 type Props = {
   title?: string;
+  // Only set true on screens that mount this Header inside a CopilotProvider
+  // (currently just the home tab) — CopilotStep internally calls useCopilot(),
+  // which throws if there's no provider ancestor, so this must stay false on
+  // every other screen that renders Header (community, training, certificate,
+  // course-content).
+  tourEnabled?: boolean;
 };
 
-export default function Header({ title }: Props) {
+export default function Header({ title, tourEnabled = false }: Props) {
   const router = useMeetingRouter();
   const { isDark, themeColors } = useTheme();
   const { open: openModuleSwitcher } = useModuleSwitcher();
   const { user: cachedUser } = useAuth();
   const previousUserIdRef = useRef<string | null>(null);
+  const advanceProfile = useTourStepAdvance('header-profile');
+  const advanceModuleSwitcher = useTourStepAdvance('header-module-switcher');
+  const advanceStudyPlan = useTourStepAdvance('header-study-plan');
+  const advanceNotifications = useTourStepAdvance('header-notifications');
 
   // fetch current user info for display
   const { data: userData } = useQuery<any>({
@@ -137,21 +150,45 @@ export default function Header({ title }: Props) {
         <View style={styles.profileSection}>
           <View style={styles.profileInfo}>
             <View style={[styles.avatarContainer, dynamicStyles.avatarContainer]}>
-              <TouchableOpacity
-                style={[styles.avatarImageWrapper, dynamicStyles.avatarImageWrapper]}
-                onPress={() => router.push('/profile')}
-                accessibilityLabel="View profile"
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Image
-                  source={{
-                    uri:
-                      profile?.photo ??
-                      'https://img.freepik.com/premium-vector/user-profile-icon-flat-style-member-avatar-vector-illustration-isolated-background-human-permission-sign-business-concept_157943-15752.jpg',
-                  }}
-                  style={[styles.avatarImage, dynamicStyles.avatarImage]}
-                />
-              </TouchableOpacity>
+              {tourEnabled ? (
+                <CopilotStep
+                  text="Iyi ni ifoto yawe. Kanda hano kugira ngo urebe cyangwa uhindure umwirondoro wawe."
+                  order={1}
+                  name="header-profile"
+                >
+                  <WalkthroughableTouchable
+                    style={[styles.avatarImageWrapper, dynamicStyles.avatarImageWrapper]}
+                    onPress={advanceProfile(() => router.push('/profile'))}
+                    accessibilityLabel="View profile"
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Image
+                      source={{
+                        uri:
+                          profile?.photo ??
+                          'https://img.freepik.com/premium-vector/user-profile-icon-flat-style-member-avatar-vector-illustration-isolated-background-human-permission-sign-business-concept_157943-15752.jpg',
+                      }}
+                      style={[styles.avatarImage, dynamicStyles.avatarImage]}
+                    />
+                  </WalkthroughableTouchable>
+                </CopilotStep>
+              ) : (
+                <TouchableOpacity
+                  style={[styles.avatarImageWrapper, dynamicStyles.avatarImageWrapper]}
+                  onPress={() => router.push('/profile')}
+                  accessibilityLabel="View profile"
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Image
+                    source={{
+                      uri:
+                        profile?.photo ??
+                        'https://img.freepik.com/premium-vector/user-profile-icon-flat-style-member-avatar-vector-illustration-isolated-background-human-permission-sign-business-concept_157943-15752.jpg',
+                    }}
+                    style={[styles.avatarImage, dynamicStyles.avatarImage]}
+                  />
+                </TouchableOpacity>
+              )}
               <TouchableOpacity
                 style={[
                   styles.editButton,
@@ -189,48 +226,103 @@ export default function Header({ title }: Props) {
             </View>
           </View>
           <View style={[styles.rightActions, { gap: actionGap }]}>
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={openModuleSwitcher}
-              accessibilityLabel="Switch application"
-            >
-              <LayoutGrid size={iconSize} color="white" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={openModuleSwitcher}
-              accessibilityLabel="Switch application"
-            >
-              <LayoutGrid size={28} color="white" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => {
-                router.push('/auth/study-plan');
-              }}
-            >
-              <CalendarDaysIcon size={bellSize} color="white" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.notificationButton, dynamicStyles.notificationButton]}
-              onPress={() => router.push('/notifications')}
-            >
-              <BellIcon size={bellSize} color="white" />
-              {unreadCount > 0 && (
-                <View
-                  style={[
-                    styles.badge,
-                    {
-                      borderColor: isDark ? '#312e81' : themeColors.primary,
-                    },
-                  ]}
+            {tourEnabled ? (
+              <CopilotStep
+                text="Koresha iyi buto kugira ngo uhindukirire izindi porogaramu zikorera kuri sisitemu imwe."
+                order={2}
+                name="header-module-switcher"
+              >
+                <WalkthroughableTouchable
+                  style={styles.actionButton}
+                  onPress={advanceModuleSwitcher(openModuleSwitcher)}
+                  accessibilityLabel="Switch application"
                 >
-                  <Text style={styles.badgeText}>
-                    {unreadCount > 9 ? '9+' : unreadCount.toString()}
-                  </Text>
-                </View>
-              )}
-            </TouchableOpacity>
+                  <LayoutGrid size={iconSize} color="white" />
+                </WalkthroughableTouchable>
+              </CopilotStep>
+            ) : (
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={openModuleSwitcher}
+                accessibilityLabel="Switch application"
+              >
+                <LayoutGrid size={iconSize} color="white" />
+              </TouchableOpacity>
+            )}
+            {tourEnabled ? (
+              <CopilotStep
+                text="Kanda hano kugira ngo urebe gahunda yawe y'amasomo."
+                order={3}
+                name="header-study-plan"
+              >
+                <WalkthroughableTouchable
+                  style={styles.actionButton}
+                  onPress={advanceStudyPlan(() => {
+                    router.push('/auth/study-plan');
+                  })}
+                >
+                  <CalendarDaysIcon size={bellSize} color="white" />
+                </WalkthroughableTouchable>
+              </CopilotStep>
+            ) : (
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={() => {
+                  router.push('/auth/study-plan');
+                }}
+              >
+                <CalendarDaysIcon size={bellSize} color="white" />
+              </TouchableOpacity>
+            )}
+            {tourEnabled ? (
+              <CopilotStep
+                text="Hano ni ho uzabona amatangazo n'ubutumwa bushya. Umubare ugaragara ku ipima ugaragaza ubutumwa utarasoma."
+                order={4}
+                name="header-notifications"
+              >
+                <WalkthroughableTouchable
+                  style={[styles.notificationButton, dynamicStyles.notificationButton]}
+                  onPress={advanceNotifications(() => router.push('/notifications'))}
+                >
+                  <BellIcon size={bellSize} color="white" />
+                  {unreadCount > 0 && (
+                    <View
+                      style={[
+                        styles.badge,
+                        {
+                          borderColor: isDark ? '#312e81' : themeColors.primary,
+                        },
+                      ]}
+                    >
+                      <Text style={styles.badgeText}>
+                        {unreadCount > 9 ? '9+' : unreadCount.toString()}
+                      </Text>
+                    </View>
+                  )}
+                </WalkthroughableTouchable>
+              </CopilotStep>
+            ) : (
+              <TouchableOpacity
+                style={[styles.notificationButton, dynamicStyles.notificationButton]}
+                onPress={() => router.push('/notifications')}
+              >
+                <BellIcon size={bellSize} color="white" />
+                {unreadCount > 0 && (
+                  <View
+                    style={[
+                      styles.badge,
+                      {
+                        borderColor: isDark ? '#312e81' : themeColors.primary,
+                      },
+                    ]}
+                  >
+                    <Text style={styles.badgeText}>
+                      {unreadCount > 9 ? '9+' : unreadCount.toString()}
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            )}
           </View>
         </View>
 

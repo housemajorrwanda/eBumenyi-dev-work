@@ -363,9 +363,7 @@ export class FileUploadController {
       roles.TRAINEE,
     ),
   )
-  public async uploadVideoChunk(
-    @Request() req: ExpressRequest,
-  ): Promise<{
+  public async uploadVideoChunk(@Request() req: ExpressRequest): Promise<{
     statusCode: number;
     message: string;
     data: { uploadId: string; chunkIndex: number; totalChunks: number } | null;

@@ -4,7 +4,6 @@ import {
   StyleSheet,
   ScrollView,
   Dimensions,
-  Alert,
   TouchableOpacity,
   Image,
   KeyboardAvoidingView,
@@ -47,6 +46,12 @@ export default function SignupScreen() {
   );
   const [phoneError, setPhoneError] = useState<string | undefined>(undefined);
   const [NIDError, setNIDError] = useState<string | undefined>(undefined);
+  const [districtError, setDistrictError] = useState<string | undefined>(undefined);
+  const [sectorError, setSectorError] = useState<string | undefined>(undefined);
+  const [hospitalError, setHospitalError] = useState<string | undefined>(undefined);
+  const [birthdateError, setBirthdateError] = useState<string | undefined>(undefined);
+  const [genderError, setGenderError] = useState<string | undefined>(undefined);
+  const [roleError, setRoleError] = useState<string | undefined>(undefined);
   const [gender, setGender] = useState<string>('');
   const [roles, setRoles] = useState<string[]>([]);
   const [district, setDistrict] = useState('');
@@ -150,23 +155,22 @@ export default function SignupScreen() {
     setFullNameError(undefined);
     setPhoneError(undefined);
     setNIDError(undefined);
-    // basic required fields
-    if (
-      !fullName ||
-      !phone ||
-      !district ||
-      !sector ||
-      !birthdate ||
-      !hospital
-    ) {
-      if (!fullName) setFullNameError(t('fieldRequired') || 'Required');
-      if (!phone) setPhoneError(t('fieldRequired') || 'Required');
-      if (!district || !sector || !birthdate || !hospital) {
-        Alert.alert(t('error'), t('fillRequired'));
-      }
-      return;
+    setDistrictError(undefined);
+    setSectorError(undefined);
+    setHospitalError(undefined);
+    setBirthdateError(undefined);
+    setGenderError(undefined);
+    setRoleError(undefined);
+
+    // Validate every field up front so all applicable errors show at once,
+    // rather than bailing out on the first failing field and hiding the rest.
+    let hasError = false;
+
+    if (!fullName) {
+      setFullNameError(t('nameRequired'));
+      hasError = true;
     }
-    // validate phone (Rwanda rules)
+
     const cleanedPhone = phone.replace(/\D/g, '');
     const localPrefixes = ['078', '079', '072', '073'];
     const intlPrefixes = localPrefixes.map((p) => '250' + p.slice(1));
@@ -176,18 +180,51 @@ export default function SignupScreen() {
     const validIntl =
       cleanedPhone.length === 12 &&
       intlPrefixes.some((p) => cleanedPhone.startsWith(p));
-    const validPhone = validLocal || validIntl;
-    if (!validPhone) {
+    if (!phone) {
+      setPhoneError(t('phoneRequired'));
+      hasError = true;
+    } else if (!(validLocal || validIntl)) {
       setPhoneError(t('invalidPhone'));
-      return;
+      hasError = true;
     }
-    // validate NID
-    const cleanedNID = (NID || '').toString().trim();
+
     // Rwanda NID: 16 digits, starts with 1
-    if (cleanedNID.length !== 16 || !/^1\d{15}$/.test(cleanedNID)) {
+    const cleanedNID = (NID || '').toString().trim();
+    if (!cleanedNID) {
+      setNIDError(t('nidRequired'));
+      hasError = true;
+    } else if (cleanedNID.length !== 16 || !/^1\d{15}$/.test(cleanedNID)) {
       setNIDError(t('invalidNID'));
-      return;
+      hasError = true;
     }
+
+    if (!district) {
+      setDistrictError(t('districtRequired'));
+      hasError = true;
+    }
+    if (!sector) {
+      setSectorError(t('sectorRequired'));
+      hasError = true;
+    }
+    if (!hospital) {
+      setHospitalError(t('hospitalRequired'));
+      hasError = true;
+    }
+    if (!birthdate) {
+      setBirthdateError(t('birthdateRequired'));
+      hasError = true;
+    }
+    if (!gender) {
+      setGenderError(t('genderRequired'));
+      hasError = true;
+    }
+    if (!roles || roles.length === 0) {
+      setRoleError(t('roleRequired'));
+      hasError = true;
+    }
+
+    if (hasError) return;
+
     let sendPhone = cleanedPhone;
     if (cleanedPhone.startsWith('250') && cleanedPhone.length >= 11) {
       sendPhone = '0' + cleanedPhone.slice(3);
@@ -292,7 +329,10 @@ export default function SignupScreen() {
                   },
                 ]}
                 value={gender}
-                onChange={(val) => setGender(val as string)}
+                onChange={(val) => {
+                  setGender(val as string);
+                  setGenderError(undefined);
+                }}
                 placeholder={t('signup.gender.label')}
                 icon={
                   <User
@@ -303,6 +343,7 @@ export default function SignupScreen() {
                 multiple={false}
                 showIcons
                 labelColor="#d1d5db"
+                error={genderError}
               />
             </View>
 
@@ -314,14 +355,16 @@ export default function SignupScreen() {
                   { id: 'TESTER', label: t('roles.tester') || 'Tester' },
                 ]}
                 value={roles}
-                onChange={(val) =>
+                onChange={(val) => {
                   setRoles(
                     Array.isArray(val) ? (val as string[]) : [val as string],
-                  )
-                }
+                  );
+                  setRoleError(undefined);
+                }}
                 placeholder={t('signup.role.placeholder') || 'Select role'}
                 multiple={false}
                 labelColor="#d1d5db"
+                error={roleError}
               />
             </View>
           </View>
@@ -379,7 +422,7 @@ export default function SignupScreen() {
                   paddingVertical: 12,
                   borderRadius: 12,
                   borderWidth: 1,
-                  borderColor: (themeColors as any).cardSubtitle ?? (isDark ? '#374151' : '#d1d5db'),
+                  borderColor: birthdateError ? '#ef4444' : ((themeColors as any).cardSubtitle ?? (isDark ? '#374151' : '#d1d5db')),
                   backgroundColor: (themeColors as any).cardBg ?? (isDark ? '#111827' : '#ffffff'),
                 }}
                 onPress={() => setShowDatePicker(true)}
@@ -401,6 +444,9 @@ export default function SignupScreen() {
                   {birthdate || 'YYYY-MM-DD'}
                 </Text>
               </TouchableOpacity>
+              {birthdateError ? (
+                <Text style={{ color: '#ef4444', marginTop: 6, fontSize: 12 }}>{birthdateError}</Text>
+              ) : null}
               <DatePickerModal
                 visible={showDatePicker}
                 value={birthDateObj || new Date(1990, 0, 1)}
@@ -410,6 +456,7 @@ export default function SignupScreen() {
                   const m = String(selectedDate.getMonth() + 1).padStart(2, '0');
                   const d = String(selectedDate.getDate()).padStart(2, '0');
                   setBirthdate(`${y}-${m}-${d}`);
+                  setBirthdateError(undefined);
                   setShowDatePicker(false);
                 }}
                 onCancel={() => setShowDatePicker(false)}
@@ -430,6 +477,7 @@ export default function SignupScreen() {
                 onChange={(val) => {
                   const v = val as string;
                   setDistrict(v);
+                  setDistrictError(undefined);
                   setSector('');
                   setCell('');
                   setVillage('');
@@ -468,6 +516,7 @@ export default function SignupScreen() {
                 }
                 multiple={false}
                 labelColor="#d1d5db"
+                error={districtError}
                 // searchable={true}
               />
             </View>
@@ -479,6 +528,7 @@ export default function SignupScreen() {
                 onChange={(val) => {
                   const v = val as string;
                   setSector(v);
+                  setSectorError(undefined);
                   setCell('');
                   setVillage('');
                   // find sector object across provinces/districts
@@ -514,6 +564,7 @@ export default function SignupScreen() {
                 }
                 multiple={false}
                 labelColor="#d1d5db"
+                error={sectorError}
                 // searchable={true}
               />
             </View>
@@ -605,7 +656,10 @@ export default function SignupScreen() {
               label={t('signup.hospital') || 'Hospital'}
               items={hospitalOptions}
               value={hospital}
-              onChange={(val) => setHospital(val as string)}
+              onChange={(val) => {
+                setHospital(val as string);
+                setHospitalError(undefined);
+              }}
               placeholder={
                 hospitalOptions.length
                   ? t('signup.hospital.placeholder') || 'Select hospital'
@@ -613,6 +667,7 @@ export default function SignupScreen() {
               }
               multiple={false}
               labelColor="#d1d5db"
+              error={hospitalError}
             />
           </View>
 

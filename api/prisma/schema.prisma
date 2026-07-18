@@ -25,7 +25,8 @@ model User {
   createdAt          DateTime       @default(now())
   updatedAt          DateTime       @updatedAt
   otp                String?
-  otpExpiresAt       DateTime? 
+  otpExpiresAt       DateTime?
+  lastLoginAt        DateTime?
   photo              String         @default("https://img.freepik.com/premium-vector/user-profile-icon-flat-style-member-avatar-vector-illustration-isolated-background-human-permission-sign-business-concept_157943-15752.jpg")
   video              String?
   audio              String?
@@ -74,6 +75,13 @@ model User {
   meetingAttendance       MeetingAttendance[]
   settings                UserSettings?
   onboardingProgress      OnboardingProgress[]
+  loginEvents             LoginEvent[]
+  sessions                UserSession[]
+
+  // Mute / Block Relations
+  conversationMutes       ConversationMute[] @relation("ConversationMutes")
+  blockedUsers            UserBlock[] @relation("UserBlocksInitiated")
+  blockedByUsers          UserBlock[] @relation("UserBlocksReceived")
 }
 
 model UserSettings {
@@ -101,6 +109,28 @@ model OnboardingProgress {
 
   @@unique([userId, tourKey])
   @@index([userId])
+}
+
+model LoginEvent {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  method    String   // "password" | "otp" | "id_phone"
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model UserSession {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courseId   String?
+  startedAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([courseId])
 }
 
 model Hospital {
@@ -409,10 +439,10 @@ model Slide {
   note             String?
   description      String?
   slideNumber      Int
-  file             String?      
+  file             String?
   pageTexts        String?
   narrationPages   String?
-  ocrStatus        String?
+  ocrStatus        String?      
   isPublished      Boolean     @default(true)
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
@@ -1131,6 +1161,35 @@ model SavedCommunityPost {
 
   @@unique([userId, postId])
   @@map("saved_community_posts")
+}
+
+model ConversationMute {
+  id               String   @id @default(uuid())
+  userId           String
+  conversationType String   // "direct" | "group" | "community"
+  conversationId   String
+  mutedAt          DateTime @default(now())
+
+  user             User     @relation("ConversationMutes", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, conversationType, conversationId])
+  @@index([userId])
+  @@map("conversation_mutes")
+}
+
+model UserBlock {
+  id        String   @id @default(uuid())
+  blockerId String
+  blockedId String
+  createdAt DateTime @default(now())
+
+  blocker   User     @relation("UserBlocksInitiated", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked   User     @relation("UserBlocksReceived", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedId])
+  @@index([blockerId])
+  @@index([blockedId])
+  @@map("user_blocks")
 }
 
 model FiredReminder {

@@ -10,6 +10,7 @@ import axios from "axios";
 import QRCode from "qrcode";
 import sharp from "sharp";
 import { NotificationHelper } from "../utils/notificationHelper";
+import { PROVINCE_DISTRICTS } from "./courseService";
 
 export class CertificateService {
   // Helper: Format date to Kinyarwanda format
@@ -299,7 +300,6 @@ export class CertificateService {
     return lastCompletedSlide?.updatedAt || null;
   }
 
-
   // ── Template-based certificate generation ─────────────────────────────────
 
   // PDF page size (points at 72 dpi — standard US Letter landscape)
@@ -310,39 +310,43 @@ export class CertificateService {
   private static readonly EDITOR_H = 816;
 
   private static readonly TOKEN_KEY_MAP: Record<string, string> = {
-    "cert-code":       "{{certificateCode}}",
-    "date":            "{{currentDate}}",
-    "course-name":     "{{courseName}}",
-    "details":         "{{courseDetails}}",
-    "progress":        "{{progress}}",
-    "duration":        "{{courseDuration}}",
-    "start-date":      "{{startDate}}",
-    "end-date":        "{{endDate}}",
-    "student-name":    "{{studentName}}",
-    "student-code":    "{{studentCode}}",
+    "cert-code": "{{certificateCode}}",
+    date: "{{currentDate}}",
+    "course-name": "{{courseName}}",
+    details: "{{courseDetails}}",
+    progress: "{{progress}}",
+    duration: "{{courseDuration}}",
+    "start-date": "{{startDate}}",
+    "end-date": "{{endDate}}",
+    "student-name": "{{studentName}}",
+    "student-code": "{{studentCode}}",
     "instructor-name": "{{instructorName}}",
   };
 
   // Fallback: match by display-label text for templates saved before tokenKey was persisted
   private static readonly TEXT_LABEL_MAP: Record<string, string> = {
-    "Certificate Code":  "{{certificateCode}}",
-    "Current Date":      "{{currentDate}}",
-    "-Course name-":     "{{courseName}}",
-    "-Details-":         "{{courseDetails}}",
-    "-Progress-":        "{{progress}}",
-    "-Duration-":        "{{courseDuration}}",
-    "-Start Date-":      "{{startDate}}",
-    "-End Date-":        "{{endDate}}",
-    "-Student name-":    "{{studentName}}",
-    "-Student code-":    "{{studentCode}}",
+    "Certificate Code": "{{certificateCode}}",
+    "Current Date": "{{currentDate}}",
+    "-Course name-": "{{courseName}}",
+    "-Details-": "{{courseDetails}}",
+    "-Progress-": "{{progress}}",
+    "-Duration-": "{{courseDuration}}",
+    "-Start Date-": "{{startDate}}",
+    "-End Date-": "{{endDate}}",
+    "-Student name-": "{{studentName}}",
+    "-Student code-": "{{studentCode}}",
     "-Instructor name-": "{{instructorName}}",
   };
 
   private static hexToRgb(hex: string): { r: number; g: number; b: number } {
-    const clean  = hex.replace("#", "");
-    const full   = clean.length === 3
-      ? clean.split("").map((c) => c + c).join("")
-      : clean;
+    const clean = hex.replace("#", "");
+    const full =
+      clean.length === 3
+        ? clean
+            .split("")
+            .map((c) => c + c)
+            .join("")
+        : clean;
     return {
       r: parseInt(full.slice(0, 2), 16) / 255,
       g: parseInt(full.slice(2, 4), 16) / 255,
@@ -354,52 +358,66 @@ export class CertificateService {
     pdfDoc: PDFDocument,
     fontFamily = "",
     fontWeight = "normal",
-    fontStyle  = "normal",
+    fontStyle = "normal",
   ): Promise<PDFFont> {
-    const serif  = /times|georgia|serif/i.test(fontFamily);
-    const mono   = /courier|mono|consolas/i.test(fontFamily);
-    const bold   = fontWeight === "bold" || Number(fontWeight) >= 700;
+    const serif = /times|georgia|serif/i.test(fontFamily);
+    const mono = /courier|mono|consolas/i.test(fontFamily);
+    const bold = fontWeight === "bold" || Number(fontWeight) >= 700;
     const italic = fontStyle === "italic" || fontStyle === "oblique";
     if (mono) {
-      if (bold && italic) return pdfDoc.embedFont(StandardFonts.CourierBoldOblique);
-      if (bold)           return pdfDoc.embedFont(StandardFonts.CourierBold);
-      if (italic)         return pdfDoc.embedFont(StandardFonts.CourierOblique);
+      if (bold && italic)
+        return pdfDoc.embedFont(StandardFonts.CourierBoldOblique);
+      if (bold) return pdfDoc.embedFont(StandardFonts.CourierBold);
+      if (italic) return pdfDoc.embedFont(StandardFonts.CourierOblique);
       return pdfDoc.embedFont(StandardFonts.Courier);
     }
     if (serif) {
-      if (bold && italic) return pdfDoc.embedFont(StandardFonts.TimesRomanBoldItalic);
-      if (bold)           return pdfDoc.embedFont(StandardFonts.TimesRomanBold);
-      if (italic)         return pdfDoc.embedFont(StandardFonts.TimesRomanItalic);
+      if (bold && italic)
+        return pdfDoc.embedFont(StandardFonts.TimesRomanBoldItalic);
+      if (bold) return pdfDoc.embedFont(StandardFonts.TimesRomanBold);
+      if (italic) return pdfDoc.embedFont(StandardFonts.TimesRomanItalic);
       return pdfDoc.embedFont(StandardFonts.TimesRoman);
     }
-    if (bold && italic) return pdfDoc.embedFont(StandardFonts.HelveticaBoldOblique);
-    if (bold)           return pdfDoc.embedFont(StandardFonts.HelveticaBold);
-    if (italic)         return pdfDoc.embedFont(StandardFonts.HelveticaOblique);
+    if (bold && italic)
+      return pdfDoc.embedFont(StandardFonts.HelveticaBoldOblique);
+    if (bold) return pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    if (italic) return pdfDoc.embedFont(StandardFonts.HelveticaOblique);
     return pdfDoc.embedFont(StandardFonts.Helvetica);
   }
 
-  private static parseColor(fill: unknown): { r: number; g: number; b: number } {
-    if (typeof fill === "string" && fill.startsWith("#")) return this.hexToRgb(fill);
+  private static parseColor(fill: unknown): {
+    r: number;
+    g: number;
+    b: number;
+  } {
+    if (typeof fill === "string" && fill.startsWith("#"))
+      return this.hexToRgb(fill);
     return { r: 0, g: 0, b: 0 };
   }
 
-  static async previewTemplate(canvasJson: Record<string, unknown>): Promise<Buffer> {
+  static async previewTemplate(
+    canvasJson: Record<string, unknown>,
+  ): Promise<Buffer> {
     const mockTokenValues: Record<string, string> = {
-      "{{studentName}}":     "John Doe",
+      "{{studentName}}": "John Doe",
       "{{certificateCode}}": "CHW-2026-001234",
-      "{{currentDate}}":     this.formatDateToKinyarwanda(new Date()),
-      "{{courseName}}":      "Community Health Worker Training",
-      "{{courseDetails}}":   "Advanced Community Health Worker Program",
-      "{{progress}}":        "100%",
-      "{{courseDuration}}":  "12 Weeks",
-      "{{startDate}}":       "01 Mutarama 2026",
-      "{{endDate}}":         this.formatDateToKinyarwanda(new Date()),
-      "{{studentCode}}":     "STU-2026-001",
-      "{{instructorName}}":  "Dr. Jane Smith",
+      "{{currentDate}}": this.formatDateToKinyarwanda(new Date()),
+      "{{courseName}}": "Community Health Worker Training",
+      "{{courseDetails}}": "Advanced Community Health Worker Program",
+      "{{progress}}": "100%",
+      "{{courseDuration}}": "12 Weeks",
+      "{{startDate}}": "01 Mutarama 2026",
+      "{{endDate}}": this.formatDateToKinyarwanda(new Date()),
+      "{{studentCode}}": "STU-2026-001",
+      "{{instructorName}}": "Dr. Jane Smith",
     };
     // Use a fixed placeholder UUID so the QR code encodes a consistent preview URL
     const mockCertId = "00000000-preview-mock-cert-000000000000";
-    return this.generateCertificateFromTemplate(canvasJson, mockTokenValues, mockCertId);
+    return this.generateCertificateFromTemplate(
+      canvasJson,
+      mockTokenValues,
+      mockCertId,
+    );
   }
 
   private static async generateCertificateFromTemplate(
@@ -421,26 +439,34 @@ export class CertificateService {
     };
 
     for (const obj of json.objects ?? []) {
-      const token    = obj.token    as string | undefined;
+      const token = obj.token as string | undefined;
       const tokenKey = obj.tokenKey as string | undefined;
-      const objText  = obj.text     as string | undefined;
+      const objText = obj.text as string | undefined;
       const value =
-        (token    ? tokenValues[token]                                         : undefined) ??
-        (tokenKey ? tokenValues[this.TOKEN_KEY_MAP[tokenKey] ?? ""]            : undefined) ??
-        (objText  ? tokenValues[this.TEXT_LABEL_MAP[objText] ?? ""]            : undefined);
+        (token ? tokenValues[token] : undefined) ??
+        (tokenKey
+          ? tokenValues[this.TOKEN_KEY_MAP[tokenKey] ?? ""]
+          : undefined) ??
+        (objText ? tokenValues[this.TEXT_LABEL_MAP[objText] ?? ""] : undefined);
       if (value !== undefined) {
         obj.text = value;
       }
     }
 
     const pdfDoc = await PDFDocument.create();
-    const page   = pdfDoc.addPage([W, H]);
+    const page = pdfDoc.addPage([W, H]);
 
     // Background colour
     const bgColor = (json.background ?? "#ffffff").toString();
     if (bgColor && bgColor !== "#ffffff" && bgColor.startsWith("#")) {
       const { r, g, b } = this.hexToRgb(bgColor);
-      page.drawRectangle({ x: 0, y: 0, width: W, height: H, color: rgb(r, g, b) });
+      page.drawRectangle({
+        x: 0,
+        y: 0,
+        width: W,
+        height: H,
+        color: rgb(r, g, b),
+      });
     }
 
     // Background image (set via the background image picker in the editor)
@@ -453,7 +479,10 @@ export class CertificateService {
           if (src.startsWith("data:")) {
             imgBytes = Buffer.from(src.split(",")[1], "base64");
           } else {
-            const resp = await axios.get<ArrayBuffer>(src, { responseType: "arraybuffer", timeout: 8000 });
+            const resp = await axios.get<ArrayBuffer>(src, {
+              responseType: "arraybuffer",
+              timeout: 8000,
+            });
             imgBytes = Buffer.from(resp.data);
           }
 
@@ -463,41 +492,49 @@ export class CertificateService {
             const m = src.match(/^data:([^;]+);/);
             mimeType = m?.[1] ?? "";
           } else {
-            if (/\.png(\?|$)/i.test(src))   mimeType = "image/png";
+            if (/\.png(\?|$)/i.test(src)) mimeType = "image/png";
             if (/\.jpe?g(\?|$)/i.test(src)) mimeType = "image/jpeg";
           }
 
           // Convert unsupported formats (WebP, AVIF, GIF…) via sharp, same as object images
           let finalBytes = imgBytes;
-          let finalMime  = mimeType;
-          if (mimeType !== "image/png" && mimeType !== "image/jpeg" && mimeType !== "image/jpg") {
+          let finalMime = mimeType;
+          if (
+            mimeType !== "image/png" &&
+            mimeType !== "image/jpeg" &&
+            mimeType !== "image/jpg"
+          ) {
             finalBytes = await sharp(imgBytes).png().toBuffer();
-            finalMime  = "image/png";
+            finalMime = "image/png";
           }
 
-          const embedded = finalMime === "image/png"
-            ? await pdfDoc.embedPng(finalBytes)
-            : await pdfDoc.embedJpg(finalBytes);
+          const embedded =
+            finalMime === "image/png"
+              ? await pdfDoc.embedPng(finalBytes)
+              : await pdfDoc.embedJpg(finalBytes);
           page.drawImage(embedded, { x: 0, y: 0, width: W, height: H });
         } catch (bgErr) {
-          console.error("[CertificateService] Background image failed to embed:", bgErr);
+          console.error(
+            "[CertificateService] Background image failed to embed:",
+            bgErr,
+          );
         }
       }
     }
 
     for (const obj of json.objects ?? []) {
-      const type    = ((obj.type    as string) ?? "").toLowerCase();
-      const scaleX  = (obj.scaleX  as number) ?? 1;
-      const scaleY  = (obj.scaleY  as number) ?? 1;
+      const type = ((obj.type as string) ?? "").toLowerCase();
+      const scaleX = (obj.scaleX as number) ?? 1;
+      const scaleY = (obj.scaleY as number) ?? 1;
       const opacity = (obj.opacity as number) ?? 1;
-      const angle   = (obj.angle   as number) ?? 0;
+      const angle = (obj.angle as number) ?? 0;
       const originX = (obj.originX as string) ?? "left";
       const originY = (obj.originY as string) ?? "top";
 
-      const rawLeft = (obj.left   as number) ?? 0;
-      const rawTop  = (obj.top    as number) ?? 0;
-      const rawW    = (obj.width  as number) ?? 0;
-      const rawH    = (obj.height as number) ?? 0;
+      const rawLeft = (obj.left as number) ?? 0;
+      const rawTop = (obj.top as number) ?? 0;
+      const rawW = (obj.width as number) ?? 0;
+      const rawH = (obj.height as number) ?? 0;
 
       // Display dimensions in canvas units (before PDF scaling)
       const displayW = rawW * scaleX;
@@ -505,12 +542,14 @@ export class CertificateService {
 
       // Convert stored position → PDF left/top edge, accounting for Fabric's
       // default originX/originY='center' (left/top store the center, not the corner).
-      const left = originX === "center"
-        ? (rawLeft - displayW / 2) * xRatio
-        : rawLeft * xRatio;
-      const top  = originY === "center"
-        ? (rawTop - displayH / 2) * yRatio
-        : rawTop * yRatio;
+      const left =
+        originX === "center"
+          ? (rawLeft - displayW / 2) * xRatio
+          : rawLeft * xRatio;
+      const top =
+        originY === "center"
+          ? (rawTop - displayH / 2) * yRatio
+          : rawTop * yRatio;
 
       // Skip rotated objects — coordinate maths become complex
       if (Math.abs(angle) > 1) continue;
@@ -529,10 +568,23 @@ export class CertificateService {
             color: { dark: "#000000", light: "#ffffff" },
           });
           const qrImage = await pdfDoc.embedPng(qrPng);
-          page.drawImage(qrImage, { x: left, y: H - top - h, width: w, height: h, opacity });
+          page.drawImage(qrImage, {
+            x: left,
+            y: H - top - h,
+            width: w,
+            height: h,
+            opacity,
+          });
         } catch {
           // fallback: plain grey square
-          page.drawRectangle({ x: left, y: H - top - h, width: w, height: h, color: rgb(0.9, 0.9, 0.9), opacity });
+          page.drawRectangle({
+            x: left,
+            y: H - top - h,
+            width: w,
+            height: h,
+            color: rgb(0.9, 0.9, 0.9),
+            opacity,
+          });
         }
         continue;
       }
@@ -542,8 +594,10 @@ export class CertificateService {
         const h = displayH * yRatio;
         const { r, g, b } = this.parseColor(obj.fill);
         page.drawRectangle({
-          x: left, y: H - top - h,
-          width: w, height: h,
+          x: left,
+          y: H - top - h,
+          width: w,
+          height: h,
           color: rgb(r, g, b),
           opacity,
         });
@@ -552,31 +606,42 @@ export class CertificateService {
           const sw = ((obj.strokeWidth as number) ?? 1) * yRatio;
           const sc = this.parseColor(obj.stroke);
           page.drawRectangle({
-            x: left, y: H - top - h,
-            width: w, height: h,
+            x: left,
+            y: H - top - h,
+            width: w,
+            height: h,
             borderColor: rgb(sc.r, sc.g, sc.b),
             borderWidth: sw,
             opacity,
           });
         }
-      } else if (type === "i-text" || type === "itext" || type === "textbox" || type === "text") {
-        const text       = (obj.text       as string)  ?? "";
-        const fontSize   = ((obj.fontSize  as number)  ?? 16) * scaleY * yRatio;
-        const fontFamily =  (obj.fontFamily as string) ?? "";
-        const fontWeight =  (obj.fontWeight as string) ?? "normal";
-        const fontStyle  =  (obj.fontStyle  as string) ?? "normal";
-        const textAlign  =  (obj.textAlign  as string) ?? "left";
+      } else if (
+        type === "i-text" ||
+        type === "itext" ||
+        type === "textbox" ||
+        type === "text"
+      ) {
+        const text = (obj.text as string) ?? "";
+        const fontSize = ((obj.fontSize as number) ?? 16) * scaleY * yRatio;
+        const fontFamily = (obj.fontFamily as string) ?? "";
+        const fontWeight = (obj.fontWeight as string) ?? "normal";
+        const fontStyle = (obj.fontStyle as string) ?? "normal";
+        const textAlign = (obj.textAlign as string) ?? "left";
         const { r, g, b } = this.parseColor(obj.fill);
 
         if (!text) continue;
 
-        const font = await this.getPdfFont(pdfDoc, fontFamily, fontWeight, fontStyle);
+        const font = await this.getPdfFont(
+          pdfDoc,
+          fontFamily,
+          fontWeight,
+          fontStyle,
+        );
         const objW = displayW * xRatio;
 
         // When originX='center', rawLeft IS the center x in canvas units → PDF center x
-        const boxCenterX = originX === "center"
-          ? rawLeft * xRatio
-          : left + objW / 2;
+        const boxCenterX =
+          originX === "center" ? rawLeft * xRatio : left + objW / 2;
 
         let tw = font.widthOfTextAtSize(text, fontSize);
         let finalFontSize = fontSize;
@@ -585,7 +650,10 @@ export class CertificateService {
         const pageMargin = 8;
         if (textAlign === "center") {
           const half = tw / 2;
-          const maxHalf = Math.min(boxCenterX - pageMargin, W - boxCenterX - pageMargin);
+          const maxHalf = Math.min(
+            boxCenterX - pageMargin,
+            W - boxCenterX - pageMargin,
+          );
           if (half > maxHalf && maxHalf > 0) {
             finalFontSize = fontSize * (maxHalf / half) * 0.95;
             tw = font.widthOfTextAtSize(text, finalFontSize);
@@ -618,8 +686,10 @@ export class CertificateService {
         const drawY = H - top - finalFontSize * 0.72;
 
         page.drawText(text, {
-          x: drawX, y: drawY,
-          size: finalFontSize, font,
+          x: drawX,
+          y: drawY,
+          size: finalFontSize,
+          font,
           color: rgb(r, g, b),
           opacity,
         });
@@ -634,8 +704,11 @@ export class CertificateService {
             const base64 = src.split(",")[1];
             imgBytes = Buffer.from(base64, "base64");
           } else {
-            const resp = await axios.get<ArrayBuffer>(src, { responseType: "arraybuffer", timeout: 8000 });
-            imgBytes   = Buffer.from(resp.data);
+            const resp = await axios.get<ArrayBuffer>(src, {
+              responseType: "arraybuffer",
+              timeout: 8000,
+            });
+            imgBytes = Buffer.from(resp.data);
           }
 
           // Detect MIME type from data URL prefix; fall back to extension hints
@@ -644,37 +717,71 @@ export class CertificateService {
             const m = src.match(/^data:([^;]+);/);
             mimeType = m?.[1] ?? "";
           } else {
-            if (/\.png(\?|$)/i.test(src))  mimeType = "image/png";
+            if (/\.png(\?|$)/i.test(src)) mimeType = "image/png";
             if (/\.jpe?g(\?|$)/i.test(src)) mimeType = "image/jpeg";
           }
 
           // Convert unsupported formats (WebP, AVIF, GIF…) to PNG via sharp
           let finalBytes = imgBytes;
-          let finalMime  = mimeType;
-          if (mimeType !== "image/png" && mimeType !== "image/jpeg" && mimeType !== "image/jpg") {
+          let finalMime = mimeType;
+          if (
+            mimeType !== "image/png" &&
+            mimeType !== "image/jpeg" &&
+            mimeType !== "image/jpg"
+          ) {
             try {
               finalBytes = await sharp(imgBytes).png().toBuffer();
-              finalMime  = "image/png";
+              finalMime = "image/png";
             } catch (convErr) {
-              console.error(`[CertificateService] sharp could not convert MIME "${mimeType}":`, convErr);
-              page.drawRectangle({ x: left, y: H - top - h, width: w, height: h, color: rgb(0.85, 0.85, 0.85), opacity });
+              console.error(
+                `[CertificateService] sharp could not convert MIME "${mimeType}":`,
+                convErr,
+              );
+              page.drawRectangle({
+                x: left,
+                y: H - top - h,
+                width: w,
+                height: h,
+                color: rgb(0.85, 0.85, 0.85),
+                opacity,
+              });
               continue;
             }
           }
 
           let embedded;
           try {
-            embedded = finalMime === "image/png"
-              ? await pdfDoc.embedPng(finalBytes)
-              : await pdfDoc.embedJpg(finalBytes);
+            embedded =
+              finalMime === "image/png"
+                ? await pdfDoc.embedPng(finalBytes)
+                : await pdfDoc.embedJpg(finalBytes);
           } catch (embedErr) {
-            console.error(`[CertificateService] Cannot embed image (MIME "${finalMime}"):`, embedErr);
-            page.drawRectangle({ x: left, y: H - top - h, width: w, height: h, color: rgb(0.85, 0.85, 0.85), opacity });
+            console.error(
+              `[CertificateService] Cannot embed image (MIME "${finalMime}"):`,
+              embedErr,
+            );
+            page.drawRectangle({
+              x: left,
+              y: H - top - h,
+              width: w,
+              height: h,
+              color: rgb(0.85, 0.85, 0.85),
+              opacity,
+            });
             continue;
           }
-          page.drawImage(embedded, { x: left, y: H - top - h, width: w, height: h, opacity });
+          page.drawImage(embedded, {
+            x: left,
+            y: H - top - h,
+            width: w,
+            height: h,
+            opacity,
+          });
         } catch (fetchErr) {
-          console.error(`[CertificateService] Failed to fetch/decode image:`, fetchErr);
+          console.error(
+            `[CertificateService] Failed to fetch/decode image:`,
+            fetchErr,
+          );
         }
       }
     }
@@ -703,9 +810,16 @@ export class CertificateService {
     const existing = await prisma.certificate.findUnique({
       where: { studentId_courseId: { studentId, courseId } },
     });
-    if (existing) throw new AppError("Certificate already exists for this student and course", 400);
+    if (existing)
+      throw new AppError(
+        "Certificate already exists for this student and course",
+        400,
+      );
 
-    const completionDate = await this.getFirstFinalExamPassDate(studentId, courseId);
+    const completionDate = await this.getFirstFinalExamPassDate(
+      studentId,
+      courseId,
+    );
 
     const courseProgress = await prisma.courseProgress.findFirst({
       where: { studentId, courseId },
@@ -718,17 +832,19 @@ export class CertificateService {
     const certDisplayCode = `CHW-${certYear}-${certShort}`;
 
     const tokenValues: Record<string, string> = {
-      "{{studentName}}":     student.user.fullNames,
+      "{{studentName}}": student.user.fullNames,
       "{{certificateCode}}": certDisplayCode,
-      "{{currentDate}}":     this.formatDateToKinyarwanda(new Date()),
-      "{{courseName}}":      course.title,
-      "{{courseDetails}}":   course.description ?? "",
-      "{{progress}}":        `${Math.round(courseProgress?.progress ?? 100)}%`,
-      "{{startDate}}":       courseProgress ? this.formatDateToKinyarwanda(courseProgress.createdAt) : "",
-      "{{endDate}}":         this.formatDateToKinyarwanda(completionDate),
-      "{{studentCode}}":     studentId.slice(0, 8).toUpperCase(),
-      "{{instructorName}}":  course.staff?.user?.fullNames ?? "",
-      "{{courseDuration}}":  "",
+      "{{currentDate}}": this.formatDateToKinyarwanda(new Date()),
+      "{{courseName}}": course.title,
+      "{{courseDetails}}": course.description ?? "",
+      "{{progress}}": `${Math.round(courseProgress?.progress ?? 100)}%`,
+      "{{startDate}}": courseProgress
+        ? this.formatDateToKinyarwanda(courseProgress.createdAt)
+        : "",
+      "{{endDate}}": this.formatDateToKinyarwanda(completionDate),
+      "{{studentCode}}": studentId.slice(0, 8).toUpperCase(),
+      "{{instructorName}}": course.staff?.user?.fullNames ?? "",
+      "{{courseDuration}}": "",
     };
 
     return {
@@ -752,8 +868,15 @@ export class CertificateService {
     base64Pdf: string,
     io?: any,
   ) {
-    const existing = await prisma.certificate.findUnique({ where: { id: certId } });
-    if (existing) return { statusCode: 200, message: "Certificate already stored", data: existing };
+    const existing = await prisma.certificate.findUnique({
+      where: { id: certId },
+    });
+    if (existing)
+      return {
+        statusCode: 200,
+        message: "Certificate already stored",
+        data: existing,
+      };
 
     const student = await prisma.student.findUnique({
       where: { id: studentId },
@@ -767,7 +890,9 @@ export class CertificateService {
     });
     if (!course) throw new AppError("Course not found", 404);
 
-    const base64Data = base64Pdf.includes(",") ? base64Pdf.split(",")[1] : base64Pdf;
+    const base64Data = base64Pdf.includes(",")
+      ? base64Pdf.split(",")[1]
+      : base64Pdf;
     const pdfBuffer = Buffer.from(base64Data, "base64");
 
     const fileName = `certificate_${studentId}_${courseId}_${Date.now()}`;
@@ -780,21 +905,37 @@ export class CertificateService {
     if (io && student.user.id) {
       try {
         await NotificationHelper.sendToUser(
-          io, student.user.id,
+          io,
+          student.user.id,
           `Icyemezo cyawe cyatanzwe: "${course.title}"`,
           `Icyemezo cyawe kirateguwe. Basura ahabigenewe urebe PDF yawe.`,
-          "success", `/certificate`, "certificate", certificate.id,
-          { courseTitle: course.title, courseId }, 0,
+          "success",
+          `/certificate`,
+          "certificate",
+          certificate.id,
+          { courseTitle: course.title, courseId },
+          0,
         );
       } catch (notifErr) {
-        console.warn("[CertificateService] Certificate notification failed:", notifErr);
+        console.warn(
+          "[CertificateService] Certificate notification failed:",
+          notifErr,
+        );
       }
     }
 
-    return { message: "Certificate stored successfully", statusCode: 201, data: certificate };
+    return {
+      message: "Certificate stored successfully",
+      statusCode: 201,
+      data: certificate,
+    };
   }
 
-  public static async generateCertificate(studentId: string, courseId: string, io?: any) {
+  public static async generateCertificate(
+    studentId: string,
+    courseId: string,
+    io?: any,
+  ) {
     // Validate student
     const student = await prisma.student.findUnique({
       where: { id: studentId },
@@ -823,11 +964,17 @@ export class CertificateService {
       where: { studentId_courseId: { studentId, courseId } },
     });
     if (existingCertificate) {
-      throw new AppError("Certificate already exists for this student and course", 400);
+      throw new AppError(
+        "Certificate already exists for this student and course",
+        400,
+      );
     }
 
     // Completion date = first time student passed the final exam
-    const completionDate = await this.getFirstFinalExamPassDate(studentId, courseId);
+    const completionDate = await this.getFirstFinalExamPassDate(
+      studentId,
+      courseId,
+    );
 
     // Enrollment date
     const courseProgress = await prisma.courseProgress.findFirst({
@@ -843,22 +990,24 @@ export class CertificateService {
     if (course.certificateTemplate?.canvasJson) {
       // Template-based generation
       // Human-readable display code (e.g. CHW-2026-A3F9C1) — shorter than the raw UUID
-      const certYear        = new Date().getFullYear();
-      const certShort       = certId.replace(/-/g, "").substring(0, 6).toUpperCase();
+      const certYear = new Date().getFullYear();
+      const certShort = certId.replace(/-/g, "").substring(0, 6).toUpperCase();
       const certDisplayCode = `CHW-${certYear}-${certShort}`;
 
       const tokenValues: Record<string, string> = {
-        "{{studentName}}":     student.user.fullNames,
+        "{{studentName}}": student.user.fullNames,
         "{{certificateCode}}": certDisplayCode,
-        "{{currentDate}}":     this.formatDateToKinyarwanda(new Date()),
-        "{{courseName}}":      course.title,
-        "{{courseDetails}}":   course.description ?? "",
-        "{{progress}}":        `${Math.round(courseProgress?.progress ?? 100)}%`,
-        "{{startDate}}":       courseProgress ? this.formatDateToKinyarwanda(courseProgress.createdAt) : "",
-        "{{endDate}}":         this.formatDateToKinyarwanda(completionDate),
-        "{{studentCode}}":     studentId.slice(0, 8).toUpperCase(),
-        "{{instructorName}}":  course.staff?.user?.fullNames ?? "",
-        "{{courseDuration}}":  "",
+        "{{currentDate}}": this.formatDateToKinyarwanda(new Date()),
+        "{{courseName}}": course.title,
+        "{{courseDetails}}": course.description ?? "",
+        "{{progress}}": `${Math.round(courseProgress?.progress ?? 100)}%`,
+        "{{startDate}}": courseProgress
+          ? this.formatDateToKinyarwanda(courseProgress.createdAt)
+          : "",
+        "{{endDate}}": this.formatDateToKinyarwanda(completionDate),
+        "{{studentCode}}": studentId.slice(0, 8).toUpperCase(),
+        "{{instructorName}}": course.staff?.user?.fullNames ?? "",
+        "{{courseDuration}}": "",
       };
       pdfBuffer = await this.generateCertificateFromTemplate(
         course.certificateTemplate.canvasJson as Record<string, unknown>,
@@ -876,7 +1025,7 @@ export class CertificateService {
 
     // Upload PDF to Cloudinary
     const fileName = `certificate_${studentId}_${courseId}_${Date.now()}`;
-    const pdfUrl   = await this.uploadPdfToCloudinary(pdfBuffer, fileName);
+    const pdfUrl = await this.uploadPdfToCloudinary(pdfBuffer, fileName);
 
     // Save certificate to database using the pre-generated ID
     const certificate = await prisma.certificate.create({
@@ -899,7 +1048,10 @@ export class CertificateService {
           0,
         );
       } catch (notifErr) {
-        console.warn("[CertificateService] Certificate notification failed:", notifErr);
+        console.warn(
+          "[CertificateService] Certificate notification failed:",
+          notifErr,
+        );
       }
     }
 
@@ -922,20 +1074,37 @@ export class CertificateService {
     courseId?: string,
     dateFrom?: string,
     dateTo?: string,
+    district?: string,
+    province?: string,
+    gender?: string,
+    role?: string,
+    year?: string,
+    month?: string,
+    hospitalId?: string,
   ) {
     const where: Prisma.CertificateWhereInput = {};
 
     if (templateId) {
-      const linkedCourses = await prisma.course.findMany({
-        where: { certificateTemplateId: templateId },
-        select: { id: true },
-      });
-      where.courseId = { in: linkedCourses.map((c) => c.id) };
+      where.course = { certificateTemplateId: templateId };
     }
 
     if (courseId) {
       where.courseId = courseId;
     }
+
+    const districtList = district
+      ? [district]
+      : province
+        ? (PROVINCE_DISTRICTS[province] ?? [])
+        : [];
+    const userFilter: Prisma.UserWhereInput = {};
+    if (districtList.length > 0) userFilter.district = { in: districtList };
+    if (gender) userFilter.gender = gender;
+    if (hospitalId) userFilter.hospitalId = hospitalId;
+    const studentFilter: Prisma.StudentWhereInput = {};
+    if (Object.keys(userFilter).length > 0) studentFilter.user = userFilter;
+    if (role) studentFilter.role = role as Prisma.StudentWhereInput["role"];
+    if (Object.keys(studentFilter).length > 0) where.student = studentFilter;
 
     if (dateFrom || dateTo) {
       const createdAtFilter: Prisma.DateTimeFilter = {};
@@ -946,6 +1115,33 @@ export class CertificateService {
         createdAtFilter.lte = new Date(`${dateTo}T23:59:59.999Z`);
       }
       where.createdAt = createdAtFilter;
+    } else if (year || month) {
+      const now = new Date();
+      const yearNum = year ? parseInt(year) : now.getFullYear();
+      const monthNames = [
+        "Jan",
+        "Feb",
+        "Mar",
+        "Apr",
+        "May",
+        "Jun",
+        "Jul",
+        "Aug",
+        "Sep",
+        "Oct",
+        "Nov",
+        "Dec",
+      ];
+      const monthIndex = month ? monthNames.indexOf(month) : -1;
+      const start =
+        monthIndex >= 0
+          ? new Date(yearNum, monthIndex, 1)
+          : new Date(yearNum, 0, 1);
+      const end =
+        monthIndex >= 0
+          ? new Date(yearNum, monthIndex + 1, 0, 23, 59, 59)
+          : new Date(yearNum, 11, 31, 23, 59, 59);
+      where.createdAt = { gte: start, lte: end };
     }
 
     if (searchq) {
@@ -1249,7 +1445,10 @@ export class CertificateService {
     });
     if (!course) throw new AppError("Course not found", 404);
 
-    const completionDate = await this.getFirstFinalExamPassDate(studentId, courseId);
+    const completionDate = await this.getFirstFinalExamPassDate(
+      studentId,
+      courseId,
+    );
 
     const courseProgress = await prisma.courseProgress.findFirst({
       where: { studentId, courseId },
@@ -1261,22 +1460,24 @@ export class CertificateService {
     let pdfBuffer: Buffer;
 
     if (course.certificateTemplate?.canvasJson) {
-      const certYear        = new Date(existingCertificate.createdAt).getFullYear();
-      const certShort       = certId.replace(/-/g, "").substring(0, 6).toUpperCase();
+      const certYear = new Date(existingCertificate.createdAt).getFullYear();
+      const certShort = certId.replace(/-/g, "").substring(0, 6).toUpperCase();
       const certDisplayCode = `CHW-${certYear}-${certShort}`;
 
       const tokenValues: Record<string, string> = {
-        "{{studentName}}":     student.user.fullNames,
+        "{{studentName}}": student.user.fullNames,
         "{{certificateCode}}": certDisplayCode,
-        "{{currentDate}}":     this.formatDateToKinyarwanda(new Date()),
-        "{{courseName}}":      course.title,
-        "{{courseDetails}}":   course.description ?? "",
-        "{{progress}}":        `${Math.round(courseProgress?.progress ?? 100)}%`,
-        "{{startDate}}":       courseProgress ? this.formatDateToKinyarwanda(courseProgress.createdAt) : "",
-        "{{endDate}}":         this.formatDateToKinyarwanda(completionDate),
-        "{{studentCode}}":     studentId.slice(0, 8).toUpperCase(),
-        "{{instructorName}}":  course.staff?.user?.fullNames ?? "",
-        "{{courseDuration}}":  "",
+        "{{currentDate}}": this.formatDateToKinyarwanda(new Date()),
+        "{{courseName}}": course.title,
+        "{{courseDetails}}": course.description ?? "",
+        "{{progress}}": `${Math.round(courseProgress?.progress ?? 100)}%`,
+        "{{startDate}}": courseProgress
+          ? this.formatDateToKinyarwanda(courseProgress.createdAt)
+          : "",
+        "{{endDate}}": this.formatDateToKinyarwanda(completionDate),
+        "{{studentCode}}": studentId.slice(0, 8).toUpperCase(),
+        "{{instructorName}}": course.staff?.user?.fullNames ?? "",
+        "{{courseDuration}}": "",
       };
       pdfBuffer = await this.generateCertificateFromTemplate(
         course.certificateTemplate.canvasJson as Record<string, unknown>,
@@ -1295,8 +1496,8 @@ export class CertificateService {
     const oldPublicId = this.extractCloudinaryPublicId(existingCertificate.pdf);
     await cloudinary.uploader.destroy(oldPublicId, { resource_type: "raw" });
 
-    const fileName    = `certificate_${studentId}_${courseId}_${Date.now()}`;
-    const pdfUrl      = await this.uploadPdfToCloudinary(pdfBuffer, fileName);
+    const fileName = `certificate_${studentId}_${courseId}_${Date.now()}`;
+    const pdfUrl = await this.uploadPdfToCloudinary(pdfBuffer, fileName);
 
     const certificate = await prisma.certificate.update({
       where: { id: certificateId },

@@ -19,6 +19,10 @@ interface CertificateCardProps {
   slides: number;
   certificateUrl: string;
   onRegenerate?: () => void;
+  // Wraps a handler so tapping it also advances/dismisses the parent screen's
+  // tour, if active — see hooks/useTourStepAdvance.ts. Optional because this
+  // card is also used outside any tour context.
+  tourAdvance?: (handler: () => void) => () => void;
 }
 
 export function CertificateCard({
@@ -32,6 +36,7 @@ export function CertificateCard({
   slides,
   certificateUrl,
   onRegenerate,
+  tourAdvance,
 }: CertificateCardProps) {
   const [showCertificateModal, setShowCertificateModal] = useState(false);
   const [certificateLoading, setCertificateLoading] = useState(false);
@@ -129,7 +134,7 @@ export function CertificateCard({
   return (
     <TouchableOpacity
       style={styles.card}
-      onPress={() => setShowCertificateModal(true)}
+      onPress={tourAdvance ? tourAdvance(() => setShowCertificateModal(true)) : () => setShowCertificateModal(true)}
     >
       <View style={styles.cardHeader}>
         <View style={styles.iconContainer}>
@@ -160,7 +165,7 @@ export function CertificateCard({
 
       <TouchableOpacity
         style={[styles.regenerateButton, certificateLoading && { opacity: 0.6 }]}
-        onPress={handleRegenerateCertificate}
+        onPress={tourAdvance ? tourAdvance(handleRegenerateCertificate) : handleRegenerateCertificate}
         disabled={certificateLoading}
         activeOpacity={0.8}
       >

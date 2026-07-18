@@ -19,6 +19,13 @@ import CoursePerformanceFeedback from './CoursePerformanceFeedback';
 import PostCourseRecommendationsModal from './PostCourseRecommendationsModal';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useIsFocused } from '@react-navigation/native';
+import { CopilotProvider, CopilotStep, useCopilot } from 'react-native-copilot';
+import { WalkthroughableView, WalkthroughableTouchable } from '@/components/onboarding/walkthroughable';
+import { useTourStepAdvance } from '@/hooks/useTourStepAdvance';
+import MascotTooltip from '@/components/onboarding/MascotTooltip';
+import { onboardingService, scheduleTourStart } from '@/services/onboarding.service';
+import { useOnboarding } from '@/contexts/OnboardingContext';
 
 interface TestComponentProps {
   test: ITest[];
@@ -50,14 +57,14 @@ interface LocalQuestion {
   options: LocalOption[];
 }
 
-const Questionnaire = forwardRef(function Questionnaire({ 
-  test, 
-  currentPage, 
-  firstHeaderSubtitle, 
-  lastHeaderSubtitle, 
-  resultsTitle, 
-  resultsSubtitle, 
-  cheerText, 
+const QuestionnaireContent = forwardRef(function QuestionnaireContent({
+  test,
+  currentPage,
+  firstHeaderSubtitle,
+  lastHeaderSubtitle,
+  resultsTitle,
+  resultsSubtitle,
+  cheerText,
   onComplete,
   handleTestComplete,
   showResultsExternally
@@ -65,6 +72,39 @@ const Questionnaire = forwardRef(function Questionnaire({
   const [showInstructions, setShowInstructions] = useState(true);
   const [showResults, setShowResults] = useState(false);
   const [drawerVisible, setDrawerVisible] = useState(false);
+  const { start, copilotEvents, stop, visible } = useCopilot();
+  // start()'s identity is not stable across CopilotProvider re-renders (the
+  // library doesn't memoize its internal visibility setter, which start
+  // depends on) — reading it through a ref means a re-render before the
+  // scheduled tour fires doesn't cancel it via the effect's cleanup.
+  const startRef = useRef(start);
+  startRef.current = start;
+  const { markComplete } = useOnboarding();
+  const advanceRecommendations = useTourStepAdvance(`${currentPage}-results-recommendations`);
+  const advanceInstructions = useTourStepAdvance(`${currentPage}-instructions-start`);
+  const advanceResultsActions = useTourStepAdvance(`${currentPage}-results-actions`);
+  const advanceQuestionsNav = useTourStepAdvance(`${currentPage}-questions-nav`);
+  const isFocused = useIsFocused();
+  // If the user navigates away (tapping the real highlighted element can
+  // itself trigger navigation, but this also covers back/tab-switch/etc.)
+  // while a tour is visible, its CopilotProvider can stay mounted (stack
+  // navigators often keep the previous screen alive) — without this, the
+  // tour's Modal renders in RN's top-level layer and keeps floating over
+  // whatever screen is now active. Close it on the focus transition.
+  const wasFocusedRef = useRef(isFocused);
+  useEffect(() => {
+    if (wasFocusedRef.current && !isFocused && visible) {
+      stop().catch(() => {});
+    }
+    wasFocusedRef.current = isFocused;
+  }, [isFocused, visible, stop]);
+  // Tracks which dynamic tour key (e.g. "pre-test-instructions") is currently
+  // showing, so the shared 'stop' handler below knows what to mark complete —
+  // only one of the 3 per-page mini-tours is ever mounted/visible at a time.
+  const activeTourKeyRef = useRef<string | null>(null);
+  const instructionsTourAttemptedRef = useRef(false);
+  const questionsTourAttemptedRef = useRef(false);
+  const resultsTourAttemptedRef = useRef(false);
   const { courseId } = useLocalSearchParams();
   const courseIdStr = normalizeCourseId(courseId as string | string[] | undefined);
   const router = useRouter();
@@ -309,6 +349,69 @@ const Questionnaire = forwardRef(function Questionnaire({
     backCtx.registerHandler(handler);
     return () => backCtx.unregisterHandler(handler);
   }, [backCtx, currentQuestionIndex, showResults]);
+
+  // --- Tour: 3 independent single-step callouts, one per page of this
+  // component (Instructions / Questions / Results). These pages are mutually
+  // exclusive conditional returns — never mounted together — so a single
+  // continuous multi-step "Next" tour spanning all 3 isn't possible. Each
+  // callout auto-shows once, the first time its page is reached, tracked
+  // under a tour key computed from `currentPage` (e.g. "pre-test-instructions").
+  // See app/(tabs)/training.tsx for the base pattern this follows.
+  useEffect(() => {
+    let cancelSchedule: (() => void) | null = null;
+    let cancelled = false;
+    if (showInstructions && isFocused && !instructionsTourAttemptedRef.current) {
+      instructionsTourAttemptedRef.current = true;
+      const key = `${currentPage}-instructions`;
+      void (async () => {
+        const done = await onboardingService.hasCompleted(key);
+        if (cancelled || done) return;
+        cancelSchedule = scheduleTourStart(() => { activeTourKeyRef.current = key; startRef.current(); });
+      })();
+    }
+    return () => { cancelled = true; cancelSchedule?.(); };
+  }, [showInstructions, isFocused, currentPage]);
+
+  useEffect(() => {
+    let cancelSchedule: (() => void) | null = null;
+    let cancelled = false;
+    if (!showInstructions && !showResults && questions.length > 0 && isFocused && !questionsTourAttemptedRef.current) {
+      questionsTourAttemptedRef.current = true;
+      const key = `${currentPage}-questions`;
+      void (async () => {
+        const done = await onboardingService.hasCompleted(key);
+        if (cancelled || done) return;
+        cancelSchedule = scheduleTourStart(() => { activeTourKeyRef.current = key; startRef.current(); });
+      })();
+    }
+    return () => { cancelled = true; cancelSchedule?.(); };
+  }, [showInstructions, showResults, questions.length, isFocused, currentPage]);
+
+  useEffect(() => {
+    let cancelSchedule: (() => void) | null = null;
+    let cancelled = false;
+    if (showResults && attemptResult && isFocused && !resultsTourAttemptedRef.current) {
+      resultsTourAttemptedRef.current = true;
+      const key = `${currentPage}-results`;
+      void (async () => {
+        const done = await onboardingService.hasCompleted(key);
+        if (cancelled || done) return;
+        cancelSchedule = scheduleTourStart(() => { activeTourKeyRef.current = key; startRef.current(); });
+      })();
+    }
+    return () => { cancelled = true; cancelSchedule?.(); };
+  }, [showResults, attemptResult, isFocused, currentPage]);
+
+  useEffect(() => {
+    const handleStop = () => {
+      if (activeTourKeyRef.current) {
+        markComplete(activeTourKeyRef.current).catch(() => {});
+        activeTourKeyRef.current = null;
+      }
+    };
+    copilotEvents.on('stop', handleStop);
+    return () => { copilotEvents.off('stop', handleStop); };
+  }, [copilotEvents, markComplete]);
 
   // Question navigation and selection
   const totalQuestions = questions.length;
@@ -689,9 +792,15 @@ const Questionnaire = forwardRef(function Questionnaire({
           <TouchableOpacity style={styles.cancelButton} onPress={() => router.back()}>
             <Text style={styles.cancelButtonText}>Hagarika</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.startButton} onPress={() => setShowInstructions(false)}>
-            <Text style={styles.startButtonText}>Tangira isuzuma</Text>
-          </TouchableOpacity>
+          <CopilotStep
+            text="Soma amabwiriza, hanyuma ukande hano kugira ngo utangire isuzuma."
+            order={1}
+            name={`${currentPage}-instructions-start`}
+          >
+            <WalkthroughableTouchable style={styles.startButton} onPress={advanceInstructions(() => setShowInstructions(false))}>
+              <Text style={styles.startButtonText}>Tangira isuzuma</Text>
+            </WalkthroughableTouchable>
+          </CopilotStep>
         </View>
 
         {courseDetails && (
@@ -819,13 +928,18 @@ const Questionnaire = forwardRef(function Questionnaire({
             </View>
           )}
           
-          <View style={styles.buttonContainer}>
+          <CopilotStep
+            text="Hano ubona ibisubizo byawe. Kanda 'Komeza' kugira ngo ukomeze, cyangwa 'Ongera' niba ushaka kongera kwisuzuma."
+            order={1}
+            name={`${currentPage}-results-actions`}
+          >
+          <WalkthroughableView style={styles.buttonContainer}>
             {isPreTest ? (
               <>
                 {attemptResult.marks < (attemptResult.testInfo?.marksToPass ?? 0) ? (
                   <TouchableOpacity
                     style={[styles.retryButton, { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.18, shadowRadius: 8, elevation: 4, marginBottom: 12 }]}
-                    onPress={handleRetry}
+                    onPress={advanceResultsActions(handleRetry)}
                     activeOpacity={0.85}
                   >
                     <Text style={{ fontSize: 20, color: '#fff', fontWeight: 'bold', marginRight: 8 }}>Ongera</Text>
@@ -834,7 +948,7 @@ const Questionnaire = forwardRef(function Questionnaire({
                 ) : null}
                 <TouchableOpacity
                   style={[styles.continueButton, { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.18, shadowRadius: 8, elevation: 4 }]}
-                  onPress={handleContinue}
+                  onPress={advanceResultsActions(handleContinue)}
                   activeOpacity={0.85}
                 >
                   <Text style={{ fontSize: 20, color: '#fff', fontWeight: 'bold', marginRight: 8 }}>Komeza ku isomo</Text>
@@ -844,29 +958,36 @@ const Questionnaire = forwardRef(function Questionnaire({
             ) : (
               <>
                 {attemptResult.marks >= attemptResult.testInfo?.marksToPass ? (
-                  <TouchableOpacity style={[styles.continueButton, { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.18, shadowRadius: 8, elevation: 4 }]} onPress={handleContinue} activeOpacity={0.85}>
+                  <TouchableOpacity style={[styles.continueButton, { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.18, shadowRadius: 8, elevation: 4 }]} onPress={advanceResultsActions(handleContinue)} activeOpacity={0.85}>
                     <Text style={{ fontSize: 20, color: '#fff', fontWeight: 'bold', marginRight: 8 }}>Komeza</Text>
                     <Text style={{ fontSize: 22 }}>➡️</Text>
                   </TouchableOpacity>
                 ) : (
-                  <TouchableOpacity style={[styles.retryButton, { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.18, shadowRadius: 8, elevation: 4 }]} onPress={handleRetry} activeOpacity={0.85}>
+                  <TouchableOpacity style={[styles.retryButton, { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.18, shadowRadius: 8, elevation: 4 }]} onPress={advanceResultsActions(handleRetry)} activeOpacity={0.85}>
                     <Text style={{ fontSize: 20, color: '#fff', fontWeight: 'bold', marginRight: 8 }}>Ongera</Text>
                     <Text style={{ fontSize: 22 }}>🔄</Text>
                   </TouchableOpacity>
                 )}
                 {isFinalExamPage && (
-                  <TouchableOpacity
-                    style={styles.recInamaButton}
-                    onPress={() => setRecModalVisible(true)}
-                    activeOpacity={0.85}
+                  <CopilotStep
+                    text="Kanda hano kugira ngo ubone inama zihariye zikwiranye n'uko witwaye mu kizamini."
+                    order={2}
+                    name={`${currentPage}-results-recommendations`}
                   >
-                    <Text style={{ fontSize: 20, marginRight: 8 }}>💡</Text>
-                    <Text style={styles.recInamaButtonText}>Reba inama</Text>
-                  </TouchableOpacity>
+                    <WalkthroughableTouchable
+                      style={styles.recInamaButton}
+                      onPress={advanceRecommendations(() => setRecModalVisible(true))}
+                      activeOpacity={0.85}
+                    >
+                      <Text style={{ fontSize: 20, marginRight: 8 }}>💡</Text>
+                      <Text style={styles.recInamaButtonText}>Reba inama</Text>
+                    </WalkthroughableTouchable>
+                  </CopilotStep>
                 )}
               </>
             )}
-          </View>
+          </WalkthroughableView>
+          </CopilotStep>
           <View style={{ height: 40 }} />
         </ScrollView>
         <PostCourseRecommendationsModal
@@ -982,11 +1103,16 @@ const Questionnaire = forwardRef(function Questionnaire({
         </View>
       </ScrollView>
 
-      <View style={[styles.navigationContainerFixed, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+      <CopilotStep
+        text="Kanda aha kugira ngo ujye ku kibazo gikurikira cyangwa ugaruke ku cyabanjirije."
+        order={1}
+        name={`${currentPage}-questions-nav`}
+      >
+      <WalkthroughableView style={[styles.navigationContainerFixed, { paddingBottom: Math.max(insets.bottom, 12) }]}>
         {currentQuestionIndex > 0 ? (
           <TouchableOpacity
             style={styles.previousButton}
-            onPress={() => setCurrentQuestionIndex((p) => p - 1)}
+            onPress={advanceQuestionsNav(() => setCurrentQuestionIndex((p) => p - 1))}
           >
             <Text style={styles.previousButtonText}>Subira inyuma</Text>
           </TouchableOpacity>
@@ -996,7 +1122,7 @@ const Questionnaire = forwardRef(function Questionnaire({
 
         <TouchableOpacity
           style={[styles.nextButton, !hasAnsweredCurrent() && styles.disabledButton]}
-          onPress={async () => {
+          onPress={advanceQuestionsNav(async () => {
             if (currentQuestionIndex < questions.length - 1) {
               setCurrentQuestionIndex((p) => p + 1);
             } else if (currentPage && currentPage.includes('pre-test')) {
@@ -1008,14 +1134,15 @@ const Questionnaire = forwardRef(function Questionnaire({
             } else {
               await handleFinish();
             }
-          }}
+          })}
           disabled={!hasAnsweredCurrent() || isSubmitting}
         >
           <Text style={styles.nextButtonText}>
             {isSubmitting ? 'Gusoza...' : (currentQuestionIndex === questions.length - 1 ? 'Soza' : 'Komeza')}
           </Text>
         </TouchableOpacity>
-      </View>
+      </WalkthroughableView>
+      </CopilotStep>
 
       {courseDetails && (
         <CourseDrawer
@@ -1026,6 +1153,28 @@ const Questionnaire = forwardRef(function Questionnaire({
         />
       )}
     </View>
+  );
+});
+
+const Questionnaire = forwardRef(function Questionnaire(props: TestComponentProps, ref) {
+  return (
+    <CopilotProvider
+      tooltipComponent={MascotTooltip}
+      overlay="view"
+      backdropColor="rgba(0, 0, 0, 0.65)"
+      animationDuration={300}
+      stepNumberComponent={() => null}
+      arrowSize={10}
+      androidStatusBarVisible
+      labels={{
+        finish: 'Rangiza',
+        next: 'Ibikurikiraho',
+        previous: 'Inyuma',
+        skip: 'Simbuka',
+      }}
+    >
+      <QuestionnaireContent {...props} ref={ref} />
+    </CopilotProvider>
   );
 });
 
