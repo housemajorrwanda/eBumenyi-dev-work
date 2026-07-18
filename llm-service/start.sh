@@ -3,6 +3,12 @@ set -euo pipefail
 
 PORT="${PORT:-11434}"
 export OLLAMA_HOST="0.0.0.0:${PORT}"
+export OLLAMA_KEEP_ALIVE=-1
+export OLLAMA_NUM_PARALLEL=1
+export OLLAMA_MAX_LOADED_MODELS=1
+export OLLAMA_CONTEXT_LENGTH="${OLLAMA_CONTEXT_LENGTH:-4096}"
+export OLLAMA_FLASH_ATTENTION="${OLLAMA_FLASH_ATTENTION:-0}"
+export OLLAMA_NEW_ENGINE="${OLLAMA_NEW_ENGINE:-0}"
 MODEL="${OLLAMA_MODEL:-llama3.2}"
 
 ollama serve &
@@ -24,5 +30,14 @@ fi
 echo "Pulling model: ${MODEL}"
 ollama pull "${MODEL}"
 
-echo "Ollama ready — model ${MODEL} loaded"
+echo "Warming up ${MODEL} (loads weights into RAM; needs ~8GB on Railway)..."
+if ! curl -sf -m 600 -X POST "http://127.0.0.1:${PORT}/api/generate" \
+  -H "Content-Type: application/json" \
+  -d "{\"model\":\"${MODEL}\",\"prompt\":\"ok\",\"stream\":false}" >/dev/null; then
+  echo "Model warmup failed — inference did not respond within 10 minutes." >&2
+  echo "On Railway: set llm-service to at least 8 GB RAM and mount a volume at /root/.ollama." >&2
+  exit 1
+fi
+
+echo "Ollama ready — model ${MODEL} loaded and warmed up"
 wait "${SERVER_PID}"
