@@ -230,7 +230,8 @@ export class SlideReadAloudService {
     }
 
     const wavBuffer = await synthesizeSpeech(VOICE_PREVIEW_TEXT, { voice });
-    const audioUrl = await uploadWav(wavBuffer, `voice_preview_${voice}`);
+    // v2: invalidate previews generated during FlexTTS concurrent-load races
+    const audioUrl = await uploadWav(wavBuffer, `voice_preview_v2_${voice}`);
     voicePreviewUrlCache.set(voice, audioUrl);
 
     return {

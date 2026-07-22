@@ -183,7 +183,8 @@ class SlideReadAloudService {
             throw new error_1.default("Serivisi yo gusoma ntabwo iboneka", 503);
         }
         const wavBuffer = await (0, mlClient_1.synthesizeSpeech)(exports.VOICE_PREVIEW_TEXT, { voice });
-        const audioUrl = await uploadWav(wavBuffer, `voice_preview_${voice}`);
+        // v2: invalidate previews generated during FlexTTS concurrent-load races
+        const audioUrl = await uploadWav(wavBuffer, `voice_preview_v2_${voice}`);
         voicePreviewUrlCache.set(voice, audioUrl);
         return {
             audioUrl,
