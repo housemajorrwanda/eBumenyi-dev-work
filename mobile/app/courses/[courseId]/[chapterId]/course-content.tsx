@@ -1031,51 +1031,59 @@ function CourseContentScreenContent() {
                   )}
                   {item.type !== 'test-question' && item.type !== 'result-slide' && (
                     idx === currentPage ? (
-                      <CopilotStep
-                        text="Kanda hano kugira ngo ubike (pin) iyi mpapuro, uzayibone nyuma muburyo bworoshye."
-                        order={2}
-                        name="lesson-pin"
-                      >
-                        <WalkthroughableTouchable
+                      <>
+                        <CopilotStep
+                          text="Kanda hano kugira ngo ubike (pin) iyi mpapuro, uzayibone nyuma muburyo bworoshye."
+                          order={2}
+                          name="lesson-pin"
+                        >
+                          <WalkthroughableTouchable
+                            style={styles.pinButton}
+                            onPress={advancePin(() => handlePinSlide(item.id))}
+                          >
+                            {slidesPinStatus[item.id] ? (
+                              <PinOff color="#F59E0B" size={16} />
+                            ) : (
+                              <Pin color="#333" size={16} />
+                            )}
+                          </WalkthroughableTouchable>
+                        </CopilotStep>
+                        <TouchableOpacity
+                          style={styles.readAloudButton}
+                          onPress={handleReadAloud}
+                          disabled={narrationUi.loading}
+                        >
+                          <Volume2
+                            color={
+                              narrationUi.playing
+                                ? '#F59E0B'
+                                : narrationUi.loading
+                                  ? '#94A3B8'
+                                  : '#3363AD'
+                            }
+                            size={16}
+                          />
+                        </TouchableOpacity>
+                      </>
+                    ) : (
+                      <>
+                        <TouchableOpacity
                           style={styles.pinButton}
-                          onPress={advancePin(() => handlePinSlide(item.id))}
+                          onPress={() => handlePinSlide(item.id)}
                         >
                           {slidesPinStatus[item.id] ? (
                             <PinOff color="#F59E0B" size={16} />
                           ) : (
                             <Pin color="#333" size={16} />
                           )}
-                        </WalkthroughableTouchable>
-                      </CopilotStep>
-                    ) : (
-                      <>
-                      <TouchableOpacity
-                        style={styles.pinButton}
-                        onPress={() => handlePinSlide(item.id)}
-                      >
-                        {slidesPinStatus[item.id] ? (
-                          <PinOff color="#F59E0B" size={16} />
-                        ) : (
-                          <Pin color="#333" size={16} />
-                        )}
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.readAloudButton}
-                        onPress={handleReadAloud}
-                        disabled={idx === currentPage && narrationUi.loading}
-                      >
-                        <Volume2
-                          color={
-                            idx === currentPage && narrationUi.playing
-                              ? '#F59E0B'
-                              : idx === currentPage && narrationUi.loading
-                                ? '#94A3B8'
-                                : '#3363AD'
-                          }
-                          size={16}
-                        />
-                      </TouchableOpacity>
-                    </>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.readAloudButton}
+                          onPress={handleReadAloud}
+                        >
+                          <Volume2 color="#3363AD" size={16} />
+                        </TouchableOpacity>
+                      </>
                     )
                   )}
                 </View>

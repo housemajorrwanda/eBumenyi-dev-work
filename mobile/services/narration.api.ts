@@ -11,6 +11,13 @@ export interface SlideNarrationResult {
   cached: boolean;
 }
 
+export interface VoicePreviewResult {
+  audioUrl: string;
+  text: string;
+  voice: NarrationVoice;
+  cached: boolean;
+}
+
 export interface SlideNarrationContext {
   file?: string | null;
   note?: string | null;
@@ -41,6 +48,16 @@ export async function requestSlideNarration(
   const response = await narrationClient.post<{ data: SlideNarrationResult }>(
     `/slides/${slideId}/narrate?page=${page}`,
     { ...(context ?? {}), voice },
+  );
+  return response.data.data;
+}
+
+export async function requestVoicePreview(
+  voice: NarrationVoice,
+): Promise<VoicePreviewResult> {
+  const response = await narrationClient.post<{ data: VoicePreviewResult }>(
+    `/slides/voice-preview`,
+    { voice },
   );
   return response.data.data;
 }
