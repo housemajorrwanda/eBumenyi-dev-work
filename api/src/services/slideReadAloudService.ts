@@ -14,6 +14,12 @@ export type NarrationVoice = "female1" | "female2" | "male";
 
 export const DEFAULT_NARRATION_VOICE: NarrationVoice = "female1";
 
+/** Short Kinyarwanda sample so learners can hear each voice before choosing. */
+export const VOICE_PREVIEW_TEXT =
+  "Muraho. Uyu ni urugero rw'ijwi ryo gusoma amasomo.";
+
+const voicePreviewUrlCache = new Map<NarrationVoice, string>();
+
 function narrationCacheKey(page: number, voice: NarrationVoice): string {
   return `${page}_${voice}`;
 }
@@ -206,6 +212,33 @@ export class SlideReadAloudService {
     }
 
     return pickPageText(pageTexts, page, fallback);
+  }
+
+  static async previewVoice(voice: NarrationVoice = DEFAULT_NARRATION_VOICE) {
+    const cachedUrl = voicePreviewUrlCache.get(voice);
+    if (cachedUrl) {
+      return {
+        audioUrl: cachedUrl,
+        text: VOICE_PREVIEW_TEXT,
+        voice,
+        cached: true,
+      };
+    }
+
+    if (!isMlServiceConfigured()) {
+      throw new AppError("Serivisi yo gusoma ntabwo iboneka", 503);
+    }
+
+    const wavBuffer = await synthesizeSpeech(VOICE_PREVIEW_TEXT, { voice });
+    const audioUrl = await uploadWav(wavBuffer, `voice_preview_${voice}`);
+    voicePreviewUrlCache.set(voice, audioUrl);
+
+    return {
+      audioUrl,
+      text: VOICE_PREVIEW_TEXT,
+      voice,
+      cached: false,
+    };
   }
 
   static async narrateSlide(

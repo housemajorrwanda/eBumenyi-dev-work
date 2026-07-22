@@ -16,6 +16,8 @@ import {
   NarrationVoice,
   saveNarrationVoice,
 } from '@/services/narrationVoice';
+import { requestVoicePreview } from '@/services/narration.api';
+import { VoicePreviewPlayer } from '@/components/course/VoicePreviewPlayer';
 import Dropdown from '@/components/Dropdown';
 import TextField from '@/components/TextField';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -105,6 +107,9 @@ function ProfileEditScreenContent() {
   const [narrationVoice, setNarrationVoice] = useState<NarrationVoice>(
     DEFAULT_NARRATION_VOICE,
   );
+  const [previewingVoice, setPreviewingVoice] = useState<NarrationVoice | null>(null);
+  const [voicePreviewUri, setVoicePreviewUri] = useState<string | null>(null);
+  const voicePreviewRequestRef = useRef(0);
   const [dateFormat, setDateFormat] = useState('DD/MM/YYYY');
   const [hospitalOptions, setHospitalOptions] = useState<{ id: string; label: string; extra?: any }[]>([]);
 
@@ -162,6 +167,52 @@ function ProfileEditScreenContent() {
     };
     loadPrefs();
   }, []);
+
+  useEffect(() => {
+    return () => {
+      voicePreviewRequestRef.current += 1;
+      setVoicePreviewUri(null);
+      setPreviewingVoice(null);
+    };
+  }, []);
+
+  const selectNarrationVoice = async (value: NarrationVoice) => {
+    setNarrationVoice(value);
+    await saveNarrationVoice(value);
+    Toast.show({
+      type: 'success',
+      text1: t(
+        value === 'female1'
+          ? 'profile.voiceFemale1'
+          : value === 'female2'
+            ? 'profile.voiceFemale2'
+            : 'profile.voiceMale',
+      ),
+      text2: t('profile.narrationVoiceChanged'),
+    });
+
+    const requestId = voicePreviewRequestRef.current + 1;
+    voicePreviewRequestRef.current = requestId;
+    setPreviewingVoice(value);
+    setVoicePreviewUri(null);
+
+    try {
+      const result = await requestVoicePreview(value);
+      if (voicePreviewRequestRef.current !== requestId) return;
+
+      const separator = result.audioUrl.includes('?') ? '&' : '?';
+      setVoicePreviewUri(`${result.audioUrl}${separator}_preview=${requestId}`);
+      setPreviewingVoice(null);
+    } catch (error) {
+      if (voicePreviewRequestRef.current !== requestId) return;
+      console.log('[Profile] Voice preview failed', error);
+      setPreviewingVoice(null);
+      Toast.show({
+        type: 'error',
+        text1: t('profile.narrationVoicePreviewFailed'),
+      });
+    }
+  };
 
   // User data
   const { data: userData } = useQuery<any>({
@@ -514,6 +565,19 @@ function ProfileEditScreenContent() {
 
   return (
     <View style={[styles.container, ds.container]}>
+      {voicePreviewUri ? (
+        <VoicePreviewPlayer
+          uri={voicePreviewUri}
+          onFinished={() => setVoicePreviewUri(null)}
+          onError={() => {
+            setVoicePreviewUri(null);
+            Toast.show({
+              type: 'error',
+              text1: t('profile.narrationVoicePreviewFailed'),
+            });
+          }}
+        />
+      ) : null}
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
@@ -1068,19 +1132,17 @@ function ProfileEditScreenContent() {
                           ...ds.themeCardActive,
                         },
                       ]}
-                      onPress={async () => {
-                        setNarrationVoice(value);
-                        await saveNarrationVoice(value);
-                        Toast.show({
-                          type: 'success',
-                          text1: t(labelKey),
-                          text2: t('profile.narrationVoiceChanged'),
-                        });
+                      onPress={() => {
+                        void selectNarrationVoice(value);
                       }}
                       activeOpacity={0.8}
                     >
                       <View style={[styles.themeIconBox, { backgroundColor: `${color}20` }]}>
-                        <Volume2 size={22} color={color} />
+                        {previewingVoice === value ? (
+                          <ActivityIndicator size="small" color={color} />
+                        ) : (
+                          <Volume2 size={22} color={color} />
+                        )}
                       </View>
                       <View style={styles.themeInfo}>
                         <Text

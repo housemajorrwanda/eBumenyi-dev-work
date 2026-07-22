@@ -67,6 +67,51 @@ function parseVoice(value: unknown): NarrationVoice {
   return "female1";
 }
 
+/** Prefer a verified JWT; in non-production allow preview when verify fails (hybrid apitest). */
+async function requireJwtOrDevPreview(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    let token = req.headers.authorization as string | undefined;
+    if (token?.startsWith("Bearer ")) {
+      token = token.split(" ")[1];
+    }
+    if (token) {
+      await verifyToken(token);
+      return next();
+    }
+  } catch {
+    // fall through
+  }
+
+  if (process.env.NODE_ENV !== "production") {
+    return next();
+  }
+
+  res.status(401).json({ message: "Unauthorized" });
+}
+
+router.post(
+  "/voice-preview",
+  requireJwtOrDevPreview,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = req.body as { voice?: string | null };
+      const voice = parseVoice(body?.voice ?? req.query.voice);
+      const result = await SlideReadAloudService.previewVoice(voice);
+      res.status(200).json({
+        message: "Voice preview ready",
+        statusCode: 200,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
 router.post(
   "/:id/narrate",
   requireValidJwtOrDevContext,
