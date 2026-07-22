@@ -621,9 +621,9 @@ export interface CreateCoursePerformanceFeedbackDto {
   isPublished?: boolean;
 }
 
-// ─── CHO Group System ─────────────────────────────────────────────────────────
+// ─── CEHO Group System ─────────────────────────────────────────────────────────
 
-export interface ICHOGroup {
+export interface ICEHOGroup {
   id: string;
   name: string;
   district?: string | null;
@@ -633,11 +633,11 @@ export interface ICHOGroup {
   cell?: string | null;
   village?: string | null;
   description?: string | null;
-  choId: string;
+  cehoId: string;
   groupChatId?: string | null;
   createdAt: string;
   updatedAt: string;
-  cho?: {
+  ceho?: {
     id: string;
     user: {
       id: string;
@@ -651,7 +651,7 @@ export interface ICHOGroup {
   };
 }
 
-export interface ICHOGroupMember {
+export interface ICEHOGroupMember {
   id: string;
   groupId: string;
   studentId: string;
@@ -671,7 +671,7 @@ export interface ICHOGroupMember {
   };
 }
 
-export interface ICHOGroupInvitation {
+export interface ICEHOGroupInvitation {
   id: string;
   groupId: string;
   studentId: string;
@@ -681,7 +681,7 @@ export interface ICHOGroupInvitation {
   group?: {
     id: string;
     name: string;
-    cho?: {
+    ceho?: {
       user: {
         id: string;
         fullNames: string;
@@ -700,7 +700,7 @@ export interface ICHOGroupInvitation {
   };
 }
 
-export interface ICHOGroupMonitoringMember {
+export interface ICEHOGroupMonitoringMember {
   studentId: string;
   user: {
     id: string;
@@ -725,11 +725,11 @@ export interface ICHOGroupMonitoringMember {
   }>;
 }
 
-export interface ICHOGroupMonitoring {
+export interface ICEHOGroupMonitoring {
   groupId: string;
   groupName: string;
   totalMembers: number;
-  members: ICHOGroupMonitoringMember[];
+  members: ICEHOGroupMonitoringMember[];
 }
 
 export interface IStudentSearchResult {

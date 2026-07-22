@@ -551,18 +551,18 @@ app.get(
   },
 );
 
-// CHO CHW-candidate search (area-filtered, max 10)
+// CEHO CHW-candidate search (area-filtered, max 10)
 app.get(
-  "/api/cho-groups/mine/chw-candidates",
+  "/api/ceho-groups/mine/chw-candidates",
   async (req: ExRequest, res: ExResponse, next: NextFunction) => {
     try {
       const { expressAuthentication } = await import("./utils/authentication");
       await expressAuthentication(req, "jwt");
       const userId = req.user?.id as string;
       if (!userId) return res.status(401).json({ message: "Unauthorized" });
-      const { CHOGroupService } = await import("./services/choGroupService");
+      const { CEHOGroupService } = await import("./services/cehoGroupService");
       const search = req.query.search as string | undefined;
-      const candidates = await CHOGroupService.searchCHWCandidates(
+      const candidates = await CEHOGroupService.searchCHWCandidates(
         userId,
         search,
       );

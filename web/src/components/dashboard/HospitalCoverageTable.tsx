@@ -14,10 +14,14 @@ interface Row {
 
 interface HospitalCoverageTableProps {
   byProvince: Row[];
+  totalChws?: number;
+  registrationRate?: number;
 }
 
 export const HospitalCoverageTable: React.FC<HospitalCoverageTableProps> = ({
   byProvince,
+  totalChws,
+  registrationRate,
 }) => {
   const [sortKey, setSortKey] = useState<SortKey>("totalChws");
   const [sortAsc, setSortAsc] = useState(false);
@@ -57,6 +61,11 @@ export const HospitalCoverageTable: React.FC<HospitalCoverageTableProps> = ({
         icon={<Building2 size={16} />}
         title="Coverage by Province"
       />
+      {typeof totalChws === "number" && typeof registrationRate === "number" && (
+        <p className="text-xs text-gray-500 -mt-3 mb-4">
+          {totalChws.toLocaleString()} CHWs registered — {registrationRate}% of national target
+        </p>
+      )}
       {byProvince.length === 0 ? (
         <div className="text-center py-8 text-sm text-gray-400">
           No data available

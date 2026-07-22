@@ -175,7 +175,7 @@ export class FileUploadController {
   @Middlewares(
     checkRole(
       roles.STAFF,
-      roles.CHO,
+      roles.CEHO,
       roles.TRAINER,
       roles.ADMIN,
       roles.TRAINEE,
@@ -291,7 +291,7 @@ export class FileUploadController {
     videoUpload.single("video"),
     checkRole(
       roles.STAFF,
-      roles.CHO,
+      roles.CEHO,
       roles.TRAINER,
       roles.ADMIN,
       roles.TRAINEE,
@@ -357,7 +357,7 @@ export class FileUploadController {
     chunkUpload.single("chunk"),
     checkRole(
       roles.STAFF,
-      roles.CHO,
+      roles.CEHO,
       roles.TRAINER,
       roles.ADMIN,
       roles.TRAINEE,
@@ -438,7 +438,7 @@ export class FileUploadController {
   @Middlewares(
     checkRole(
       roles.STAFF,
-      roles.CHO,
+      roles.CEHO,
       roles.TRAINER,
       roles.ADMIN,
       roles.TRAINEE,
@@ -548,7 +548,7 @@ export class FileUploadController {
     generalUpload.array("files", 10),
     checkRole(
       roles.STAFF,
-      roles.CHO,
+      roles.CEHO,
       roles.TRAINER,
       roles.ADMIN,
       roles.TRAINEE,
@@ -700,7 +700,7 @@ export class FileUploadController {
     generalUpload.single("image"),
     checkRole(
       roles.STAFF,
-      roles.CHO,
+      roles.CEHO,
       roles.TRAINER,
       roles.ADMIN,
       roles.TRAINEE,
@@ -752,7 +752,7 @@ export class FileUploadController {
     generalUpload.single("audio"),
     checkRole(
       roles.STAFF,
-      roles.CHO,
+      roles.CEHO,
       roles.TRAINER,
       roles.ADMIN,
       roles.TRAINEE,
@@ -807,7 +807,7 @@ export class FileUploadController {
     generalUpload.single("document"),
     checkRole(
       roles.STAFF,
-      roles.CHO,
+      roles.CEHO,
       roles.TRAINER,
       roles.ADMIN,
       roles.TRAINEE,

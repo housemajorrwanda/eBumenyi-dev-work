@@ -12,7 +12,7 @@ import { formatDate } from "@/utils/formats/formats";
 const ROLE_OPTIONS = [
   { label: "Admin", value: "ADMIN" },
   { label: "Trainer", value: "TRAINER" },
-  { label: "CHO", value: "CHO" },
+  { label: "CEHO", value: "CEHO" },
   { label: "Staff", value: "STAFF" },
   { label: "Developer", value: "DEVELOPER" },
 ];
@@ -198,7 +198,7 @@ export const Staff = () => {
                       ? "bg-blue-100 text-blue-800"
                       : row.role === "TRAINER"
                         ? "bg-green-100 text-green-800"
-                        : row.role === "CHO"
+                        : row.role === "CEHO"
                           ? "bg-orange-100 text-orange-800"
                           : "bg-gray-100 text-gray-800"
                 }`}

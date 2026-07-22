@@ -74,7 +74,7 @@ export class CourseController {
   @Middlewares(
     upload.single("coverIcon"),
     appendCoverIconPhoto,
-    checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN),
+    checkRole(roles.STAFF, roles.CEHO, roles.TRAINER, roles.ADMIN),
   )
   public async createCourse(
     @Body() body: CreateCourseDto,
@@ -114,7 +114,7 @@ export class CourseController {
   @Middlewares(
     upload.single("coverIcon"),
     appendCoverIconPhoto,
-    checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN),
+    checkRole(roles.STAFF, roles.CEHO, roles.TRAINER, roles.ADMIN),
   )
   public updateCourse(
     @Path() id: string,
@@ -127,7 +127,7 @@ export class CourseController {
 
   @Delete("/{id}")
   @Security("jwt")
-  @Middlewares(checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN))
+  @Middlewares(checkRole(roles.STAFF, roles.CEHO, roles.TRAINER, roles.ADMIN))
   public deleteCourse(@Path() id: string, @Request() req: ExpressRequest) {
     const io = getIOInstance(req);
     return CourseService.deleteCourse(id, io);
@@ -152,7 +152,7 @@ export class CourseController {
 
   @Post("/super")
   @Security("jwt")
-  @Middlewares(checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN))
+  @Middlewares(checkRole(roles.STAFF, roles.CEHO, roles.TRAINER, roles.ADMIN))
   public async createSuperCourse(
     @Body() body: CreateSuperCourseDto,
     @Request() req: ExpressRequest,
@@ -171,7 +171,7 @@ export class CourseController {
 
   @Put("/super/{courseId}")
   @Security("jwt")
-  @Middlewares(checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN))
+  @Middlewares(checkRole(roles.STAFF, roles.CEHO, roles.TRAINER, roles.ADMIN))
   public async updateSuperCourse(
     @Path() courseId: string,
     @Body() body: CreateSuperCourseDto,
@@ -186,7 +186,7 @@ export class CourseController {
   @Post("/{id}/notify-users")
   @Security("jwt")
   @Middlewares(
-    checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN),
+    checkRole(roles.STAFF, roles.CEHO, roles.TRAINER, roles.ADMIN),
   )
   public notifyCourseUsers(
     @Path() id: string,
@@ -210,7 +210,7 @@ export class CourseController {
     checkRole(
       roles.ADMIN,
       roles.STAFF,
-      roles.CHO,
+      roles.CEHO,
       roles.TRAINER,
       roles.TRAINEE,
       roles.TESTER,
@@ -244,7 +244,7 @@ export class CourseController {
     checkRole(
       roles.ADMIN,
       roles.STAFF,
-      roles.CHO,
+      roles.CEHO,
       roles.TRAINER,
       roles.DEVELOPER,
     ),
@@ -260,7 +260,7 @@ export class CourseController {
    */
   @Post("/large/create")
   @Security("jwt")
-  @Middlewares(checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN))
+  @Middlewares(checkRole(roles.STAFF, roles.CEHO, roles.TRAINER, roles.ADMIN))
   public async createLargeCourse(
     @Body() body: CreateSuperCourseDto,
     @Request() req: ExpressRequest,
@@ -421,7 +421,7 @@ export class CourseController {
    */
   @Put("/large/{courseId}")
   @Security("jwt")
-  @Middlewares(checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN))
+  @Middlewares(checkRole(roles.STAFF, roles.CEHO, roles.TRAINER, roles.ADMIN))
   public async updateLargeCourse(
     @Path() courseId: string,
     @Body() body: UpdateSuperCourseDto,
@@ -462,7 +462,7 @@ export class CourseController {
    */
   @Put("/{courseId}/sections")
   @Security("jwt")
-  @Middlewares(checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN))
+  @Middlewares(checkRole(roles.STAFF, roles.CEHO, roles.TRAINER, roles.ADMIN))
   public async updateSection(
     @Path() courseId: string,
     @Body() sectionData: any,

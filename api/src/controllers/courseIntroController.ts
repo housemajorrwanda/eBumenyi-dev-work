@@ -23,7 +23,7 @@ export class CourseIntroController {
   @Post("/")
   @Security("jwt")
   @Middlewares(
-    checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN),
+    checkRole(roles.STAFF, roles.CEHO, roles.TRAINER, roles.ADMIN),
   )
   public async createCourseIntro(@Body() body: CreateCourseIntroDto) {
     return CourseIntroService.createCourseIntro(body);
@@ -38,7 +38,7 @@ export class CourseIntroController {
   @Put("/{id}")
   @Security("jwt")
   @Middlewares(
-    checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN),
+    checkRole(roles.STAFF, roles.CEHO, roles.TRAINER, roles.ADMIN),
   )
   public updateCourseIntro(
     @Path() id: string,
@@ -50,7 +50,7 @@ export class CourseIntroController {
   @Delete("/{id}")
   @Security("jwt")
   @Middlewares(
-    checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN),
+    checkRole(roles.STAFF, roles.CEHO, roles.TRAINER, roles.ADMIN),
   )
   public deleteCourseIntro(@Path() id: string) {
     return CourseIntroService.deleteCourseIntro(id);

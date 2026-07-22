@@ -39,7 +39,7 @@ export class CalendarController {
     checkRole(
       roles.ADMIN,
       roles.STAFF,
-      roles.CHO,
+      roles.CEHO,
       roles.TRAINER,
       roles.TRAINEE,
     ),
@@ -57,7 +57,7 @@ export class CalendarController {
   @Security("jwt")
   @Middlewares(
     loggerMiddleware,
-    checkRole(roles.ADMIN, roles.STAFF, roles.CHO, roles.TRAINER),
+    checkRole(roles.ADMIN, roles.STAFF, roles.CEHO, roles.TRAINER),
   )
   public getAllEvents(
     @Request() req: ExpressRequest,
@@ -75,7 +75,7 @@ export class CalendarController {
     checkRole(
       roles.ADMIN,
       roles.STAFF,
-      roles.CHO,
+      roles.CEHO,
       roles.TRAINER,
       roles.TRAINEE,
     ),
@@ -92,7 +92,7 @@ export class CalendarController {
     checkRole(
       roles.ADMIN,
       roles.STAFF,
-      roles.CHO,
+      roles.CEHO,
       roles.TRAINER,
       roles.TRAINEE,
     ),
@@ -114,7 +114,7 @@ export class CalendarController {
     checkRole(
       roles.ADMIN,
       roles.STAFF,
-      roles.CHO,
+      roles.CEHO,
       roles.TRAINER,
       roles.TRAINEE,
     ),
@@ -130,7 +130,7 @@ export class CalendarController {
   @Security("jwt")
   @Middlewares(
     loggerMiddleware,
-    checkRole(roles.ADMIN, roles.STAFF, roles.CHO, roles.TRAINER),
+    checkRole(roles.ADMIN, roles.STAFF, roles.CEHO, roles.TRAINER),
   )
   public updateOccurrence(
     @Request() req: ExpressRequest,
@@ -146,7 +146,7 @@ export class CalendarController {
   @Security("jwt")
   @Middlewares(
     loggerMiddleware,
-    checkRole(roles.ADMIN, roles.STAFF, roles.CHO, roles.TRAINER),
+    checkRole(roles.ADMIN, roles.STAFF, roles.CEHO, roles.TRAINER),
   )
   public cancelOccurrence(
     @Request() req: ExpressRequest,

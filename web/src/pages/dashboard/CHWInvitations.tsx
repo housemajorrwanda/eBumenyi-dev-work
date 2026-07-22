@@ -11,8 +11,8 @@ import {
 } from "lucide-react";
 import { Dialog, Transition } from "@headlessui/react";
 import toast from "react-hot-toast";
-import { getMyInvitations, respondToInvitation } from "@/services/choGroup.service";
-import { ICHOGroupInvitation } from "@/types";
+import { getMyInvitations, respondToInvitation } from "@/services/cehoGroup.service";
+import { ICEHOGroupInvitation } from "@/types";
 import { Button } from "@/components/common/Button";
 
 const UserAvatar = ({ name, photo }: { name: string; photo: string | null }) => {
@@ -38,7 +38,7 @@ const UserAvatar = ({ name, photo }: { name: string; photo: string | null }) => 
 const CHWInvitationsPage = () => {
   const queryClient = useQueryClient();
   const [pendingAction, setPendingAction] = useState<{
-    invitation: ICHOGroupInvitation;
+    invitation: ICEHOGroupInvitation;
     accept: boolean;
   } | null>(null);
 
@@ -91,13 +91,13 @@ const CHWInvitationsPage = () => {
           </div>
           <p className="text-gray-600 font-semibold">No pending invitations</p>
           <p className="text-gray-400 text-sm">
-            When a CHO invites you to their group, it will appear here.
+            When a CEHO invites you to their group, it will appear here.
           </p>
         </div>
       ) : (
         <div className="space-y-3">
           {invitations.map((inv) => {
-            const cho = inv.group?.cho?.user;
+            const ceho = inv.group?.ceho?.user;
             const groupName = inv.group?.name ?? "Unknown Group";
             const invitedAt = new Date(inv.invitedAt).toLocaleDateString(undefined, {
               day: "numeric",
@@ -118,15 +118,15 @@ const CHWInvitationsPage = () => {
                 {/* Info */}
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-gray-900 truncate">{groupName}</p>
-                  {cho && (
+                  {ceho && (
                     <div className="flex items-center gap-2 mt-1">
-                      <UserAvatar name={cho.fullNames} photo={cho.photo} />
+                      <UserAvatar name={ceho.fullNames} photo={ceho.photo} />
                       <div className="min-w-0">
-                        <p className="text-sm text-gray-700 font-medium truncate">{cho.fullNames}</p>
-                        {cho.phoneNumber && (
+                        <p className="text-sm text-gray-700 font-medium truncate">{ceho.fullNames}</p>
+                        {ceho.phoneNumber && (
                           <div className="flex items-center gap-1 text-xs text-gray-400">
                             <Phone className="w-3 h-3" />
-                            <span>{cho.phoneNumber}</span>
+                            <span>{ceho.phoneNumber}</span>
                           </div>
                         )}
                       </div>

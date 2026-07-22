@@ -10,11 +10,11 @@ import {
   X,
 } from "lucide-react";
 import { IStudent, getAllStudentsNoPagination, updateStudent } from "@/services/students.service";
-import { adminDemoteToCHW, adminPromoteToCHO } from "@/services/choGroup.service";
+import { adminDemoteToCHW, adminPromoteToCEHO } from "@/services/cehoGroup.service";
 import { studentKeys } from "@/utils/constants/queryKeys";
 import { Button } from "@/components/common/Button";
 
-type RoleFilter = "TRAINEE" | "TESTER" | "CHO";
+type RoleFilter = "TRAINEE" | "TESTER" | "CEHO";
 
 interface BulkStudentRoleActionsProps {
   roleFilter: RoleFilter;
@@ -25,7 +25,7 @@ interface BulkStudentRoleActionsProps {
 const roleLabel: Record<RoleFilter, string> = {
   TRAINEE: "CHW",
   TESTER: "Tester",
-  CHO: "CHO",
+  CEHO: "CEHO",
 };
 
 export const BulkStudentRoleActions: FC<BulkStudentRoleActionsProps> = ({
@@ -36,11 +36,10 @@ export const BulkStudentRoleActions: FC<BulkStudentRoleActionsProps> = ({
   const queryClient = useQueryClient();
   const count = selectedStudents.length;
 
-  const [promoteChoOpen, setPromoteChoOpen] = useState(false);
-  const [groupNamePrefix, setGroupNamePrefix] = useState("");
+  const [promoteCehoOpen, setPromoteCehoOpen] = useState(false);
 
   const [demoteOpen, setDemoteOpen] = useState(false);
-  const [newCHO, setNewCHO] = useState<IStudent | null>(null);
+  const [newCEHO, setNewCEHO] = useState<IStudent | null>(null);
   const [demoteSearch, setDemoteSearch] = useState("");
   const [demoteDebounced, setDemoteDebounced] = useState("");
 
@@ -60,7 +59,7 @@ export const BulkStudentRoleActions: FC<BulkStudentRoleActionsProps> = ({
 
   const invalidateAll = () => {
     queryClient.invalidateQueries({ queryKey: studentKeys.all });
-    queryClient.invalidateQueries({ queryKey: ["admin-cho-groups"] });
+    queryClient.invalidateQueries({ queryKey: ["admin-ceho-groups"] });
     onClear();
   };
 
@@ -96,16 +95,10 @@ export const BulkStudentRoleActions: FC<BulkStudentRoleActionsProps> = ({
     },
   });
 
-  const { mutate: promoteCHWsToCHO, isPending: isPromotingCHW } = useMutation({
+  const { mutate: promoteCHWsToCEHO, isPending: isPromotingCHW } = useMutation({
     mutationFn: async () => {
-      const prefix = groupNamePrefix.trim();
       const results = await Promise.allSettled(
-        selectedStudents.map((student) =>
-          adminPromoteToCHO(
-            student.userId,
-            prefix ? `${prefix} — ${student.fullName}` : undefined,
-          ),
-        ),
+        selectedStudents.map((student) => adminPromoteToCEHO(student.userId)),
       );
       const failed = results.filter((r) => r.status === "rejected").length;
       if (failed === results.length) throw new Error("All promotions failed");
@@ -113,30 +106,29 @@ export const BulkStudentRoleActions: FC<BulkStudentRoleActionsProps> = ({
     },
     onSuccess: ({ succeeded, failed }) => {
       invalidateAll();
-      setPromoteChoOpen(false);
-      setGroupNamePrefix("");
+      setPromoteCehoOpen(false);
       if (failed > 0) {
-        toast.success(`Promoted ${succeeded} to CHO. ${failed} failed.`);
+        toast.success(`Promoted ${succeeded} to CEHO. ${failed} failed.`);
       } else {
-        toast.success(`Promoted ${succeeded} CHW${succeeded !== 1 ? "s" : ""} to CHO.`);
+        toast.success(`Promoted ${succeeded} CHW${succeeded !== 1 ? "s" : ""} to CEHO.`);
       }
     },
     onError: (error: any) => {
-      toast.error(error?.response?.data?.message ?? error?.message ?? "Failed to promote to CHO.");
+      toast.error(error?.response?.data?.message ?? error?.message ?? "Failed to promote to CEHO.");
     },
   });
 
-  const { mutate: demoteCHO, isPending: isDemoting } = useMutation({
-    mutationFn: () => adminDemoteToCHW(selectedStudents[0].userId, newCHO!.id),
+  const { mutate: demoteCEHO, isPending: isDemoting } = useMutation({
+    mutationFn: () => adminDemoteToCHW(selectedStudents[0].userId, newCEHO!.id),
     onSuccess: (data) => {
       invalidateAll();
       setDemoteOpen(false);
-      setNewCHO(null);
+      setNewCEHO(null);
       setDemoteSearch("");
-      toast.success(`${selectedStudents[0].fullName} demoted. ${data.newCHO.fullNames} is now the CHO.`);
+      toast.success(`${selectedStudents[0].fullName} demoted. ${data.newCEHO.fullNames} is now the CEHO.`);
     },
     onError: (error: any) => {
-      toast.error(error?.response?.data?.message ?? "Failed to demote CHO.");
+      toast.error(error?.response?.data?.message ?? "Failed to demote CEHO.");
     },
   });
 
@@ -146,7 +138,7 @@ export const BulkStudentRoleActions: FC<BulkStudentRoleActionsProps> = ({
 
   const handleDemoteClick = () => {
     if (count > 1) {
-      toast.error("Demote one CHO at a time — each group needs its own replacement CHO.");
+      toast.error("Demote one CEHO at a time — each group needs its own replacement CEHO.");
       return;
     }
     setDemoteOpen(true);
@@ -183,16 +175,16 @@ export const BulkStudentRoleActions: FC<BulkStudentRoleActionsProps> = ({
           {roleFilter === "TRAINEE" && (
             <button
               type="button"
-              onClick={() => setPromoteChoOpen(true)}
+              onClick={() => setPromoteCehoOpen(true)}
               disabled={isBusy}
               className="text-xs font-semibold bg-amber-500 text-white px-3 py-1.5 rounded-lg shadow-sm hover:bg-amber-600 disabled:opacity-50 flex items-center gap-1"
             >
               <ArrowUpCircle className="w-3.5 h-3.5" />
-              Promote to CHO
+              Promote to CEHO
             </button>
           )}
 
-          {roleFilter === "CHO" && (
+          {roleFilter === "CEHO" && (
             <button
               type="button"
               onClick={handleDemoteClick}
@@ -206,44 +198,30 @@ export const BulkStudentRoleActions: FC<BulkStudentRoleActionsProps> = ({
         </div>
       </div>
 
-      {/* Bulk promote to CHO */}
-      <Transition appear show={promoteChoOpen} as={Fragment}>
-        <Dialog as="div" className="relative z-50" onClose={() => !isPromotingCHW && setPromoteChoOpen(false)}>
+      {/* Bulk promote to CEHO */}
+      <Transition appear show={promoteCehoOpen} as={Fragment}>
+        <Dialog as="div" className="relative z-50" onClose={() => !isPromotingCHW && setPromoteCehoOpen(false)}>
           <Transition.Child as={Fragment} enter="ease-out duration-200" enterFrom="opacity-0" enterTo="opacity-100" leave="ease-in duration-150" leaveFrom="opacity-100" leaveTo="opacity-0">
             <div className="fixed inset-0 bg-black/40" />
           </Transition.Child>
           <div className="fixed inset-0 flex items-center justify-center p-4">
             <Transition.Child as={Fragment} enter="ease-out duration-200" enterFrom="opacity-0 scale-95" enterTo="opacity-100 scale-100" leave="ease-in duration-150" leaveFrom="opacity-100 scale-100" leaveTo="opacity-0 scale-95">
               <Dialog.Panel className="w-full max-w-md bg-white rounded-2xl shadow-xl p-6 space-y-4">
-                <Dialog.Title className="text-lg font-bold text-gray-900">Promote to CHO</Dialog.Title>
+                <Dialog.Title className="text-lg font-bold text-gray-900">Promote to CEHO</Dialog.Title>
                 <Dialog.Description className="text-sm text-gray-500">
-                  Promote {count} CHW{count !== 1 ? "s" : ""} to CHO. A group will be created for each person.
+                  Promote {count} CHW{count !== 1 ? "s" : ""} to CEHO. A group will be created for
+                  each person, automatically named after their hospital.
                 </Dialog.Description>
                 <ul className="max-h-32 overflow-y-auto text-sm text-gray-700 border border-gray-100 rounded-lg divide-y divide-gray-50">
                   {selectedStudents.map((s) => (
                     <li key={s.id} className="px-3 py-2">{s.fullName}</li>
                   ))}
                 </ul>
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-gray-600">
-                    Group name prefix <span className="font-normal text-gray-400">(optional)</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={groupNamePrefix}
-                    onChange={(e) => setGroupNamePrefix(e.target.value)}
-                    placeholder="e.g. Kigali North"
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#3363AD]/30"
-                  />
-                  <p className="text-[11px] text-gray-400">
-                    Leave empty to use each person&apos;s name (e.g. &quot;Jane&apos;s Group&quot;).
-                  </p>
-                </div>
                 <div className="flex gap-3">
-                  <Button variant="ghost" size="sm" className="flex-1" onClick={() => setPromoteChoOpen(false)} disabled={isPromotingCHW}>
+                  <Button variant="ghost" size="sm" className="flex-1" onClick={() => setPromoteCehoOpen(false)} disabled={isPromotingCHW}>
                     Cancel
                   </Button>
-                  <Button size="sm" className="flex-1 !bg-amber-500 hover:!bg-amber-600" onClick={() => promoteCHWsToCHO()} isLoading={isPromotingCHW}>
+                  <Button size="sm" className="flex-1 !bg-amber-500 hover:!bg-amber-600" onClick={() => promoteCHWsToCEHO()} isLoading={isPromotingCHW}>
                     Promote {count}
                   </Button>
                 </div>
@@ -253,7 +231,7 @@ export const BulkStudentRoleActions: FC<BulkStudentRoleActionsProps> = ({
         </Dialog>
       </Transition>
 
-      {/* Single CHO demote */}
+      {/* Single CEHO demote */}
       <Transition appear show={demoteOpen} as={Fragment}>
         <Dialog as="div" className="relative z-50" onClose={() => !isDemoting && setDemoteOpen(false)}>
           <Transition.Child as={Fragment} enter="ease-out duration-200" enterFrom="opacity-0" enterTo="opacity-100" leave="ease-in duration-150" leaveFrom="opacity-100" leaveTo="opacity-0">
@@ -265,10 +243,10 @@ export const BulkStudentRoleActions: FC<BulkStudentRoleActionsProps> = ({
                 <Dialog.Title className="text-lg font-bold text-gray-900">Demote to CHW</Dialog.Title>
                 <Dialog.Description className="text-sm text-gray-500">
                   Demote <span className="font-semibold text-gray-700">{selectedStudents[0]?.fullName}</span> back to CHW.
-                  Select a replacement CHO for their group.
+                  Select a replacement CEHO for their group.
                 </Dialog.Description>
                 <div className="space-y-1">
-                  <label className="text-xs font-semibold text-gray-600">Replacement CHO</label>
+                  <label className="text-xs font-semibold text-gray-600">Replacement CEHO</label>
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
                     <input
@@ -276,7 +254,7 @@ export const BulkStudentRoleActions: FC<BulkStudentRoleActionsProps> = ({
                       value={demoteSearch}
                       onChange={(e) => {
                         setDemoteSearch(e.target.value);
-                        setNewCHO(null);
+                        setNewCEHO(null);
                         debouncedSetDemote(e.target.value);
                       }}
                       placeholder="Search CHW by name…"
@@ -286,13 +264,13 @@ export const BulkStudentRoleActions: FC<BulkStudentRoleActionsProps> = ({
                       <div className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 border-2 border-gray-300 border-t-red-400 rounded-full animate-spin" />
                     )}
                   </div>
-                  {demoteCandidates.length > 0 && !newCHO && (
+                  {demoteCandidates.length > 0 && !newCEHO && (
                     <div className="border border-gray-100 rounded-lg shadow-lg bg-white max-h-44 overflow-y-auto">
                       {demoteCandidates.map((s) => (
                         <button
                           key={s.id}
                           type="button"
-                          onClick={() => { setNewCHO(s); setDemoteSearch(s.fullName); }}
+                          onClick={() => { setNewCEHO(s); setDemoteSearch(s.fullName); }}
                           className="w-full px-3 py-2.5 text-left text-sm hover:bg-gray-50"
                         >
                           {s.fullName}
@@ -300,10 +278,10 @@ export const BulkStudentRoleActions: FC<BulkStudentRoleActionsProps> = ({
                       ))}
                     </div>
                   )}
-                  {newCHO && (
+                  {newCEHO && (
                     <div className="flex items-center justify-between px-3 py-2 bg-gray-50 rounded-lg text-sm">
-                      <span>{newCHO.fullName}</span>
-                      <button type="button" onClick={() => { setNewCHO(null); setDemoteSearch(""); }}>
+                      <span>{newCEHO.fullName}</span>
+                      <button type="button" onClick={() => { setNewCEHO(null); setDemoteSearch(""); }}>
                         <X className="w-3.5 h-3.5 text-gray-400" />
                       </button>
                     </div>
@@ -313,7 +291,7 @@ export const BulkStudentRoleActions: FC<BulkStudentRoleActionsProps> = ({
                   <Button variant="ghost" size="sm" className="flex-1" onClick={() => setDemoteOpen(false)} disabled={isDemoting}>
                     Cancel
                   </Button>
-                  <Button size="sm" className="flex-1 !bg-red-500 hover:!bg-red-600" onClick={() => demoteCHO()} isLoading={isDemoting} disabled={!newCHO}>
+                  <Button size="sm" className="flex-1 !bg-red-500 hover:!bg-red-600" onClick={() => demoteCEHO()} isLoading={isDemoting} disabled={!newCEHO}>
                     Demote
                   </Button>
                 </div>

@@ -23,7 +23,7 @@ export class FinalExamController {
   @Post("/")
   @Security("jwt")
   @Middlewares(
-    checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN),
+    checkRole(roles.STAFF, roles.CEHO, roles.TRAINER, roles.ADMIN),
   )
   public async createFinalExam(@Body() body: CreateFinalExamDto) {
     return FinalExamService.createFinalExam(body);
@@ -38,7 +38,7 @@ export class FinalExamController {
   @Put("/{id}")
   @Security("jwt")
   @Middlewares(
-    checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN),
+    checkRole(roles.STAFF, roles.CEHO, roles.TRAINER, roles.ADMIN),
   )
   public updateFinalExam(@Path() id: string, @Body() body: CreateFinalExamDto) {
     return FinalExamService.updateFinalExam(id, body);
@@ -47,7 +47,7 @@ export class FinalExamController {
   @Delete("/{id}")
   @Security("jwt")
   @Middlewares(
-    checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN),
+    checkRole(roles.STAFF, roles.CEHO, roles.TRAINER, roles.ADMIN),
   )
   public deleteFinalExam(@Path() id: string) {
     return FinalExamService.deleteFinalExam(id);

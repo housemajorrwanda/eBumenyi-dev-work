@@ -12,6 +12,9 @@ import {
   ICourseDurationStats,
   IRecentActivityFeed,
   IRecommendationInsightsResponse,
+  IMonthlyActiveTrends,
+  ICertificationAnalytics,
+  ISupervisorResponseRate,
 } from "@/types";
 import api from "./api";
 
@@ -82,4 +85,22 @@ export const getRecentActivityFeed = async (qs: string = ""): Promise<
   IResponse<IRecentActivityFeed>
 > => {
   return (await api.get(withQuery("/export/dashboard/recent-activity", qs))).data;
+};
+
+export const getMonthlyActiveTrends = async (qs: string = ""): Promise<
+  IResponse<IMonthlyActiveTrends>
+> => {
+  return (await api.get(withQuery("/export/dashboard/monthly-active-trends", qs))).data;
+};
+
+export const getCertificationAnalytics = async (qs: string = ""): Promise<
+  IResponse<ICertificationAnalytics>
+> => {
+  return (await api.get(withQuery("/export/dashboard/certification-analytics", qs))).data;
+};
+
+export const getSupervisorResponseRate = async (qs: string = ""): Promise<
+  IResponse<ISupervisorResponseRate>
+> => {
+  return (await api.get(withQuery("/export/dashboard/supervisor-response-rate", qs))).data;
 };

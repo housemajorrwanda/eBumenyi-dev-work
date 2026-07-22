@@ -423,7 +423,7 @@ export class MeetingRecordingService extends BaseService {
   /**
    * Returns published recordings visible to the requesting user:
    *  - ALL      → everyone
-   *  - TRAINEES → only users with TRAINEE or CHO role
+   *  - TRAINEES → only users with TRAINEE or CEHO role
    *  - INVITED  → only users listed in MeetingRecordingInvite
    */
   public static async getPublishedRecordings(
@@ -434,7 +434,7 @@ export class MeetingRecordingService extends BaseService {
       await this.relinkOrphanedRecordings();
 
       const isTrainee = userRoles.some((r) =>
-        ["TRAINEE", "CHO"].includes(r),
+        ["TRAINEE", "CEHO"].includes(r),
       );
 
       const recordings = await prisma.meetingRecording.findMany({

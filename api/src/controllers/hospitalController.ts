@@ -50,7 +50,7 @@ export class HospitalController {
   @Security("jwt")
   @Middlewares(
     loggerMiddleware,
-    checkRole(roles.ADMIN, roles.STAFF, roles.CHO, roles.TRAINER),
+    checkRole(roles.ADMIN, roles.STAFF, roles.CEHO, roles.TRAINER),
   )
   public async createHospital(@Body() body: CreateHospitalDto) {
     return HospitalService.createHospital(body);
@@ -63,7 +63,7 @@ export class HospitalController {
     checkRole(
       roles.ADMIN,
       roles.STAFF,
-      roles.CHO,
+      roles.CEHO,
       roles.TRAINER,
       roles.DEVELOPER,
     ),
@@ -91,7 +91,7 @@ export class HospitalController {
   @Middlewares(
     importUpload.single("file"),
     loggerMiddleware,
-    checkRole(roles.ADMIN, roles.STAFF, roles.CHO, roles.TRAINER),
+    checkRole(roles.ADMIN, roles.STAFF, roles.CEHO, roles.TRAINER),
   )
   public async importHospitals(@Request() req: ExpressRequest) {
     if (!req.file) {
@@ -125,7 +125,7 @@ export class HospitalController {
     checkRole(
       roles.ADMIN,
       roles.STAFF,
-      roles.CHO,
+      roles.CEHO,
       roles.TRAINER,
       roles.DEVELOPER,
     ),
@@ -138,7 +138,7 @@ export class HospitalController {
   @Security("jwt")
   @Middlewares(
     loggerMiddleware,
-    checkRole(roles.ADMIN, roles.STAFF, roles.CHO, roles.TRAINER),
+    checkRole(roles.ADMIN, roles.STAFF, roles.CEHO, roles.TRAINER),
   )
   public async updateHospital(
     @Path() id: string,
@@ -151,7 +151,7 @@ export class HospitalController {
   @Security("jwt")
   @Middlewares(
     loggerMiddleware,
-    checkRole(roles.ADMIN, roles.STAFF, roles.CHO, roles.TRAINER),
+    checkRole(roles.ADMIN, roles.STAFF, roles.CEHO, roles.TRAINER),
   )
   public async deleteHospital(@Path() id: string) {
     return HospitalService.deleteHospital(id);

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   BarChart,
   Bar,
@@ -19,9 +19,13 @@ interface TestScoreAnalyticsCardProps {
   data: ITestScoreAnalytics | null;
 }
 
+type ViewMode = "course" | "district";
+
 export const TestScoreAnalyticsCard: React.FC<TestScoreAnalyticsCardProps> = ({
   data,
 }) => {
+  const [view, setView] = useState<ViewMode>("course");
+
   if (!data || data.byCourse.length === 0) {
     return (
       <Card>
@@ -33,15 +37,26 @@ export const TestScoreAnalyticsCard: React.FC<TestScoreAnalyticsCardProps> = ({
     );
   }
 
-  // Build chart data — only courses with at least one score
-  const chartData = data.byCourse
-    .filter((c) => c.meanPreTest !== null || c.meanFinalTest !== null)
-    .map((c) => ({
-      name:
-        c.courseTitle.length > 16 ? c.courseTitle.slice(0, 16) + "…" : c.courseTitle,
-      "Pre-test": c.meanPreTest ?? 0,
-      "Final test": c.meanFinalTest ?? 0,
-    }));
+  // Build chart data — only rows with at least one score, switchable by course/district
+  const chartData =
+    view === "course"
+      ? data.byCourse
+          .filter((c) => c.meanPreTest !== null || c.meanFinalTest !== null)
+          .map((c) => ({
+            name:
+              c.courseTitle.length > 16
+                ? c.courseTitle.slice(0, 16) + "…"
+                : c.courseTitle,
+            "Pre-test": c.meanPreTest ?? 0,
+            "Final test": c.meanFinalTest ?? 0,
+          }))
+      : (data.byDistrict ?? [])
+          .filter((d) => d.meanPreTest !== null || d.meanFinalTest !== null)
+          .map((d) => ({
+            name: d.district,
+            "Pre-test": d.meanPreTest ?? 0,
+            "Final test": d.meanFinalTest ?? 0,
+          }));
 
   const gain = data.overallKnowledgeGain;
   const GainIcon = gain > 0 ? TrendingUp : gain < 0 ? TrendingDown : Minus;
@@ -77,6 +92,26 @@ export const TestScoreAnalyticsCard: React.FC<TestScoreAnalyticsCardProps> = ({
         </div>
       </div>
 
+      {/* View toggle */}
+      <div className='flex gap-1 bg-gray-100 p-1 rounded-lg w-fit mb-3'>
+        {([
+          { key: "course", label: "By Course" },
+          { key: "district", label: "By District" },
+        ] as { key: ViewMode; label: string }[]).map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setView(tab.key)}
+            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+              view === tab.key
+                ? "bg-white text-[#3363AD] shadow-sm"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
       {/* Bar chart */}
       {chartData.length > 0 && (
         <div style={{ height: 200 }}>
@@ -97,7 +132,7 @@ export const TestScoreAnalyticsCard: React.FC<TestScoreAnalyticsCardProps> = ({
                 axisLine={false}
                 tickLine={false}
                 label={{
-                  value: "Course",
+                  value: view === "course" ? "Course" : "District",
                   position: "insideBottomRight",
                   offset: -8,
                   style: { fontSize: 10, fill: "#9ca3af" },

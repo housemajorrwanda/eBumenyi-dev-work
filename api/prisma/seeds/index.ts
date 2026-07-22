@@ -120,7 +120,7 @@ async function main() {
     gender: "Female",
     hospitalId: hospital.id,
   });
-  await ensureRole(supervisor.id, roles.CHO);
+  await ensureRole(supervisor.id, roles.CEHO);
 
   const trainee = await upsertUser("trainee.amina@chwplatform.rw", {
     id: "user-seed-trainee",
@@ -147,7 +147,7 @@ async function main() {
   console.log("   developer@gmail.com            → DEVELOPER");
   console.log("   admin@gmail.com                → ADMIN");
   console.log("   trainer.alice@chwplatform.rw   → TRAINER");
-  console.log("   supervisor.grace@chwplatform.rw → CHO");
+  console.log("   supervisor.grace@chwplatform.rw → CEHO");
   console.log("   trainee.amina@chwplatform.rw   → TRAINEE");
 }
 

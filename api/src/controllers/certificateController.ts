@@ -24,7 +24,7 @@ export class CertificateController {
   @Security("jwt")
   @Middlewares(
     loggerMiddleware,
-    checkRole(roles.TRAINEE, roles.TESTER, roles.CHO),
+    checkRole(roles.TRAINEE, roles.TESTER, roles.CEHO),
   )
   public async generateCertificate(
     @Body() body: { courseId: string },
@@ -51,7 +51,7 @@ export class CertificateController {
   @Security("jwt")
   @Middlewares(
     loggerMiddleware,
-    checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN),
+    checkRole(roles.STAFF, roles.CEHO, roles.TRAINER, roles.ADMIN),
   )
   public async regenerateCertificate(@Path() id: string) {
     return CertificateService.regenerateCertificate(id);
@@ -61,7 +61,7 @@ export class CertificateController {
   @Security("jwt")
   @Middlewares(
     loggerMiddleware,
-    checkRole(roles.TRAINEE, roles.TESTER, roles.CHO),
+    checkRole(roles.TRAINEE, roles.TESTER, roles.CEHO),
   )
   public async regenerateMyCertificate(
     @Path() courseId: string,
@@ -94,7 +94,7 @@ export class CertificateController {
   @Security("jwt")
   @Middlewares(
     loggerMiddleware,
-    checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN),
+    checkRole(roles.STAFF, roles.CEHO, roles.TRAINER, roles.ADMIN),
   )
   public async generateCertificateForStudent(
     @Body() body: { studentId: string; courseId: string },
@@ -109,7 +109,7 @@ export class CertificateController {
   @Security("jwt")
   @Middlewares(
     loggerMiddleware,
-    checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN),
+    checkRole(roles.STAFF, roles.CEHO, roles.TRAINER, roles.ADMIN),
   )
   public async getAllCertificates(
     @Query() searchq?: string,
@@ -161,7 +161,7 @@ export class CertificateController {
   @Security("jwt")
   @Middlewares(
     loggerMiddleware,
-    checkRole(roles.TRAINEE, roles.TESTER, roles.CHO),
+    checkRole(roles.TRAINEE, roles.TESTER, roles.CEHO),
   )
   public async getMyCertificates(@Request() req: ExpressRequest) {
     const userId = req.user?.id as string;
@@ -183,7 +183,7 @@ export class CertificateController {
   @Security("jwt")
   @Middlewares(
     loggerMiddleware,
-    checkRole(roles.TRAINEE, roles.TESTER, roles.CHO),
+    checkRole(roles.TRAINEE, roles.TESTER, roles.CEHO),
   )
   public async getMyCertificateByCourseId(
     @Path() courseId: string,
@@ -208,7 +208,7 @@ export class CertificateController {
   @Security("jwt")
   @Middlewares(
     loggerMiddleware,
-    checkRole(roles.TRAINEE, roles.TESTER, roles.CHO),
+    checkRole(roles.TRAINEE, roles.TESTER, roles.CEHO),
   )
   public async prepareCertificate(
     @Body() body: { courseId: string },
@@ -227,7 +227,7 @@ export class CertificateController {
   @Security("jwt")
   @Middlewares(
     loggerMiddleware,
-    checkRole(roles.TRAINEE, roles.TESTER, roles.CHO),
+    checkRole(roles.TRAINEE, roles.TESTER, roles.CEHO),
   )
   public async storeFrontendCertificate(
     @Body() body: { certId: string; courseId: string; base64Pdf: string },
@@ -260,7 +260,7 @@ export class CertificateController {
     loggerMiddleware,
     checkRole(
       roles.STAFF,
-      roles.CHO,
+      roles.CEHO,
       roles.TRAINER,
       roles.ADMIN,
       roles.TRAINEE,

@@ -10,7 +10,7 @@ interface DemographicsSectionProps {
   filteredByGender?: IDemographicsAnalytics["byGender"];
 }
 
-type FilterView = "district" | "gender" | "ageGroup";
+type FilterView = "district" | "gender" | "ageGroup" | "combined";
 
 const ProgressBar: React.FC<{ value: number; color: string }> = ({ value, color }) => (
   <div className="flex items-center gap-2">
@@ -35,7 +35,8 @@ export const DemographicsSection: React.FC<DemographicsSectionProps> = ({ data, 
     if (!data) return [];
     if (activeView === "district") return filteredByDistrict ?? data.byDistrict;
     if (activeView === "gender")   return filteredByGender   ?? data.byGender;
-    return data.byAgeGroup;
+    if (activeView === "ageGroup") return data.byAgeGroup;
+    return [];
   }, [activeView, data, filteredByDistrict, filteredByGender]);
 
   const rows = useMemo(() => {
@@ -45,10 +46,17 @@ export const DemographicsSection: React.FC<DemographicsSectionProps> = ({ data, 
     );
   }, [rawRows, activeView, searchDistrict]);
 
+  const combinedRows = useMemo(() => {
+    const all = data?.combined ?? [];
+    if (!searchDistrict.trim()) return all;
+    return all.filter(r => r.district.toLowerCase().includes(searchDistrict.toLowerCase()));
+  }, [data, searchDistrict]);
+
   const tabs: { key: FilterView; label: string }[] = [
     { key: "district", label: "District" },
     { key: "gender",   label: "Gender" },
     { key: "ageGroup", label: "Age Group" },
+    { key: "combined", label: "Combined" },
   ];
 
   const getLabel = (row: IDemographicRow): string => {
@@ -100,7 +108,7 @@ export const DemographicsSection: React.FC<DemographicsSectionProps> = ({ data, 
       </div>
 
       {/* District search */}
-      {activeView === "district" && (
+      {(activeView === "district" || activeView === "combined") && (
         <input
           type="text"
           placeholder="Search district..."
@@ -111,8 +119,41 @@ export const DemographicsSection: React.FC<DemographicsSectionProps> = ({ data, 
         />
       )}
 
-      {/* Table */}
-      {rows.length === 0 ? (
+      {/* Combined cross-tab table */}
+      {activeView === "combined" ? (
+        combinedRows.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-6">No data available</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-gray-100">
+                  <th className="text-left py-2 pr-3 font-medium text-gray-500">District</th>
+                  <th className="text-left py-2 px-2 font-medium text-gray-500">Gender</th>
+                  <th className="text-left py-2 px-2 font-medium text-gray-500">Age Group</th>
+                  <th className="text-right py-2 px-2 font-medium text-gray-500">Learners</th>
+                  <th className="text-right py-2 px-2 font-medium text-gray-500">Active</th>
+                  <th className="text-left py-2 pl-3 font-medium text-gray-500 min-w-[100px]">Active (%)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {combinedRows.map((row, i) => (
+                  <tr key={i} className="border-b border-gray-50 hover:bg-gray-50">
+                    <td className="py-2.5 pr-3 font-medium text-gray-800">{row.district}</td>
+                    <td className="py-2.5 px-2 text-gray-600">{row.gender}</td>
+                    <td className="py-2.5 px-2 text-gray-600">{row.ageGroup}</td>
+                    <td className="py-2.5 px-2 text-right text-gray-600">{row.total.toLocaleString()}</td>
+                    <td className="py-2.5 px-2 text-right text-gray-600">{row.active.toLocaleString()}</td>
+                    <td className="py-2.5 pl-3">
+                      <ProgressBar value={row.activeRate} color="#3363AD" />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
+      ) : rows.length === 0 ? (
         <p className="text-sm text-gray-400 text-center py-6">No data available</p>
       ) : (
         <div className="overflow-x-auto">

@@ -26,7 +26,7 @@ export class SlideController {
   @Middlewares(
     upload.single("file"),
     appendFile,
-    checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN),
+    checkRole(roles.STAFF, roles.CEHO, roles.TRAINER, roles.ADMIN),
   )
   public async createSlide(@Body() body: CreateSlideDto) {
     return SlideService.createSlide(body);
@@ -41,7 +41,7 @@ export class SlideController {
   @Put("/{id}")
   @Security("jwt")
   @Middlewares(
-    checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN),
+    checkRole(roles.STAFF, roles.CEHO, roles.TRAINER, roles.ADMIN),
   )
   public updateSlide(@Path() id: string, @Body() body: CreateSlideDto) {
     return SlideService.updateSlide(id, body);
@@ -50,7 +50,7 @@ export class SlideController {
   @Delete("/{id}")
   @Security("jwt")
   @Middlewares(
-    checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN),
+    checkRole(roles.STAFF, roles.CEHO, roles.TRAINER, roles.ADMIN),
   )
   public deleteSlide(@Path() id: string) {
     return SlideService.deleteSlide(id);

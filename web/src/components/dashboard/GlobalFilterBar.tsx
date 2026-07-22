@@ -26,13 +26,13 @@ const EMPTY: IDashboardFilters = DEFAULT_DASHBOARD_FILTERS;
 const ROLE_LABELS: Record<string, string> = {
   TRAINEE: "CHW",
   TESTER: "Tester",
-  CHO: "CHO",
+  CEHO: "CEHO",
 };
 
 const ROLE_OPTIONS: { value: string; label: string }[] = [
   { value: "TRAINEE", label: "CHW" },
   { value: "TESTER", label: "Tester" },
-  { value: "CHO", label: "CHO" },
+  { value: "CEHO", label: "CEHO" },
 ];
 
 const FILTER_CHIP_LABELS: Record<keyof IDashboardFilters, string> = {

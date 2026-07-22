@@ -38,11 +38,11 @@ function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const { getConversationUnread } = useUnreadCount();
   const { user } = useAuth();
 
-  const isCHO = user?.roles?.includes('CHO') ?? false;
+  const isCEHO = user?.roles?.includes('CEHO') ?? false;
 
   const TAB_CONFIG = useMemo(
-    () => (isCHO ? ALL_TAB_CONFIG : ALL_TAB_CONFIG.filter((t) => t.name !== 'itsinda')),
-    [isCHO],
+    () => (isCEHO ? ALL_TAB_CONFIG : ALL_TAB_CONFIG.filter((t) => t.name !== 'itsinda')),
+    [isCEHO],
   );
 
   const { start, copilotEvents } = useCopilot();
@@ -63,7 +63,7 @@ function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const appTourDone = hasCompleted(TOUR_KEYS.APP);
   const autoStartAttemptedRef = useRef(false);
   // ALL_TAB_CONFIG (not the rendered/filtered TAB_CONFIG, which varies with
-  // isCHO) so this calls the same fixed number of hooks every render,
+  // isCEHO) so this calls the same fixed number of hooks every render,
   // regardless of which tabs are actually visible for this user.
   const advanceIndex = useTourStepAdvance('tab-index');
   const advanceTraining = useTourStepAdvance('tab-training');

@@ -26,7 +26,7 @@ export class AnswerController {
   @Middlewares(
     upload.single("image"),
     appendImage,
-    checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN),
+    checkRole(roles.STAFF, roles.CEHO, roles.TRAINER, roles.ADMIN),
   )
   public async createAnswer(@Body() body: CreateAnswerDto) {
     return AnswerService.createAnswer(body);
@@ -41,7 +41,7 @@ export class AnswerController {
   @Put("/{id}")
   @Security("jwt")
   @Middlewares(
-    checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN),
+    checkRole(roles.STAFF, roles.CEHO, roles.TRAINER, roles.ADMIN),
   )
   public updateAnswer(@Path() id: string, @Body() body: CreateAnswerDto) {
     return AnswerService.updateAnswer(id, body);
@@ -50,7 +50,7 @@ export class AnswerController {
   @Delete("/{id}")
   @Security("jwt")
   @Middlewares(
-    checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN),
+    checkRole(roles.STAFF, roles.CEHO, roles.TRAINER, roles.ADMIN),
   )
   public deleteAnswer(@Path() id: string) {
     return AnswerService.deleteAnswer(id);

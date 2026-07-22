@@ -23,7 +23,7 @@ export class SectionController {
   @Post("/")
   @Security("jwt")
   @Middlewares(
-    checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN),
+    checkRole(roles.STAFF, roles.CEHO, roles.TRAINER, roles.ADMIN),
   )
   public async createSection(@Body() body: CreateSectionDto) {
     return SectionService.createSection(body);
@@ -38,7 +38,7 @@ export class SectionController {
   @Put("/{id}")
   @Security("jwt")
   @Middlewares(
-    checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN),
+    checkRole(roles.STAFF, roles.CEHO, roles.TRAINER, roles.ADMIN),
   )
   public updateSection(@Path() id: string, @Body() body: CreateSectionDto) {
     return SectionService.updateSection(id, body);
@@ -47,7 +47,7 @@ export class SectionController {
   @Delete("/{id}")
   @Security("jwt")
   @Middlewares(
-    checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN),
+    checkRole(roles.STAFF, roles.CEHO, roles.TRAINER, roles.ADMIN),
   )
   public deleteSection(@Path() id: string) {
     return SectionService.deleteSection(id);

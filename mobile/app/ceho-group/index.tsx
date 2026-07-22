@@ -12,15 +12,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronLeft, UserPlus, MapPin, Info, Users } from 'lucide-react-native';
-import { getMyGroup } from '@/services/choGroup.api';
+import { getMyGroup } from '@/services/cehoGroup.api';
 import { useTheme } from '@/contexts/ThemeContext';
 
-export default function CHOGroupScreen() {
+export default function CEHOGroupScreen() {
   const router = useRouter();
   const { isDark, themeColors } = useTheme();
 
   const { data: group, isLoading, isError, refetch, isRefetching } = useQuery({
-    queryKey: ['cho-group-mine'],
+    queryKey: ['ceho-group-mine'],
     queryFn: getMyGroup,
   });
 
@@ -90,7 +90,7 @@ export default function CHOGroupScreen() {
             <View style={styles.actionsGrid}>
               <TouchableOpacity
                 style={[styles.actionCard, { backgroundColor: cardBg }]}
-                onPress={() => router.push('/cho-group/invite')}
+                onPress={() => router.push('/ceho-group/invite')}
                 activeOpacity={0.8}
               >
                 <View style={[styles.actionIconWrapper, { backgroundColor: '#D1FAE5' }]}>

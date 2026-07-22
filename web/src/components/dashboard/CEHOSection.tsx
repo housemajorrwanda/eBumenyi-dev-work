@@ -11,8 +11,9 @@ import {
   Activity,
   MapPin,
 } from "lucide-react";
-import { getMyGroup, getGroupMonitoring } from "@/services/choGroup.service";
-import { ICHOGroupMonitoringMember } from "@/types";
+import { getMyGroup, getGroupMonitoring } from "@/services/cehoGroup.service";
+import { ICEHOGroupMonitoringMember } from "@/types";
+import { SectionSkeleton } from "./shared/SectionSkeleton";
 
 /* ─── Avatar ─────────────────────────────────────────────────────── */
 const Avatar: React.FC<{ name: string; photo: string | null; size?: string }> = ({
@@ -42,7 +43,7 @@ const Avatar: React.FC<{ name: string; photo: string | null; size?: string }> = 
 };
 
 /* ─── Member row ─────────────────────────────────────────────────── */
-const MemberRow: React.FC<{ member: ICHOGroupMonitoringMember }> = ({ member }) => {
+const MemberRow: React.FC<{ member: ICEHOGroupMonitoringMember }> = ({ member }) => {
   const avgProgress =
     member.courseProgress.length > 0
       ? Math.round(
@@ -115,21 +116,25 @@ const StatCard: React.FC<{
   </div>
 );
 
-/* ─── Main CHO section ───────────────────────────────────────────── */
-export const CHOSection: React.FC = () => {
+/* ─── Main CEHO section ───────────────────────────────────────────── */
+export const CEHOSection: React.FC = () => {
   const navigate = useNavigate();
 
-  const { data: group } = useQuery({
-    queryKey: ["cho-group-mine"],
+  const { data: group, isLoading: isGroupLoading } = useQuery({
+    queryKey: ["ceho-group-mine"],
     queryFn: getMyGroup,
     retry: false,
   });
 
-  const { data: monitoring, isLoading } = useQuery({
-    queryKey: ["cho-group-monitoring"],
+  const { data: monitoring, isLoading: isMonitoringLoading } = useQuery({
+    queryKey: ["ceho-group-monitoring"],
     queryFn: getGroupMonitoring,
     retry: false,
   });
+
+  const isLoading = isGroupLoading || isMonitoringLoading;
+
+  if (isLoading) return <SectionSkeleton cards={4} rows={2} />;
 
   const members = monitoring?.members ?? [];
 
@@ -175,7 +180,7 @@ export const CHOSection: React.FC = () => {
           </div>
         </div>
         <button
-          onClick={() => navigate("/cho-group")}
+          onClick={() => navigate("/ceho-group")}
           className="text-xs text-[#3363AD] hover:underline flex items-center gap-0.5"
         >
           View group <ChevronRight size={12} />
@@ -236,20 +241,14 @@ export const CHOSection: React.FC = () => {
               )}
             </div>
             <button
-              onClick={() => navigate("/cho-group")}
+              onClick={() => navigate("/ceho-group")}
               className="text-xs text-[#3363AD] hover:underline flex items-center gap-0.5"
             >
               View all <ChevronRight size={12} />
             </button>
           </div>
 
-          {isLoading ? (
-            <div className="space-y-3 animate-pulse">
-              {[...Array(4)].map((_, i) => (
-                <div key={i} className="h-14 bg-gray-50 rounded-xl" />
-              ))}
-            </div>
-          ) : members.length === 0 ? (
+          {members.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-10 text-center">
               <div className="w-12 h-12 rounded-xl bg-[#EBF0F9] flex items-center justify-center mb-3">
                 <Users size={20} className="text-[#3363AD]/40" />
@@ -257,7 +256,7 @@ export const CHOSection: React.FC = () => {
               <p className="text-sm font-medium text-gray-500">No members yet</p>
               <p className="text-xs text-gray-400 mt-1">Invite CHW members to your group</p>
               <button
-                onClick={() => navigate("/cho-group/invite")}
+                onClick={() => navigate("/ceho-group/invite")}
                 className="mt-4 px-4 py-2 text-xs font-semibold text-white bg-[#3363AD] rounded-lg hover:bg-[#2a52a0] transition-colors"
               >
                 Invite CHW
@@ -270,7 +269,7 @@ export const CHOSection: React.FC = () => {
               ))}
               {members.length > 6 && (
                 <button
-                  onClick={() => navigate("/cho-group")}
+                  onClick={() => navigate("/ceho-group")}
                   className="w-full text-xs text-[#3363AD] hover:underline pt-2 pb-1 text-center"
                 >
                   +{members.length - 6} more members
@@ -287,7 +286,7 @@ export const CHOSection: React.FC = () => {
               label: "My Group",
               desc: "View and manage CHWs",
               Icon: Users,
-              path: "/cho-group",
+              path: "/ceho-group",
               bg: "bg-[#EBF0F9]",
               color: "text-[#3363AD]",
             },
@@ -295,7 +294,7 @@ export const CHOSection: React.FC = () => {
               label: "Add CHW",
               desc: "Add new members",
               Icon: UserPlus,
-              path: "/cho-group/invite",
+              path: "/ceho-group/invite",
               bg: "bg-amber-50",
               color: "text-amber-600",
             },

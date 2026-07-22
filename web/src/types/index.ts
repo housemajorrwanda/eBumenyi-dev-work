@@ -7,7 +7,7 @@ export type UserRole =
   | "TRAINEE"
   | "TESTER"
   | "DEVELOPER"
-  | "CHO"
+  | "CEHO"
   | "STAFF";
 export type UserIndustry = "WELTEL" | "RBC" | "SFH" | "CIIC-HIN";
 export type Permission = "ALL" | "DEFAULT";
@@ -297,6 +297,7 @@ export interface ICommentThread {
 export interface IAttachment {
   url: string;
   type: "image" | "video" | "audio" | "file";
+  name?: string;
 }
 
 export interface IMessage {
@@ -313,7 +314,12 @@ export interface IMessage {
   isEdited?: boolean;
   readBy?: IReadBy[];
   likes?: number;
+  isLikedByMe?: boolean;
   comments?: ICommentThread[];
+  /** Only present on search results — this message's 0-based position under the
+   * conversation's normal newest-first pagination, used to jump to the page that
+   * contains it. */
+  offsetInConversation?: number;
 }
 
 export type ConversationType = "direct" | "group" | "community";
@@ -335,6 +341,9 @@ export interface IConversation {
   lastMessageId?: string | null;
   participants: IConversationParticipant[];
   lastMessage?: IMessage | null;
+  muted?: boolean;
+  createdById?: string;
+  photo?: string | null;
 }
 
 export interface IParticipant {
@@ -357,9 +366,9 @@ export interface IGroup {
   createdBy?: string;
 }
 
-// ── CHO Group ────────────────────────────────────────────────────────────────
+// ── CEHO Group ────────────────────────────────────────────────────────────────
 
-export interface ICHOGroup {
+export interface ICEHOGroup {
   id: string;
   name: string;
   district?: string | null;
@@ -369,17 +378,17 @@ export interface ICHOGroup {
   cell?: string | null;
   village?: string | null;
   description?: string | null;
-  choId: string;
+  cehoId: string;
   createdAt: string;
   updatedAt: string;
-  cho?: {
+  ceho?: {
     id: string;
     user: { id: string; fullNames: string; photo: string | null; phoneNumber: string | null };
   };
   _count?: { members: number };
 }
 
-export interface ICHOGroupMember {
+export interface ICEHOGroupMember {
   id: string;
   groupId: string;
   studentId: string;
@@ -397,7 +406,7 @@ export interface ICHOGroupMember {
   };
 }
 
-export interface ICHOGroupInvitation {
+export interface ICEHOGroupInvitation {
   id: string;
   groupId: string;
   studentId: string;
@@ -407,12 +416,12 @@ export interface ICHOGroupInvitation {
   group?: {
     id: string;
     name: string;
-    cho?: { user: { id: string; fullNames: string; photo: string | null; phoneNumber: string | null } };
+    ceho?: { user: { id: string; fullNames: string; photo: string | null; phoneNumber: string | null } };
   };
   student?: { user: { id: string; fullNames: string; photo: string | null; phoneNumber: string | null } };
 }
 
-export interface ICHOGroupMonitoringMember {
+export interface ICEHOGroupMonitoringMember {
   studentId: string;
   user: { id: string; fullNames: string; photo: string | null; phoneNumber: string | null };
   status: string;
@@ -432,11 +441,11 @@ export interface ICHOGroupMonitoringMember {
   }>;
 }
 
-export interface ICHOGroupMonitoring {
+export interface ICEHOGroupMonitoring {
   groupId: string;
   groupName: string;
   totalMembers: number;
-  members: ICHOGroupMonitoringMember[];
+  members: ICEHOGroupMonitoringMember[];
 }
 
 export interface IStudentSearchResult {
@@ -629,6 +638,7 @@ export interface IUser {
   otp: string | null;
   otpExpiresAt: string | null;
   photo: string;
+  hospitalId?: string | null;
 }
 
 export interface ICourseIntro {
@@ -926,6 +936,7 @@ export interface ICoursePerformance {
   inProgress: number;
   completed: number;
   rate: number; // completion rate
+  certified: number; // certificates issued for this course
 }
 
 export interface IStudentAnalyticsResponse {
@@ -934,11 +945,20 @@ export interface IStudentAnalyticsResponse {
   data: IStudentAnalytics;
 }
 
+export interface IAvgStudyTimeByCourse {
+  courseId: string;
+  courseTitle: string;
+  avgHours: number;
+  source: "live" | "estimated";
+  activeStudents: number;
+}
+
 export interface IStudentAnalytics {
   totalStudents: IStatWithTrend<number>;
   activeStudents: IStatWithTrend<number>;
   onLeaveStudents: IStatWithTrend<number>;
-  avgStudyTime: IStatWithTrend<number> & { unit: string };
+  avgStudyTime: IStatWithTrend<number> & { unit: string; isEstimate: boolean };
+  avgStudyTimeByCourse: IAvgStudyTimeByCourse[];
   completionRate: IStatWithTrend<number> & { unit: string };
 
   performanceDistribution: IPerformanceDistribution;
@@ -1029,6 +1049,7 @@ export interface StudentInfo {
   photo: string;
   status: string;
   role: string;
+  hospitalId?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -1271,11 +1292,21 @@ export interface ITestScoreByCourse {
   finalTestAttempts: number;
 }
 
+export interface ITestScoreByDistrict {
+  district: string;
+  meanPreTest: number | null;
+  meanFinalTest: number | null;
+  knowledgeGain: number | null;
+  preTestAttempts: number;
+  finalTestAttempts: number;
+}
+
 export interface ITestScoreAnalytics {
   overallMeanPreTest: number;
   overallMeanFinalTest: number;
   overallKnowledgeGain: number;
   byCourse: ITestScoreByCourse[];
+  byDistrict: ITestScoreByDistrict[];
 }
 
 // ── Communications analytics ─────────────────────────────────────
@@ -1288,8 +1319,8 @@ export interface ICommType {
 
 export interface ICommMonthlyTrend {
   month: string;
-  direct: number;
-  group: number;
+  peerToPeer: number;
+  chwToSupervisor: number;
   community: number;
   total: number;
 }
@@ -1312,11 +1343,24 @@ export interface IDemographicRow {
   certificationRate: number;
 }
 
+export interface IDemographicCombinedRow {
+  district: string;
+  gender: string;
+  ageGroup: string;
+  total: number;
+  active: number;
+  inactive: number;
+  suspended: number;
+  graduated: number;
+  activeRate: number;
+}
+
 export interface IDemographicsAnalytics {
   totalStudents: number;
   byDistrict: IDemographicRow[];
   byGender: IDemographicRow[];
   byAgeGroup: IDemographicRow[];
+  combined: IDemographicCombinedRow[];
 }
 
 export interface IDashboardFilters {
@@ -1329,6 +1373,11 @@ export interface IDashboardFilters {
   hospitalId: string; // "" means all
 }
 
+export interface IActivationTrend {
+  value: number;
+  direction: "up" | "down" | "stable";
+}
+
 export interface ICHWStats {
   chws: {
     total: number;
@@ -1336,6 +1385,9 @@ export interface ICHWStats {
     inactive: number;
     suspended: number;
     graduated: number;
+    activationRate: number;
+    activationTrend: IActivationTrend | null;
+    avgLogins: number;
   };
   completion: {
     rate: number;
@@ -1355,6 +1407,9 @@ export interface ICHWStats {
     male: number;
     female: number;
     other: number;
+    activationRate: number;
+    activationTrend: IActivationTrend | null;
+    avgLogins: number;
   };
 }
 
@@ -1390,3 +1445,45 @@ export interface IRecentActivityFeed {
   submissions: IActivityItem[];
   courseUpdates: IActivityItem[];
 }
+
+export interface IMonthlyActiveTrends {
+  activeCHWTrend: { month: string; activeCHWs: number }[];
+  activeUsersTrend: { month: string; activeUsers: number }[];
+}
+
+export interface ICertificationRateEntry {
+  eligible: number;
+  issued: number;
+  rate: number;
+}
+
+export interface ICertificationByCourse extends ICertificationRateEntry {
+  courseId: string;
+  courseTitle: string;
+}
+
+export interface ICertificationByDistrict extends ICertificationRateEntry {
+  district: string;
+}
+
+export interface ICertificationByFacility extends ICertificationRateEntry {
+  hospitalId: string;
+  hospitalName: string;
+}
+
+export interface ICertificationAnalytics {
+  total: ICertificationRateEntry & { certifiedStudents: number };
+  byCourse: ICertificationByCourse[];
+  byDistrict: ICertificationByDistrict[];
+  byFacility: ICertificationByFacility[];
+}
+
+export interface ISupervisorResponseRate {
+  totalChwMessages: number;
+  respondedCount: number;
+  responseRate: number;
+  avgResponseHours: number | null;
+  within24hRate: number;
+  note: string;
+}
+

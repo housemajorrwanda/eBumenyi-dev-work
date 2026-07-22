@@ -18,6 +18,7 @@ interface DashboardData {
   courseAnalytics: ICourseAnalytics | null;
   studentAnalytics: IStudentAnalytics | null;
   isLoading: boolean;
+  isFetching: boolean;
   error: string | null;
   refetch: () => void;
 }
@@ -49,7 +50,7 @@ export const useDashboardStats = ({
 
   const activeFilters = filters ?? DEFAULT_DASHBOARD_FILTERS;
 
-  const { data, isLoading, error, refetch } = useQuery({
+  const { data, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: dashboardKeys.stats(dashboardFilterKey(activeFilters)),
     queryFn: async (): Promise<DashboardStatsResult> => {
       const statsPath = withDashboardFilterQuery("/courses/dashboard/statistics", activeFilters);
@@ -72,6 +73,7 @@ export const useDashboardStats = ({
       };
     },
     enabled,
+    keepPreviousData: true,
     staleTime: DASHBOARD_CACHE_MS,
     gcTime: DASHBOARD_CACHE_MS,
   });
@@ -81,6 +83,7 @@ export const useDashboardStats = ({
     courseAnalytics: data?.courseAnalytics ?? null,
     studentAnalytics: data?.studentAnalytics ?? null,
     isLoading,
+    isFetching,
     error: error ? "Failed to fetch data. Please try again." : null,
     refetch: () => {
       void refetch();

@@ -17,7 +17,7 @@ import type { ICourse } from "@/types";
 interface StudentsListProps {
   hideHeader?: boolean;
   filter?: string;
-  roleFilter?: "TRAINEE" | "TESTER" | "CHO";
+  roleFilter?: "TRAINEE" | "TESTER" | "CEHO";
 }
 
 const StudentsList: FC<StudentsListProps> = ({
@@ -150,7 +150,7 @@ const StudentsList: FC<StudentsListProps> = ({
     roleFilter &&
     ((roleFilter === "TESTER" && canChangeLearnerRole) ||
       (roleFilter === "TRAINEE" && isAdmin) ||
-      (roleFilter === "CHO" && isAdmin));
+      (roleFilter === "CEHO" && isAdmin));
 
   const tableContent = (
     <>
@@ -300,16 +300,13 @@ const StudentsList: FC<StudentsListProps> = ({
           {
             title: "Actions",
             key: "actions",
-            render: (row: IStudent) => (
-              <TableActions>
-                <StudentTableActions
-                  item={row}
-                  showPromote={roleFilter === "TRAINEE" && isAdmin}
-                  showDemote={roleFilter === "CHO" && isAdmin}
-                  showPromoteToCHW={roleFilter === "TESTER" && canChangeLearnerRole}
-                />
-              </TableActions>
-            ),
+            render: (row: IStudent) => {
+              return (
+                <TableActions>
+                  <StudentTableActions item={row} showPromote={roleFilter === "TRAINEE"} showDemote={roleFilter === "CEHO"} />
+                </TableActions>
+              );
+            },
           },
         ]}
         data={data?.data || []}

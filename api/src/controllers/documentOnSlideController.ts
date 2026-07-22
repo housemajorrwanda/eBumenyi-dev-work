@@ -23,7 +23,7 @@ export class DocumentOnSlideController {
   @Post("/")
   @Security("jwt")
   @Middlewares(
-    checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN),
+    checkRole(roles.STAFF, roles.CEHO, roles.TRAINER, roles.ADMIN),
   )
   public async createDocument(@Body() body: CreateDocumentOnSlideDto) {
     return DocumentOnSlideService.createDocument(body);
@@ -54,7 +54,7 @@ export class DocumentOnSlideController {
   @Put("/{id}")
   @Security("jwt")
   @Middlewares(
-    checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN),
+    checkRole(roles.STAFF, roles.CEHO, roles.TRAINER, roles.ADMIN),
   )
   public async updateDocument(
     @Path() id: string,
@@ -66,7 +66,7 @@ export class DocumentOnSlideController {
   @Delete("/{id}")
   @Security("jwt")
   @Middlewares(
-    checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN),
+    checkRole(roles.STAFF, roles.CEHO, roles.TRAINER, roles.ADMIN),
   )
   public async deleteDocument(@Path() id: string) {
     return DocumentOnSlideService.deleteDocument(id);

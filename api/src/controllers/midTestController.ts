@@ -23,7 +23,7 @@ export class MidTestController {
   @Post("/")
   @Security("jwt")
   @Middlewares(
-    checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN),
+    checkRole(roles.STAFF, roles.CEHO, roles.TRAINER, roles.ADMIN),
   )
   public async createMidTest(@Body() body: CreateMidTestDto) {
     return MidTestService.createMidTest(body);
@@ -38,7 +38,7 @@ export class MidTestController {
   @Put("/{id}")
   @Security("jwt")
   @Middlewares(
-    checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN),
+    checkRole(roles.STAFF, roles.CEHO, roles.TRAINER, roles.ADMIN),
   )
   public updateMidTest(@Path() id: string, @Body() body: CreateMidTestDto) {
     return MidTestService.updateMidTest(id, body);
@@ -47,7 +47,7 @@ export class MidTestController {
   @Delete("/{id}")
   @Security("jwt")
   @Middlewares(
-    checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN),
+    checkRole(roles.STAFF, roles.CEHO, roles.TRAINER, roles.ADMIN),
   )
   public deleteMidTest(@Path() id: string) {
     return MidTestService.deleteMidTest(id);

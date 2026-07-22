@@ -4,7 +4,7 @@ import { prisma } from "../utils/client";
 import { chatWithTools } from "../services/chatService";
 import { loggerMiddleware } from "../utils/loggers/loggingMiddleware";
 
-const STAFF_ROLES = ["ADMIN", "STAFF", "CHO", "TRAINER"];
+const STAFF_ROLES = ["ADMIN", "STAFF", "CEHO", "TRAINER"];
 
 async function chatContext(
   req: ExpressRequest,

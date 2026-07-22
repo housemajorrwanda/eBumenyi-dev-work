@@ -23,7 +23,7 @@ export class FinalTestController {
   @Post("/")
   @Security("jwt")
   @Middlewares(
-    checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN),
+    checkRole(roles.STAFF, roles.CEHO, roles.TRAINER, roles.ADMIN),
   )
   public async createFinalTest(@Body() body: CreateFinalTestDto) {
     return FinalTestService.createFinalTest(body);
@@ -38,7 +38,7 @@ export class FinalTestController {
   @Put("/{id}")
   @Security("jwt")
   @Middlewares(
-    checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN),
+    checkRole(roles.STAFF, roles.CEHO, roles.TRAINER, roles.ADMIN),
   )
   public updateFinalTest(@Path() id: string, @Body() body: CreateFinalTestDto) {
     return FinalTestService.updateFinalTest(id, body);
@@ -47,7 +47,7 @@ export class FinalTestController {
   @Delete("/{id}")
   @Security("jwt")
   @Middlewares(
-    checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN),
+    checkRole(roles.STAFF, roles.CEHO, roles.TRAINER, roles.ADMIN),
   )
   public deleteFinalTest(@Path() id: string) {
     return FinalTestService.deleteFinalTest(id);

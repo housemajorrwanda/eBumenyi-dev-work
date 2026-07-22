@@ -26,6 +26,7 @@ import { userValidations } from "./../varifications/user";
 import { normalizeRwandaPhone } from "../utils/normalizeRwandaPhone";
 import { WeltelService } from "./weltelService";
 import { OnboardingService } from "./onboardingService";
+import { CEHOGroupService } from "./cehoGroupService";
 
 export class UserService extends BaseService {
   private static normalizePhone(phone: string): string {
@@ -986,6 +987,11 @@ export class UserService extends BaseService {
         },
       });
 
+      const newHospitalId = user.hospitalId ?? existing.hospitalId ?? null;
+      if (newHospitalId !== existing.hospitalId) {
+        await CEHOGroupService.handleUserHospitalChange(prisma, id, existing.hospitalId, newHospitalId);
+      }
+
       await UserService.syncWeltelOnUserUpdate(id, existing, {
         fullNames: payload.fullNames,
         phoneNumber,
@@ -1439,6 +1445,11 @@ export class UserService extends BaseService {
           gender: profileData.gender ?? undefined,
         },
       });
+
+      const newHospitalId = profileData.hospitalId ?? user.hospitalId ?? null;
+      if (newHospitalId !== user.hospitalId) {
+        await CEHOGroupService.handleUserHospitalChange(prisma, userId, user.hospitalId, newHospitalId);
+      }
 
       await UserService.syncWeltelOnUserUpdate(userId, user, {
         fullNames: profileData.fullNames,

@@ -151,6 +151,7 @@ model Hospital {
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
   users                 User[]
+  cehoGroups            CEHOGroup[]
 }
 
 enum Industry {
@@ -169,7 +170,7 @@ enum RecordingAudience {
 enum RoleType {
   ADMIN
   TRAINER
-  CHO
+  CEHO
   TRAINEE
   DEVELOPER
   TESTER
@@ -685,15 +686,16 @@ model Student {
   sectionReview      SectionReview[]
   chapterReview      ChapterReview[]
   certificates       Certificate[]
-  ledGroup           CHOGroup?            @relation("CHOLeader")
-  groupMembership    CHOGroupMember?      @relation("CHWGroupMembership")
-  receivedInvitations CHOGroupInvitation[] @relation("CHWInvitations")
+  ledGroup           CEHOGroup?            @relation("CEHOLeader")
+  groupMembership    CEHOGroupMember?      @relation("CHWGroupMembership")
+  receivedInvitations CEHOGroupInvitation[] @relation("CHWInvitations")
 }
 
-model CHOGroup {
+model CEHOGroup {
   id          String     @id @default(uuid())
   name        String
-  choId       String     @unique
+  cehoId      String     @unique
+  hospitalId  String?
   district    String?
   sectors     String[]   @default([])
   cells       String[]   @default([])
@@ -704,31 +706,40 @@ model CHOGroup {
   groupChatId String?    @unique
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
-  cho         Student    @relation("CHOLeader", fields: [choId], references: [id], onDelete: Cascade)
-  groupChat   GroupChat? @relation("CHOGroupChat", fields: [groupChatId], references: [id], onDelete: SetNull)
-  members     CHOGroupMember[]
-  invitations CHOGroupInvitation[]
+  ceho        Student    @relation("CEHOLeader", fields: [cehoId], references: [id], onDelete: Cascade)
+  hospital    Hospital?  @relation(fields: [hospitalId], references: [id], onDelete: SetNull)
+  groupChat   GroupChat? @relation("CEHOGroupChat", fields: [groupChatId], references: [id], onDelete: SetNull)
+  members     CEHOGroupMember[]
+  invitations CEHOGroupInvitation[]
+
+  @@unique([hospitalId])
 }
 
-model CHOGroupMember {
-  id        String   @id @default(uuid())
+enum MemberSource {
+  AUTO
+  MANUAL
+}
+
+model CEHOGroupMember {
+  id        String       @id @default(uuid())
   groupId   String
-  studentId String   @unique
-  joinedAt  DateTime @default(now())
-  group     CHOGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  studentId String       @unique
+  addedVia  MemberSource @default(MANUAL)
+  joinedAt  DateTime     @default(now())
+  group     CEHOGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
   student   Student  @relation("CHWGroupMembership", fields: [studentId], references: [id], onDelete: Cascade)
 
   @@index([groupId])
 }
 
-model CHOGroupInvitation {
+model CEHOGroupInvitation {
   id          String           @id @default(uuid())
   groupId     String
   studentId   String
   status      InvitationStatus @default(PENDING)
   invitedAt   DateTime         @default(now())
   respondedAt DateTime?
-  group       CHOGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  group       CEHOGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
   student     Student  @relation("CHWInvitations", fields: [studentId], references: [id], onDelete: Cascade)
 
   @@unique([groupId, studentId])
@@ -949,7 +960,7 @@ model GroupChat {
   lastMessage     GroupMessage? @relation("GroupChatLastMessage", fields: [lastMessageId], references: [id], onDelete: SetNull)
   participants    GroupChatParticipant[]
   messages        GroupMessage[] @relation("GroupChatMessages")
-  choGroup        CHOGroup? @relation("CHOGroupChat")
+  cehoGroup       CEHOGroup? @relation("CEHOGroupChat")
   
   @@index([createdById])
   @@index([updatedAt(sort: Desc)])
@@ -1252,13 +1263,35 @@ model MeetingAttendance {
   leftAt       DateTime?
   durationSec  Int?
 
-  event CalendarEvent? @relation(fields: [eventId], references: [id], onDelete: SetNull)
-  user  User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  event  CalendarEvent?  @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  user   User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+  survey MeetingSurvey?
 
   @@index([eventId])
   @@index([streamRoomId])
   @@index([userId])
   @@map("meeting_attendance")
+}
+
+model MeetingSurvey {
+  id           String   @id @default(uuid())
+  attendanceId String   @unique
+  rating       Int?
+  comment      String?
+  name         String?
+  phoneNumber  String?
+  hospital     String?
+  gender       String?
+  district     String?
+  sector       String?
+  cell         String?
+  village      String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  attendance MeetingAttendance @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+
+  @@map("meeting_survey")
 }
 
 model CertificateTemplate {

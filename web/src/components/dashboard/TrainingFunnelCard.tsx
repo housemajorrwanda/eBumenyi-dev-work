@@ -32,7 +32,7 @@ export const TrainingFunnelCard: React.FC<TrainingFunnelCardProps> = ({ courses 
     { label: "Enrolled", value: selectedCourse.enrolled, color: "#3363AD" },
     { label: "In Progress", value: selectedCourse.inProgress, color: "#5B86C4" },
     { label: "Completed", value: selectedCourse.completed, color: "#799DCD" },
-    { label: "Certificates", value: Math.round(selectedCourse.rate), color: "#A1BCE0" },
+    { label: "Certified", value: selectedCourse.certified, color: "#A1BCE0" },
   ];
 
   return (
@@ -58,7 +58,7 @@ export const TrainingFunnelCard: React.FC<TrainingFunnelCardProps> = ({ courses 
 
       <div className="space-y-3">
         {steps.map((step, index) => {
-          const max = index === 3 ? 100 : selectedCourse.enrolled;
+          const max = selectedCourse.enrolled;
           const percentage = max > 0 ? (step.value / max) * 100 : 0;
 
           return (
@@ -71,7 +71,7 @@ export const TrainingFunnelCard: React.FC<TrainingFunnelCardProps> = ({ courses 
                 />
               </div>
               <span className="w-10 text-sm font-medium text-gray-700 text-right shrink-0">
-                {step.value}{index === 3 ? "%" : ""}
+                {step.value}
               </span>
             </div>
           );

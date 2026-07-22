@@ -3,7 +3,7 @@ import { TsoaResponse } from "tsoa";
 export type RoleTypeEnum =
   | "ADMIN"
   | "TRAINER"
-  | "CHO"
+  | "CEHO"
   | "TRAINEE"
   | "DEVELOPER"
   | "TESTER"
@@ -320,7 +320,7 @@ export interface TCourseResponse {
 }
 
 export interface NotifyCourseUsersDto {
-  roles?: Array<"TRAINEE" | "TESTER" | "CHO" | "TRAINER" | "STAFF" | "ADMIN">;
+  roles?: Array<"TRAINEE" | "TESTER" | "CEHO" | "TRAINER" | "STAFF" | "ADMIN">;
 }
 
 // Section

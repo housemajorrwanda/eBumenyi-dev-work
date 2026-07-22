@@ -460,7 +460,7 @@ function translateRole(role: string): string {
   const translations: Record<string, string> = {
     ADMIN: 'Umuyobozi',
     TRAINER: 'Umwarimu',
-    CHO: 'Umugenzuzi',
+    CEHO: 'Umugenzuzi',
     TRAINEE: 'Umujyanama',
     TESTER: 'Umusuzumyi',
     STAFF: 'Umukozi',
@@ -487,7 +487,7 @@ function getBadgeStyle(role: string) {
       return { backgroundColor: '#d1fae5', color: '#059669' };
     case 'TRAINER':
       return { backgroundColor: '#dbeafe', color: '#2563eb' };
-    case 'CHO':
+    case 'CEHO':
       return { backgroundColor: '#fef3c7', color: '#d97706' };
     case 'TRAINEE':
     case 'TESTER':

@@ -3,7 +3,7 @@ import { ICourseAnalytics, IStudentAnalytics, IDashboardStats, IDashboardFilters
 import { KpiCard } from "./shared/KpiCard";
 import { DashboardSectionHeader } from "./shared/DashboardSectionHeader";
 import { SectionSkeleton } from "./shared/SectionSkeleton";
-// import { TrainingFunnelCard } from "./TrainingFunnelCard";
+import { TrainingFunnelCard } from "./TrainingFunnelCard";
 import { TestScoreCard } from "./TestScoreCard";
 import { RecommendationReviewCard } from "./RecommendationReviewCard";
 import { CertificationCard } from "./CertificationCard";
@@ -15,6 +15,7 @@ interface Phase3SectionProps {
   courseAnalytics: ICourseAnalytics | null;
   studentAnalytics: IStudentAnalytics | null;
   isLoading: boolean;
+  isFetching?: boolean;
   isSupervisorView: boolean;
   hideKpis?: boolean;
   filters?: IDashboardFilters;
@@ -25,6 +26,7 @@ export const Phase3Section: React.FC<Phase3SectionProps> = ({
   courseAnalytics,
   studentAnalytics,
   isLoading,
+  isFetching = false,
   isSupervisorView,
   hideKpis = false,
   filters: _filters,
@@ -32,7 +34,7 @@ export const Phase3Section: React.FC<Phase3SectionProps> = ({
   if (isLoading && !dashboardStats) return <SectionSkeleton cards={4} rows={2} />;
 
   return (
-    <div className="space-y-6">
+    <div className={`space-y-6 transition-opacity duration-200 ${isFetching ? "opacity-60 pointer-events-none" : "opacity-100"}`}>
       <DashboardSectionHeader
         icon={<BarChart2 size={18} />}
         title="Training Analytics"
@@ -94,6 +96,11 @@ export const Phase3Section: React.FC<Phase3SectionProps> = ({
             />
           </div>
         </div>
+      )}
+
+      {/* Training funnel */}
+      {!hideKpis && (
+        <TrainingFunnelCard courses={courseAnalytics?.coursePerformanceMetrics ?? []} />
       )}
     </div>
   );

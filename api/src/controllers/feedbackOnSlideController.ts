@@ -30,7 +30,7 @@ export class FeedbackOnSlideController {
   @Middlewares(
     checkRole(
       roles.STAFF,
-      roles.CHO,
+      roles.CEHO,
       roles.TRAINER,
       roles.ADMIN,
       roles.TRAINEE,
@@ -118,7 +118,7 @@ export class FeedbackOnSlideController {
   @Middlewares(
     checkRole(
       roles.STAFF,
-      roles.CHO,
+      roles.CEHO,
       roles.TRAINER,
       roles.ADMIN,
       roles.TRAINEE,
@@ -136,7 +136,7 @@ export class FeedbackOnSlideController {
   @Middlewares(
     checkRole(
       roles.STAFF,
-      roles.CHO,
+      roles.CEHO,
       roles.TRAINER,
       roles.ADMIN,
       roles.TRAINEE,

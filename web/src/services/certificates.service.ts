@@ -114,6 +114,13 @@ export const getAllCertificates = async (params?: {
   courseId?: string;
   dateFrom?: string;
   dateTo?: string;
+  district?: string;
+  province?: string;
+  gender?: string;
+  role?: string;
+  year?: string;
+  month?: string;
+  hospitalId?: string;
 }): Promise<IIssuedCertificatesResponse> => {
   const query = new URLSearchParams();
   if (params?.searchq) query.set("searchq", params.searchq);
@@ -123,6 +130,13 @@ export const getAllCertificates = async (params?: {
   if (params?.courseId) query.set("courseId", params.courseId);
   if (params?.dateFrom) query.set("dateFrom", params.dateFrom);
   if (params?.dateTo) query.set("dateTo", params.dateTo);
+  if (params?.district) query.set("district", params.district);
+  if (params?.province) query.set("province", params.province);
+  if (params?.gender) query.set("gender", params.gender);
+  if (params?.role) query.set("role", params.role);
+  if (params?.year) query.set("year", params.year);
+  if (params?.month) query.set("month", params.month);
+  if (params?.hospitalId) query.set("hospitalId", params.hospitalId);
   const res = await api.get(`/certificates/all?${query.toString()}`);
   return res.data as IIssuedCertificatesResponse;
 };

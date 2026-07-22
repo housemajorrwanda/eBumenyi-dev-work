@@ -12,7 +12,7 @@ const isLearnerRole = (role?: UserRole) => role === "TRAINEE" || role === "TESTE
 
 // Normalize legacy role names to their current equivalents
 const normalizeRole = (role: string): string =>
-  role === "CHO" ? "CHO" : role;
+  role === "CEHO" ? "CEHO" : role;
 
 // Hook to check if the current user has permission based on roles and/or industries
 export const usePermission = (config: PermissionConfig = {}) => {

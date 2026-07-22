@@ -5,16 +5,16 @@ import { getStudentAnalytics } from "@/services/analytics.service";
 import { studentKeys } from "@/utils/constants/queryKeys";
 
 interface StudentStatsCardsProps {
-  roleFilter?: "TRAINEE" | "TESTER" | "CHO";
+  roleFilter?: "TRAINEE" | "TESTER" | "CEHO";
 }
 
-const buildStudentAnalyticsQuery = (roleFilter?: "TRAINEE" | "TESTER" | "CHO") => {
+const buildStudentAnalyticsQuery = (roleFilter?: "TRAINEE" | "TESTER" | "CEHO") => {
   return roleFilter ? `role=${roleFilter}` : "";
 };
 
-const getRoleLabel = (roleFilter?: "TRAINEE" | "TESTER" | "CHO") => {
+const getRoleLabel = (roleFilter?: "TRAINEE" | "TESTER" | "CEHO") => {
   if (roleFilter === "TESTER") return "Tester";
-  if (roleFilter === "CHO") return "CHO";
+  if (roleFilter === "CEHO") return "CEHO";
   return "CHW";
 };
 

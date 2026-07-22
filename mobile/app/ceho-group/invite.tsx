@@ -15,7 +15,7 @@ import { useRouter } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
 import { ChevronLeft, Search, UserPlus, MapPin } from 'lucide-react-native';
-import { searchCHWCandidates, choDirectlyAddMember } from '@/services/choGroup.api';
+import { searchCHWCandidates, cehoDirectlyAddMember } from '@/services/cehoGroup.api';
 import { IStudentSearchResult } from '@/types';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useIsFocused } from '@react-navigation/native';
@@ -67,11 +67,11 @@ function InviteScreenContent() {
   });
 
   const { mutate: addMember, isPending } = useMutation({
-    mutationFn: (studentId: string) => choDirectlyAddMember(studentId),
+    mutationFn: (studentId: string) => cehoDirectlyAddMember(studentId),
     onSuccess: (_, studentId) => {
       setInvitedIds((prev) => new Set([...prev, studentId]));
-      queryClient.invalidateQueries({ queryKey: ['cho-group-members'] });
-      queryClient.invalidateQueries({ queryKey: ['cho-chw-candidates'] });
+      queryClient.invalidateQueries({ queryKey: ['ceho-group-members'] });
+      queryClient.invalidateQueries({ queryKey: ['ceho-chw-candidates'] });
       Toast.show({ type: 'success', text1: 'Byongewe mu itsinda' });
     },
     onError: (error: any) => {

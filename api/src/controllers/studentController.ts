@@ -26,7 +26,7 @@ export class StudentController {
     checkRole(
       roles.ADMIN,
       roles.STAFF,
-      roles.CHO,
+      roles.CEHO,
       roles.TRAINER,
       roles.DEVELOPER,
     ),
@@ -61,7 +61,7 @@ export class StudentController {
   @Security("jwt")
   @Middlewares(
     loggerMiddleware,
-    checkRole(roles.ADMIN, roles.STAFF, roles.CHO, roles.TRAINER),
+    checkRole(roles.ADMIN, roles.STAFF, roles.CEHO, roles.TRAINER),
   )
   public getAllStudentsWithProgress(
     @Query() searchq?: string,
@@ -77,7 +77,7 @@ export class StudentController {
   @Security("jwt")
   @Middlewares(
     loggerMiddleware,
-    checkRole(roles.ADMIN, roles.STAFF, roles.CHO, roles.TRAINER),
+    checkRole(roles.ADMIN, roles.STAFF, roles.CEHO, roles.TRAINER),
   )
   public getStudentWithProgressById(@Path() studentId: string) {
     return StudentService.getStudentWithProgressById(studentId);
@@ -90,7 +90,7 @@ export class StudentController {
     checkRole(
       roles.ADMIN,
       roles.STAFF,
-      roles.CHO,
+      roles.CEHO,
       roles.TRAINER,
       roles.DEVELOPER,
     ),
@@ -103,7 +103,7 @@ export class StudentController {
   @Security("jwt")
   @Middlewares(
     loggerMiddleware,
-    checkRole(roles.ADMIN, roles.STAFF, roles.CHO, roles.TRAINER),
+    checkRole(roles.ADMIN, roles.STAFF, roles.CEHO, roles.TRAINER),
   )
   public updateStudentStatus(
     @Path() studentId: string,
@@ -116,7 +116,7 @@ export class StudentController {
   @Security("jwt")
   @Middlewares(
     loggerMiddleware,
-    checkRole(roles.ADMIN, roles.STAFF, roles.CHO, roles.TRAINER),
+    checkRole(roles.ADMIN, roles.STAFF, roles.CEHO, roles.TRAINER),
   )
   public updateStudentInfo(
     @Path() studentId: string,
@@ -132,7 +132,7 @@ export class StudentController {
     checkRole(
       roles.ADMIN,
       roles.STAFF,
-      roles.CHO,
+      roles.CEHO,
       roles.TRAINER,
       roles.TRAINEE,
     ),
@@ -148,7 +148,7 @@ export class StudentController {
     checkRole(
       roles.ADMIN,
       roles.STAFF,
-      roles.CHO,
+      roles.CEHO,
       roles.TRAINER,
       roles.DEVELOPER,
     ),

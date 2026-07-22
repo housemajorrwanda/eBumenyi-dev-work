@@ -23,15 +23,15 @@ export default function Footer({ activeTab, onTabPress }: FooterProps) {
   const insets = useSafeAreaInsets();
   const { user, loading } = useAuth();
 
-  const [isCHO, setIsCHO] = useState(false);
+  const [isCEHO, setIsCEHO] = useState(false);
   useEffect(() => {
-    const detected = user?.roles?.includes('CHO') ?? false;
-    if (detected) setIsCHO(true);
+    const detected = user?.roles?.includes('CEHO') ?? false;
+    if (detected) setIsCEHO(true);
   }, [user]);
 
   const TAB_CONFIG = useMemo(
-    () => (isCHO ? BASE_TAB_CONFIG : BASE_TAB_CONFIG.filter((t) => t.name !== 'itsinda')),
-    [isCHO],
+    () => (isCEHO ? BASE_TAB_CONFIG : BASE_TAB_CONFIG.filter((t) => t.name !== 'itsinda')),
+    [isCEHO],
   );
 
   const barStyle = {
@@ -47,7 +47,7 @@ export default function Footer({ activeTab, onTabPress }: FooterProps) {
   };
 
   // Hold rendering until we know the user's role — prevents the tab count jumping
-  if (loading && !isCHO) {
+  if (loading && !isCEHO) {
     return <View style={[styles.tabBar, barStyle]} />;
   }
 

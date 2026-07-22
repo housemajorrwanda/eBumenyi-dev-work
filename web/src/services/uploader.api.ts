@@ -114,6 +114,20 @@ export const uploadDocument = async (file: File): Promise<FileUploadResponse> =>
   return response.data;
 };
 
+// Upload audio file specifically (voice notes)
+export const uploadAudio = async (file: File | Blob, fileName = 'voice-note.webm'): Promise<FileUploadResponse> => {
+  const formData = new FormData();
+  formData.append('audio', file, fileName);
+
+  const response = await api.post('/upload/audio', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+
+  return response.data;
+};
+
 // Get a signed (time-limited) URL for a Cloudinary asset — needed for raw/authenticated files
 export const getSignedUrl = async (url: string): Promise<string> => {
   const response = await api.get('/upload/sign', { params: { url } });
@@ -135,6 +149,10 @@ export const uploadFileByType = async (file: File): Promise<FileUploadResponse> 
   
   if (file.type.startsWith('image/')) {
     return uploadImage(file);
+  } else if (file.type.startsWith('video/')) {
+    return uploadVideoFile(file);
+  } else if (file.type.startsWith('audio/')) {
+    return uploadAudio(file, file.name);
   } else if (
     file.type === 'application/pdf' ||
     file.type === 'application/msword' ||

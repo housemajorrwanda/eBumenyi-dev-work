@@ -22,11 +22,11 @@ interface MonitoringData {
 export const DeveloperSection: React.FC = () => {
   const [monitoring, setMonitoring] = useState<MonitoringData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [error, setError] = useState<string | null>(null);
 
-  const fetchAll = useCallback(async () => {
-    setIsLoading(true);
+  const doFetch = useCallback(async () => {
     setError(null);
     try {
       const res = await api.get("/monitoring/health");
@@ -35,14 +35,22 @@ export const DeveloperSection: React.FC = () => {
       setLastRefresh(new Date());
     } catch {
       setError("Failed to fetch monitoring data.");
-    } finally {
-      setIsLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchAll();
-  }, [fetchAll]);
+    (async () => {
+      setIsLoading(true);
+      await doFetch();
+      setIsLoading(false);
+    })();
+  }, [doFetch]);
+
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    await doFetch();
+    setIsRefreshing(false);
+  }, [doFetch]);
 
   if (isLoading) return <SectionSkeleton cards={4} rows={0} />;
 
@@ -59,11 +67,11 @@ export const DeveloperSection: React.FC = () => {
   const systemOk = cacheConnected && redisConnected;
 
   return (
-    <div className="space-y-5">
+    <div className={`space-y-5 transition-opacity duration-200 ${isRefreshing ? "opacity-60 pointer-events-none" : "opacity-100"}`}>
       <DashboardSectionHeader
         icon={<Server size={18} />}
         title="System Monitoring"
-        action={{ label: "Refresh", onClick: fetchAll }}
+        action={{ label: isRefreshing ? "Refreshing…" : "Refresh", onClick: handleRefresh }}
       />
 
       {error && (

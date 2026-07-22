@@ -26,7 +26,7 @@ export class OptionController {
   @Middlewares(
     upload.single("image"),
     appendImage,
-    checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN),
+    checkRole(roles.STAFF, roles.CEHO, roles.TRAINER, roles.ADMIN),
   )
   public async createOption(@Body() body: CreateOptionDto) {
     return OptionService.createOption(body);
@@ -41,7 +41,7 @@ export class OptionController {
   @Put("/{id}")
   @Security("jwt")
   @Middlewares(
-    checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN),
+    checkRole(roles.STAFF, roles.CEHO, roles.TRAINER, roles.ADMIN),
   )
   public updateOption(@Path() id: string, @Body() body: CreateOptionDto) {
     return OptionService.updateOption(id, body);
@@ -50,7 +50,7 @@ export class OptionController {
   @Delete("/{id}")
   @Security("jwt")
   @Middlewares(
-    checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN),
+    checkRole(roles.STAFF, roles.CEHO, roles.TRAINER, roles.ADMIN),
   )
   public deleteOption(@Path() id: string) {
     return OptionService.deleteOption(id);

@@ -24,7 +24,7 @@ export class ChapterController {
   @Security("jwt")
   @Middlewares(
     loggerMiddleware,
-    checkRole(roles.ADMIN, roles.STAFF, roles.CHO, roles.TRAINER),
+    checkRole(roles.ADMIN, roles.STAFF, roles.CEHO, roles.TRAINER),
   )
   public async createChapter(@Body() body: CreateChapterDto) {
     return ChapterService.createChapter(body);
@@ -40,7 +40,7 @@ export class ChapterController {
   @Security("jwt")
   @Middlewares(
     loggerMiddleware,
-    checkRole(roles.ADMIN, roles.STAFF, roles.CHO, roles.TRAINER),
+    checkRole(roles.ADMIN, roles.STAFF, roles.CEHO, roles.TRAINER),
   )
   public updateChapter(@Path() id: string, @Body() body: CreateChapterDto) {
     return ChapterService.updateChapter(id, body);
@@ -50,7 +50,7 @@ export class ChapterController {
   @Security("jwt")
   @Middlewares(
     loggerMiddleware,
-    checkRole(roles.ADMIN, roles.STAFF, roles.CHO, roles.TRAINER),
+    checkRole(roles.ADMIN, roles.STAFF, roles.CEHO, roles.TRAINER),
   )
   public deleteChapter(@Path() id: string) {
     return ChapterService.deleteChapter(id);

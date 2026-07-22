@@ -34,10 +34,10 @@ import {
   getMyGroup,
   getMyGroupMembers,
   getGroupMonitoring,
-  choRemoveMyMember,
-  choUpdateMyGroup,
-} from '@/services/choGroup.api';
-import { ICHOGroupMember } from '@/types';
+  cehoRemoveMyMember,
+  cehoUpdateMyGroup,
+} from '@/services/cehoGroup.api';
+import { ICEHOGroupMember } from '@/types';
 import { useIsFocused } from '@react-navigation/native';
 import { CopilotProvider, CopilotStep, useCopilot } from 'react-native-copilot';
 import { WalkthroughableView, WalkthroughableTouchable } from '@/components/onboarding/walkthroughable';
@@ -122,7 +122,7 @@ function ItsindaScreenContent() {
   const autoStartAttemptedRef = useRef(false);
 
   const [search, setSearch] = useState('');
-  const [pendingRemove, setPendingRemove] = useState<ICHOGroupMember | null>(null);
+  const [pendingRemove, setPendingRemove] = useState<ICEHOGroupMember | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState('');
   const [editSector, setEditSector] = useState('');
@@ -132,7 +132,7 @@ function ItsindaScreenContent() {
     isLoading,
     isError,
   } = useQuery({
-    queryKey: ['cho-group-mine'],
+    queryKey: ['ceho-group-mine'],
     queryFn: getMyGroup,
     retry: false,
   });
@@ -143,22 +143,22 @@ function ItsindaScreenContent() {
     refetch,
     isRefetching,
   } = useQuery({
-    queryKey: ['cho-group-members'],
+    queryKey: ['ceho-group-members'],
     queryFn: getMyGroupMembers,
   });
 
   const { data: monitoring } = useQuery({
-    queryKey: ['cho-group-monitoring'],
+    queryKey: ['ceho-group-monitoring'],
     queryFn: getGroupMonitoring,
     retry: false,
   });
 
   const { mutate: removeMember, isPending: isRemoving } = useMutation({
-    mutationFn: (studentId: string) => choRemoveMyMember(studentId),
+    mutationFn: (studentId: string) => cehoRemoveMyMember(studentId),
     onSuccess: () => {
       setPendingRemove(null);
-      queryClient.invalidateQueries({ queryKey: ['cho-group-members'] });
-      queryClient.invalidateQueries({ queryKey: ['cho-chw-candidates'] });
+      queryClient.invalidateQueries({ queryKey: ['ceho-group-members'] });
+      queryClient.invalidateQueries({ queryKey: ['ceho-chw-candidates'] });
       Toast.show({ type: 'success', text1: 'Umunyamuryango yakuwe mu itsinda' });
     },
     onError: (error: any) => {
@@ -173,13 +173,13 @@ function ItsindaScreenContent() {
         .split(',')
         .map((s) => s.trim())
         .filter(Boolean);
-      return choUpdateMyGroup({
+      return cehoUpdateMyGroup({
         name: editName.trim() || undefined,
         sectors: sectors.length > 0 ? sectors : undefined,
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['cho-group-mine'] });
+      queryClient.invalidateQueries({ queryKey: ['ceho-group-mine'] });
       Toast.show({ type: 'success', text1: 'Itsinda ryavuguruwe' });
       setIsEditing(false);
     },
@@ -216,12 +216,12 @@ function ItsindaScreenContent() {
     m.courseProgress.some((c) => c.progress > 0 && !c.isCompleted),
   ).length;
 
-  const filtered = members.filter((m: ICHOGroupMember) =>
+  const filtered = members.filter((m: ICEHOGroupMember) =>
     m.student.user.fullNames.toLowerCase().includes(search.toLowerCase()),
   );
-  const cho = group?.cho;
-  const choMatchesSearch =
-    !!cho && (!search || cho.user.fullNames.toLowerCase().includes(search.toLowerCase()));
+  const ceho = group?.ceho;
+  const cehoMatchesSearch =
+    !!ceho && (!search || ceho.user.fullNames.toLowerCase().includes(search.toLowerCase()));
 
   // Theme colours
   const bg = isDark ? '#111827' : '#f8fafc';
@@ -275,32 +275,32 @@ function ItsindaScreenContent() {
     );
   }
 
-  // ─── List header (CHO card + spinner only — CopilotSteps live in the main JSX) ──
+  // ─── List header (CEHO card + spinner only — CopilotSteps live in the main JSX) ──
 
   const ListHeader = (
     <View>
-      {/* CHO leader card */}
-      {choMatchesSearch && cho && (
+      {/* CEHO leader card */}
+      {cehoMatchesSearch && ceho && (
         <TouchableOpacity
           style={[styles.memberCard, { backgroundColor: cardBg, borderColor: themeColors.primary + '33', marginHorizontal: 16, marginBottom: 8 }]}
-          onPress={() => router.push(`/students/${cho.id}`)}
+          onPress={() => router.push(`/students/${ceho.id}`)}
           activeOpacity={0.8}
         >
           <View style={styles.memberCardInner}>
-            <MemberAvatar name={cho.user.fullNames} photo={cho.user.photo} />
+            <MemberAvatar name={ceho.user.fullNames} photo={ceho.user.photo} />
             <View style={styles.memberInfo}>
               <Text style={[styles.memberName, { color: textPrimary }]} numberOfLines={1}>
-                {cho.user.fullNames}
+                {ceho.user.fullNames}
               </Text>
               <View style={[styles.roleBadge, { backgroundColor: themeColors.primary + '18' }]}>
                 <Text style={[styles.roleBadgeText, { color: themeColors.primary }]}>
-                  Umuyobozi (CHO)
+                  Umuyobozi (CEHO)
                 </Text>
               </View>
-              {cho.user.phoneNumber ? (
+              {ceho.user.phoneNumber ? (
                 <View style={styles.infoRow}>
                   <Phone size={11} color={textMuted} />
-                  <Text style={[styles.infoText, { color: textMuted }]}>{cho.user.phoneNumber}</Text>
+                  <Text style={[styles.infoText, { color: textMuted }]}>{ceho.user.phoneNumber}</Text>
                 </View>
               ) : null}
             </View>
@@ -463,7 +463,7 @@ function ItsindaScreenContent() {
             </View>
             <TouchableOpacity
               style={[styles.addBtn, { backgroundColor: themeColors.primary }]}
-              onPress={advanceAdd(() => router.push('/cho-group/invite'))}
+              onPress={advanceAdd(() => router.push('/ceho-group/invite'))}
               activeOpacity={0.8}
             >
               <UserPlus size={18} color="#ffffff" />
@@ -550,7 +550,7 @@ function ItsindaScreenContent() {
                   {!search && (
                     <TouchableOpacity
                       style={[styles.actionBtn, { backgroundColor: themeColors.primary, marginTop: 12 }]}
-                      onPress={() => router.push('/cho-group/invite')}
+                      onPress={() => router.push('/ceho-group/invite')}
                     >
                       <UserPlus size={16} color="#ffffff" />
                       <Text style={styles.actionBtnText}>Ongeramo CHW wa mbere</Text>

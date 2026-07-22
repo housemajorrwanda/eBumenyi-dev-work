@@ -23,7 +23,7 @@ export class PreTestController {
   @Post("/")
   @Security("jwt")
   @Middlewares(
-    checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN),
+    checkRole(roles.STAFF, roles.CEHO, roles.TRAINER, roles.ADMIN),
   )
   public async createPreTest(@Body() body: CreatePreTestDto) {
     return PreTestService.createPreTest(body);
@@ -38,7 +38,7 @@ export class PreTestController {
   @Put("/{id}")
   @Security("jwt")
   @Middlewares(
-    checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN),
+    checkRole(roles.STAFF, roles.CEHO, roles.TRAINER, roles.ADMIN),
   )
   public updatePreTest(@Path() id: string, @Body() body: CreatePreTestDto) {
     return PreTestService.updatePreTest(id, body);
@@ -47,7 +47,7 @@ export class PreTestController {
   @Delete("/{id}")
   @Security("jwt")
   @Middlewares(
-    checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN),
+    checkRole(roles.STAFF, roles.CEHO, roles.TRAINER, roles.ADMIN),
   )
   public deletePreTest(@Path() id: string) {
     return PreTestService.deletePreTest(id);

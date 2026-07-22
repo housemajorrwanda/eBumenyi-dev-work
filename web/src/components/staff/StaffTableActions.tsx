@@ -9,7 +9,7 @@ import EditUserModal, { EditUserFormData } from "@/components/common/EditUserMod
 const STAFF_ROLE_OPTIONS = [
   { label: "Admin", value: "ADMIN" },
   { label: "Trainer", value: "TRAINER" },
-  { label: "CHO", value: "CHO" },
+  { label: "CEHO", value: "CEHO" },
   { label: "Staff", value: "STAFF" },
   { label: "Developer", value: "DEVELOPER" },
 ];
@@ -42,6 +42,7 @@ const StaffTableActions: FC<StaffTableActionsProps> = ({ item }) => {
     cell: item.user.cell ?? "",
     village: item.user.village ?? "",
     role: item.role ?? "",
+    hospitalId: item.user.hospitalId ?? "",
   };
 
   return (

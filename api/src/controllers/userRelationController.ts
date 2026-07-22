@@ -28,7 +28,7 @@ export class UserRelationController {
     checkRole(
       roles.ADMIN,
       roles.STAFF,
-      roles.CHO,
+      roles.CEHO,
       roles.TRAINER,
       roles.TRAINEE,
       roles.DEVELOPER,
@@ -51,7 +51,7 @@ export class UserRelationController {
     checkRole(
       roles.ADMIN,
       roles.STAFF,
-      roles.CHO,
+      roles.CEHO,
       roles.TRAINER,
       roles.TRAINEE,
       roles.DEVELOPER,
@@ -74,7 +74,7 @@ export class UserRelationController {
     checkRole(
       roles.ADMIN,
       roles.STAFF,
-      roles.CHO,
+      roles.CEHO,
       roles.TRAINER,
       roles.TRAINEE,
       roles.DEVELOPER,

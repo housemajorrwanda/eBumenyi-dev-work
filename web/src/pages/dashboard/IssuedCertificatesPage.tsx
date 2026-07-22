@@ -22,35 +22,75 @@ import {
 } from "@/services/certificates.service";
 import {
   listCertificateTemplates,
-  getLinkedCourses,
   type CertificateTemplateSummary,
-  type LinkedCourse,
 } from "@/services/certificateTemplate.service";
+import { getAllCoursesNoPagination } from "@/services/course.service";
+import { ICourse } from "@/types";
 import { formatDate } from "@/utils/formats/formats";
 
 const PAGE_SIZE = 15;
 
+interface CarriedFilters {
+  district?: string;
+  province?: string;
+  gender?: string;
+  role?: string;
+  year?: string;
+  month?: string;
+  hospitalId?: string;
+}
+
+const CARRIED_FILTER_LABELS: Record<keyof CarriedFilters, string> = {
+  district: "District",
+  province: "Province",
+  gender: "Gender",
+  role: "Role",
+  year: "Year",
+  month: "Month",
+  hospitalId: "Hospital",
+};
+
+const CARRIED_ROLE_LABELS: Record<string, string> = {
+  TRAINEE: "CHW",
+  TESTER: "Tester",
+  CEHO: "CEHO",
+};
+
 export default function IssuedCertificatesPage() {
   const location = useLocation();
 
-  // Pre-selection from navigation state (coming from template card)
+  // Pre-selection from navigation state (coming from a template/certification card)
   const navState = location.state as
-    | { templateId?: string; templateName?: string }
+    | ({ templateId?: string; templateName?: string; courseId?: string } & CarriedFilters)
     | null;
 
   // ── Filter state ─────────────────────────────────────────────────────
   const [filterTemplateId, setFilterTemplateId] = useState(navState?.templateId ?? "");
-  const [filterCourseId, setFilterCourseId] = useState("");
+  const [filterCourseId, setFilterCourseId] = useState(navState?.courseId ?? "");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
+  // ── Filters carried over from another page (e.g. Certification Rate card) ──
+  const [carriedFilters, setCarriedFilters] = useState<CarriedFilters>({
+    district: navState?.district,
+    province: navState?.province,
+    gender: navState?.gender,
+    role: navState?.role,
+    year: navState?.year,
+    month: navState?.month,
+    hospitalId: navState?.hospitalId,
+  });
+  const clearCarriedFilter = (key: keyof CarriedFilters) =>
+    setCarriedFilters((prev) => ({ ...prev, [key]: undefined }));
+  const activeCarriedCount = Object.values(carriedFilters).filter(Boolean).length;
+
   // ── Dropdown options ─────────────────────────────────────────────────
   const [templates, setTemplates] = useState<CertificateTemplateSummary[]>([]);
-  const [courses, setCourses] = useState<LinkedCourse[]>([]);
+  const [courses, setCourses] = useState<ICourse[]>([]);
   const [loadingTemplates, setLoadingTemplates] = useState(true);
-  const [loadingCourses, setLoadingCourses] = useState(false);
+  const [loadingCourses, setLoadingCourses] = useState(true);
 
   // ── Table state ──────────────────────────────────────────────────────
   const [certificates, setCertificates] = useState<IIssuedCertificate[]>([]);
@@ -69,19 +109,13 @@ export default function IssuedCertificatesPage() {
       .finally(() => setLoadingTemplates(false));
   }, []);
 
-  // ── Load courses when template changes ───────────────────────────────
+  // ── Load courses once (independent of the template filter) ───────────
   useEffect(() => {
-    setFilterCourseId("");
-    if (!filterTemplateId) {
-      setCourses([]);
-      return;
-    }
-    setLoadingCourses(true);
-    getLinkedCourses(filterTemplateId)
-      .then(setCourses)
-      .catch(() => setCourses([]))
+    getAllCoursesNoPagination()
+      .then((res) => setCourses(res.data ?? []))
+      .catch(() => toast.error("Failed to load courses"))
       .finally(() => setLoadingCourses(false));
-  }, [filterTemplateId]);
+  }, []);
 
   // ── Debounce search ──────────────────────────────────────────────────
   useEffect(() => {
@@ -98,7 +132,7 @@ export default function IssuedCertificatesPage() {
   // Reset to page 1 when any filter changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [filterTemplateId, filterCourseId, dateFrom, dateTo]);
+  }, [filterTemplateId, filterCourseId, dateFrom, dateTo, carriedFilters]);
 
   // ── Fetch table data ─────────────────────────────────────────────────
   const fetchData = useCallback(async () => {
@@ -112,6 +146,13 @@ export default function IssuedCertificatesPage() {
         courseId: filterCourseId || undefined,
         dateFrom: dateFrom || undefined,
         dateTo: dateTo || undefined,
+        district: carriedFilters.district || undefined,
+        province: carriedFilters.province || undefined,
+        gender: carriedFilters.gender || undefined,
+        role: carriedFilters.role || undefined,
+        year: carriedFilters.year || undefined,
+        month: carriedFilters.month || undefined,
+        hospitalId: carriedFilters.hospitalId || undefined,
       });
       setCertificates(res.data ?? []);
       setTotalItems(res.totalItems ?? 0);
@@ -120,7 +161,7 @@ export default function IssuedCertificatesPage() {
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, currentPage, filterTemplateId, filterCourseId, dateFrom, dateTo]);
+  }, [debouncedSearch, currentPage, filterTemplateId, filterCourseId, dateFrom, dateTo, carriedFilters]);
 
   useEffect(() => {
     fetchData();
@@ -128,7 +169,9 @@ export default function IssuedCertificatesPage() {
 
   const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
 
-  const activeFilterCount = [filterTemplateId, filterCourseId, dateFrom, dateTo].filter(Boolean).length;
+  const activeFilterCount =
+    [filterTemplateId, filterCourseId, dateFrom, dateTo].filter(Boolean).length +
+    activeCarriedCount;
 
   const clearFilters = () => {
     setFilterTemplateId("");
@@ -136,6 +179,7 @@ export default function IssuedCertificatesPage() {
     setDateFrom("");
     setDateTo("");
     setSearch("");
+    setCarriedFilters({});
   };
 
   // ── Fetch ALL for export (respects current filters) ──────────────────
@@ -148,6 +192,13 @@ export default function IssuedCertificatesPage() {
       courseId: filterCourseId || undefined,
       dateFrom: dateFrom || undefined,
       dateTo: dateTo || undefined,
+      district: carriedFilters.district || undefined,
+      province: carriedFilters.province || undefined,
+      gender: carriedFilters.gender || undefined,
+      role: carriedFilters.role || undefined,
+      year: carriedFilters.year || undefined,
+      month: carriedFilters.month || undefined,
+      hospitalId: carriedFilters.hospitalId || undefined,
     });
     return res.data ?? [];
   };
@@ -389,6 +440,29 @@ export default function IssuedCertificatesPage() {
           )}
         </div>
 
+        {activeCarriedCount > 0 && (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-xs text-gray-400">From dashboard:</span>
+            {(Object.entries(carriedFilters) as [keyof CarriedFilters, string | undefined][])
+              .filter(([, value]) => Boolean(value))
+              .map(([key, value]) => (
+                <span
+                  key={key}
+                  className="flex items-center gap-1 bg-[#3363AD]/10 text-[#3363AD] text-xs px-2 py-1 rounded-full"
+                >
+                  {CARRIED_FILTER_LABELS[key]}:{" "}
+                  {key === "role" ? (CARRIED_ROLE_LABELS[value as string] ?? value) : value}
+                  <button
+                    onClick={() => clearCarriedFilter(key)}
+                    className="hover:text-red-500 transition-colors"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              ))}
+          </div>
+        )}
+
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {/* Search */}
           <div className="relative">
@@ -425,15 +499,11 @@ export default function IssuedCertificatesPage() {
             <select
               value={filterCourseId}
               onChange={(e) => setFilterCourseId(e.target.value)}
-              disabled={loadingCourses || !filterTemplateId}
+              disabled={loadingCourses}
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white appearance-none pr-8 text-gray-700 disabled:opacity-50"
             >
               <option value="">
-                {!filterTemplateId
-                  ? "Select a template first"
-                  : loadingCourses
-                  ? "Loading courses..."
-                  : "All courses"}
+                {loadingCourses ? "Loading courses..." : "All courses"}
               </option>
               {courses.map((c) => (
                 <option key={c.id} value={c.id}>

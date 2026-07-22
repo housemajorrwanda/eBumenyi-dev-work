@@ -29,7 +29,7 @@ export class FAQOnSlideController {
   @Middlewares(
     checkRole(
       roles.STAFF,
-      roles.CHO,
+      roles.CEHO,
       roles.TRAINER,
       roles.ADMIN,
       roles.TRAINEE,
@@ -72,7 +72,7 @@ export class FAQOnSlideController {
   @Middlewares(
     checkRole(
       roles.STAFF,
-      roles.CHO,
+      roles.CEHO,
       roles.TRAINER,
       roles.ADMIN,
       roles.TRAINEE,
@@ -90,7 +90,7 @@ export class FAQOnSlideController {
   @Middlewares(
     checkRole(
       roles.STAFF,
-      roles.CHO,
+      roles.CEHO,
       roles.TRAINER,
       roles.ADMIN,
       roles.TRAINEE,

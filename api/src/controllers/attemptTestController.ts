@@ -59,7 +59,7 @@ export class AttemptTestController {
 
   @Post("/")
   @Security("jwt")
-  @Middlewares(checkRole(roles.TRAINEE, roles.TESTER, roles.CHO))
+  @Middlewares(checkRole(roles.TRAINEE, roles.TESTER, roles.CEHO))
   public async createAttempt(
     @Body() body: CreateAttempTestDto,
     @Request() req: ExpressRequest,
@@ -108,7 +108,7 @@ export class AttemptTestController {
   @Put("/{id}")
   @Security("jwt")
   @Middlewares(
-    checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN),
+    checkRole(roles.STAFF, roles.CEHO, roles.TRAINER, roles.ADMIN),
   )
   public async updateAttempt(
     @Path() id: string,
@@ -139,7 +139,7 @@ export class AttemptTestController {
   @Delete("/{id}")
   @Security("jwt")
   @Middlewares(
-    checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN),
+    checkRole(roles.STAFF, roles.CEHO, roles.TRAINER, roles.ADMIN),
   )
   public async deleteAttempt(@Path() id: string) {
     return AttemptTestService.deleteAttempt(id);

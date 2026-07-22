@@ -57,12 +57,12 @@ export class StudentService {
 
     if (noGroup) {
       const [members, groups] = await Promise.all([
-        prisma.cHOGroupMember.findMany({ select: { studentId: true } }),
-        prisma.cHOGroup.findMany({ select: { choId: true } }),
+        prisma.cEHOGroupMember.findMany({ select: { studentId: true } }),
+        prisma.cEHOGroup.findMany({ select: { cehoId: true } }),
       ]);
       const groupedIds = [
         ...members.map((m) => m.studentId),
-        ...groups.map((g) => g.choId),
+        ...groups.map((g) => g.cehoId),
       ];
       where.id = { notIn: [...new Set(groupedIds)] };
     }
@@ -256,12 +256,12 @@ export class StudentService {
 
     if (noGroup) {
       const [members, groups] = await Promise.all([
-        prisma.cHOGroupMember.findMany({ select: { studentId: true } }),
-        prisma.cHOGroup.findMany({ select: { choId: true } }),
+        prisma.cEHOGroupMember.findMany({ select: { studentId: true } }),
+        prisma.cEHOGroup.findMany({ select: { cehoId: true } }),
       ]);
       const groupedIds = [
         ...members.map((m) => m.studentId),
-        ...groups.map((g) => g.choId),
+        ...groups.map((g) => g.cehoId),
       ];
       where.id = { notIn: [...new Set(groupedIds)] };
     }

@@ -13,8 +13,8 @@ import {
   Activity,
   Award,
 } from "lucide-react";
-import { getGroupMonitoring } from "@/services/choGroup.service";
-import { ICHOGroupMonitoringMember } from "@/types";
+import { getGroupMonitoring } from "@/services/cehoGroup.service";
+import { ICEHOGroupMonitoringMember } from "@/types";
 import { MetricCard } from "@/components/common/MetricCard";
 import { Button } from "@/components/common/Button";
 
@@ -50,7 +50,7 @@ function ProgressBar({ value, completed }: { value: number; completed: boolean }
   );
 }
 
-function MemberCard({ member }: { member: ICHOGroupMonitoringMember }) {
+function MemberCard({ member }: { member: ICEHOGroupMonitoringMember }) {
   const [expanded, setExpanded] = useState(false);
 
   const completed = member.courseProgress.filter((c) => c.isCompleted).length;
@@ -159,11 +159,11 @@ function MemberCard({ member }: { member: ICHOGroupMonitoringMember }) {
   );
 }
 
-const CHOGroupMonitoringPage = () => {
+const CEHOGroupMonitoringPage = () => {
   const [search, setSearch] = useState("");
 
   const { data: monitoring, isLoading, refetch, isRefetching } = useQuery({
-    queryKey: ["cho-group-monitoring"],
+    queryKey: ["ceho-group-monitoring"],
     queryFn: getGroupMonitoring,
   });
 
@@ -195,7 +195,7 @@ const CHOGroupMonitoringPage = () => {
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <Link
-            to="/cho-group"
+            to="/ceho-group"
             className="p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-500"
           >
             <ChevronLeft className="w-5 h-5" />
@@ -283,4 +283,4 @@ const CHOGroupMonitoringPage = () => {
   );
 };
 
-export default CHOGroupMonitoringPage;
+export default CEHOGroupMonitoringPage;

@@ -9,6 +9,10 @@ import {
   ICourseAnalytics,
   ICourseDurationStats,
   IRecentActivityFeed,
+  IMonthlyActiveTrends,
+  ICertificationAnalytics,
+  ISupervisorResponseRate,
+  IAvgStudyTimeByCourse,
   IDashboardFilters,
 } from "@/types";
 import { listAllHospitals } from "@/services/hospitals.service";
@@ -21,6 +25,9 @@ import {
   getCHWDashboardStats,
   getCourseDurationStats,
   getRecentActivityFeed,
+  getMonthlyActiveTrends,
+  getCertificationAnalytics,
+  getSupervisorResponseRate,
 } from "@/services/analytics.service";
 import { DEFAULT_DASHBOARD_FILTERS } from "@/utils/constants/dashboardFilters";
 import { buildDashboardFilterQuery, dashboardFilterKey } from "@/utils/dashboardFilterQuery";
@@ -35,7 +42,7 @@ interface AdoptionStats {
   registrationRate: number;
   activeRate: number;
   enrollmentTrends: IEnrollmentTrend[];
-  avgStudyTime: number;
+  avgStudyTimeByCourse: IAvgStudyTimeByCourse[];
   byProvince: {
     province: string;
     totalChws: number;
@@ -49,7 +56,11 @@ interface AdoptionStats {
   chwStats: ICHWStats | null;
   courseDuration: ICourseDurationStats | null;
   recentActivity: IRecentActivityFeed | null;
+  monthlyActiveTrends: IMonthlyActiveTrends | null;
+  certification: ICertificationAnalytics | null;
+  supervisorResponseRate: ISupervisorResponseRate | null;
   isLoading: boolean;
+  isFetching: boolean;
   error: string | null;
   refetch: () => void;
 }
@@ -60,7 +71,7 @@ const DASHBOARD_CACHE_MS = 1000 * 60 * 30;
 interface AdoptionQueryResult {
   hospitals: IHospital[];
   enrollmentTrends: IEnrollmentTrend[];
-  avgStudyTime: number;
+  avgStudyTimeByCourse: IAvgStudyTimeByCourse[];
   courseAnalytics: ICourseAnalytics | null;
   testScores: ITestScoreAnalytics | null;
   communications: ICommunicationsAnalytics | null;
@@ -68,14 +79,18 @@ interface AdoptionQueryResult {
   chwStats: ICHWStats | null;
   courseDuration: ICourseDurationStats | null;
   recentActivity: IRecentActivityFeed | null;
+  monthlyActiveTrends: IMonthlyActiveTrends | null;
+  certification: ICertificationAnalytics | null;
+  supervisorResponseRate: ISupervisorResponseRate | null;
 }
 
 export const useAdoptionStats = (
   filters: AnalyticsFilters = DEFAULT_DASHBOARD_FILTERS,
+  enabled: boolean = true,
 ): AdoptionStats => {
   const qs = buildDashboardFilterQuery(filters);
 
-  const { data, isLoading, error, refetch } = useQuery({
+  const { data, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: dashboardKeys.adoption(dashboardFilterKey(filters)),
     queryFn: async (): Promise<AdoptionQueryResult> => {
       const results = await Promise.allSettled([
@@ -88,6 +103,9 @@ export const useAdoptionStats = (
         getCHWDashboardStats(qs),
         getCourseDurationStats(qs),
         getRecentActivityFeed(qs),
+        getMonthlyActiveTrends(qs),
+        getCertificationAnalytics(qs),
+        getSupervisorResponseRate(qs),
       ]);
 
       let hospitalList: IHospital[] = [];
@@ -104,10 +122,10 @@ export const useAdoptionStats = (
         enrollmentTrends = courseAnalytics?.enrollmentTrends ?? [];
       }
 
-      let avgStudyTime = 0;
+      let avgStudyTimeByCourse: IAvgStudyTimeByCourse[] = [];
       const studentRes = results[2];
       if (studentRes.status === "fulfilled") {
-        avgStudyTime = studentRes.value?.data?.avgStudyTime?.value ?? 0;
+        avgStudyTimeByCourse = studentRes.value?.data?.avgStudyTimeByCourse ?? [];
       }
 
       const testScores =
@@ -122,11 +140,17 @@ export const useAdoptionStats = (
         results[7].status === "fulfilled" ? results[7].value?.data ?? null : null;
       const recentActivity =
         results[8].status === "fulfilled" ? results[8].value?.data ?? null : null;
+      const monthlyActiveTrends =
+        results[9].status === "fulfilled" ? results[9].value?.data ?? null : null;
+      const certification =
+        results[10].status === "fulfilled" ? results[10].value?.data ?? null : null;
+      const supervisorResponseRate =
+        results[11].status === "fulfilled" ? results[11].value?.data ?? null : null;
 
       return {
         hospitals: hospitalList,
         enrollmentTrends,
-        avgStudyTime,
+        avgStudyTimeByCourse,
         courseAnalytics,
         testScores,
         communications,
@@ -134,8 +158,13 @@ export const useAdoptionStats = (
         chwStats,
         courseDuration,
         recentActivity,
+        monthlyActiveTrends,
+        certification,
+        supervisorResponseRate,
       };
     },
+    enabled,
+    keepPreviousData: true,
     staleTime: DASHBOARD_CACHE_MS,
     gcTime: DASHBOARD_CACHE_MS,
   });
@@ -175,7 +204,7 @@ export const useAdoptionStats = (
     registrationRate,
     activeRate,
     enrollmentTrends: data?.enrollmentTrends ?? [],
-    avgStudyTime: data?.avgStudyTime ?? 0,
+    avgStudyTimeByCourse: data?.avgStudyTimeByCourse ?? [],
     byProvince,
     courseAnalytics: data?.courseAnalytics ?? null,
     testScores: data?.testScores ?? null,
@@ -184,7 +213,11 @@ export const useAdoptionStats = (
     chwStats: data?.chwStats ?? null,
     courseDuration: data?.courseDuration ?? null,
     recentActivity: data?.recentActivity ?? null,
+    monthlyActiveTrends: data?.monthlyActiveTrends ?? null,
+    certification: data?.certification ?? null,
+    supervisorResponseRate: data?.supervisorResponseRate ?? null,
     isLoading,
+    isFetching,
     error: error ? "Failed to fetch data. Please try again." : null,
     refetch: () => {
       void refetch();

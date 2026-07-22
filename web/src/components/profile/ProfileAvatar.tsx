@@ -7,6 +7,7 @@ const ProfileAvatar: FC<ProfileAvatarProps> = ({
   size = "w-4 h-4",
   rounded = true,
   photo,
+  color,
   className = "",
 }) => {
   // If photo is provided, show the image
@@ -40,7 +41,7 @@ const ProfileAvatar: FC<ProfileAvatarProps> = ({
     <div
       className={`${size} ${
         rounded ? "rounded-full" : "rounded"
-      } bg-gray-300 flex items-center justify-center text-gray-700 font-medium text-sm ${className}`}
+      } ${color || "bg-gray-300 text-gray-700"} flex items-center justify-center font-medium text-sm ${className}`}
     >
       {initials || <UserIcon className='w-4 h-4' />}
     </div>

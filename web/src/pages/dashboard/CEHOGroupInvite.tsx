@@ -13,7 +13,7 @@ import {
 import { Dialog, Transition } from "@headlessui/react";
 import { debounce } from "lodash";
 import toast from "react-hot-toast";
-import { searchCHWCandidates, choDirectlyAddMember } from "@/services/choGroup.service";
+import { searchCHWCandidates, cehoDirectlyAddMember } from "@/services/cehoGroup.service";
 import { IStudentSearchResult } from "@/types";
 import { Button } from "@/components/common/Button";
 
@@ -37,7 +37,7 @@ const StudentAvatar = ({ name, photo }: { name: string; photo: string | null }) 
   );
 };
 
-const CHOGroupInvitePage = () => {
+const CEHOGroupInvitePage = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
@@ -55,17 +55,17 @@ const CHOGroupInvitePage = () => {
   };
 
   const { data: students = [], isLoading, isFetching } = useQuery({
-    queryKey: ["cho-chw-candidates", debouncedSearch],
+    queryKey: ["ceho-chw-candidates", debouncedSearch],
     queryFn: () => searchCHWCandidates(debouncedSearch || undefined),
   });
 
   const { mutate: addMember, isPending } = useMutation({
-    mutationFn: (studentId: string) => choDirectlyAddMember(studentId),
+    mutationFn: (studentId: string) => cehoDirectlyAddMember(studentId),
     onSuccess: (_, studentId) => {
       setAddedIds((prev) => new Set([...prev, studentId]));
       setPendingStudent(null);
-      queryClient.invalidateQueries({ queryKey: ["cho-group-members"] });
-      queryClient.invalidateQueries({ queryKey: ["cho-chw-candidates"] });
+      queryClient.invalidateQueries({ queryKey: ["ceho-group-members"] });
+      queryClient.invalidateQueries({ queryKey: ["ceho-chw-candidates"] });
       toast.success("CHW added to your group successfully.");
     },
     onError: (error: any) => {
@@ -89,7 +89,7 @@ const CHOGroupInvitePage = () => {
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <Link
-            to="/cho-group"
+            to="/ceho-group"
             className="p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-500"
           >
             <ChevronLeft className="w-5 h-5" />
@@ -290,4 +290,4 @@ const CHOGroupInvitePage = () => {
   );
 };
 
-export default CHOGroupInvitePage;
+export default CEHOGroupInvitePage;

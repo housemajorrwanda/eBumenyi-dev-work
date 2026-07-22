@@ -25,7 +25,7 @@ export class UnifiedExportController {
     checkRole(
       roles.ADMIN,
       roles.STAFF,
-      roles.CHO,
+      roles.CEHO,
       roles.TRAINER,
       roles.DEVELOPER,
     ),
@@ -57,7 +57,7 @@ export class UnifiedExportController {
     checkRole(
       roles.ADMIN,
       roles.STAFF,
-      roles.CHO,
+      roles.CEHO,
       roles.TRAINER,
       roles.DEVELOPER,
     ),
@@ -89,7 +89,7 @@ export class UnifiedExportController {
     checkRole(
       roles.ADMIN,
       roles.STAFF,
-      roles.CHO,
+      roles.CEHO,
       roles.TRAINER,
       roles.DEVELOPER,
     ),
@@ -121,7 +121,7 @@ export class UnifiedExportController {
     checkRole(
       roles.ADMIN,
       roles.STAFF,
-      roles.CHO,
+      roles.CEHO,
       roles.TRAINER,
       roles.DEVELOPER,
     ),
@@ -153,7 +153,7 @@ export class UnifiedExportController {
     checkRole(
       roles.ADMIN,
       roles.STAFF,
-      roles.CHO,
+      roles.CEHO,
       roles.TRAINER,
       roles.DEVELOPER,
     ),
@@ -185,7 +185,7 @@ export class UnifiedExportController {
     checkRole(
       roles.ADMIN,
       roles.STAFF,
-      roles.CHO,
+      roles.CEHO,
       roles.TRAINER,
       roles.DEVELOPER,
     ),
@@ -217,7 +217,7 @@ export class UnifiedExportController {
     checkRole(
       roles.ADMIN,
       roles.STAFF,
-      roles.CHO,
+      roles.CEHO,
       roles.TRAINER,
       roles.DEVELOPER,
     ),
@@ -249,7 +249,7 @@ export class UnifiedExportController {
     checkRole(
       roles.ADMIN,
       roles.STAFF,
-      roles.CHO,
+      roles.CEHO,
       roles.TRAINER,
       roles.DEVELOPER,
     ),
@@ -281,7 +281,7 @@ export class UnifiedExportController {
     checkRole(
       roles.ADMIN,
       roles.STAFF,
-      roles.CHO,
+      roles.CEHO,
       roles.TRAINER,
       roles.DEVELOPER,
     ),
@@ -313,7 +313,7 @@ export class UnifiedExportController {
     checkRole(
       roles.ADMIN,
       roles.STAFF,
-      roles.CHO,
+      roles.CEHO,
       roles.TRAINER,
       roles.DEVELOPER,
     ),
@@ -345,7 +345,7 @@ export class UnifiedExportController {
     checkRole(
       roles.ADMIN,
       roles.STAFF,
-      roles.CHO,
+      roles.CEHO,
       roles.TRAINER,
       roles.DEVELOPER,
     ),

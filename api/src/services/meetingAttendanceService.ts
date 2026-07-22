@@ -13,6 +13,7 @@ const ATTENDANCE_SELECT_USER = {
   sector: true,
   cell: true,
   village: true,
+  hospital: { select: { name: true } },
   userRoles: { select: { name: true } },
 };
 
@@ -129,10 +130,37 @@ export class MeetingAttendanceService extends BaseService {
         orderBy: { joinedAt: "asc" },
       });
 
+      // Invited-vs-attended: only internally-invited (registered) participants
+      // are counted, matched by exact userId. Guests are never part of this ratio,
+      // and are never considered "absent" since there's no reliable way to match
+      // an externally-invited email to a guest's typed join-name.
+      const attendedUserIds = new Set(
+        records.filter((r) => r.userId).map((r) => r.userId as string),
+      );
+      const invitedParticipants = eventId
+        ? await prisma.calendarEventParticipant.findMany({
+            where: { eventId },
+            select: { userId: true, user: { select: ATTENDANCE_SELECT_USER } },
+          })
+        : [];
+      const invitedTotal = invitedParticipants.length;
+      const attendedInvited = invitedParticipants.filter((p) =>
+        attendedUserIds.has(p.userId),
+      );
+      const absentees = invitedParticipants
+        .filter((p) => !attendedUserIds.has(p.userId))
+        .map((p) => p.user);
+
       return {
         message: "Attendance fetched successfully",
         statusCode: 200,
         data: records,
+        invited: {
+          total: invitedTotal,
+          attended: attendedInvited.length,
+          pct: invitedTotal > 0 ? Math.round((attendedInvited.length / invitedTotal) * 100) : null,
+          absentees,
+        },
       };
     } catch (error) {
       throw new AppError(error, 500);
@@ -165,7 +193,7 @@ export class MeetingAttendanceService extends BaseService {
       // Count UNIQUE participants per event (same logic as the attendance detail page).
       // Group registered users by userId and guests by guestName so that rejoins
       // are not double-counted.
-      const [registeredGroups, guestGroups] = await Promise.all([
+      const [registeredGroups, guestGroups, invitedParticipants] = await Promise.all([
         prisma.meetingAttendance.groupBy({
           by: ["eventId", "userId"],
           where: { userId: { not: null } },
@@ -173,6 +201,9 @@ export class MeetingAttendanceService extends BaseService {
         prisma.meetingAttendance.groupBy({
           by: ["eventId", "guestName"],
           where: { userId: null },
+        }),
+        prisma.calendarEventParticipant.findMany({
+          select: { eventId: true, userId: true },
         }),
       ]);
 
@@ -186,6 +217,21 @@ export class MeetingAttendanceService extends BaseService {
         uniqueCountMap.set(g.eventId, (uniqueCountMap.get(g.eventId) ?? 0) + 1);
       }
 
+      // Invited-vs-attended per event: only internally-invited (registered)
+      // participants are counted, matched by exact userId. Guests are excluded.
+      const invitedByEvent = new Map<string, Set<string>>();
+      for (const p of invitedParticipants) {
+        if (!invitedByEvent.has(p.eventId)) invitedByEvent.set(p.eventId, new Set());
+        invitedByEvent.get(p.eventId)!.add(p.userId);
+      }
+      const attendedInvitedMap = new Map<string, number>();
+      for (const g of registeredGroups) {
+        if (!g.eventId || !g.userId) continue;
+        if (invitedByEvent.get(g.eventId)?.has(g.userId)) {
+          attendedInvitedMap.set(g.eventId, (attendedInvitedMap.get(g.eventId) ?? 0) + 1);
+        }
+      }
+
       const rows = events.map((e) => {
         const agg = e.id ? durationMap.get(e.id) : undefined;
         const status = e.isCancelled
@@ -193,6 +239,8 @@ export class MeetingAttendanceService extends BaseService {
           : e.startAt > now
           ? "UPCOMING"
           : "COMPLETED";
+        const invitedCount = invitedByEvent.get(e.id)?.size ?? 0;
+        const attendedInvitedCount = attendedInvitedMap.get(e.id) ?? 0;
         return {
           id: e.id,
           title: e.title,
@@ -203,6 +251,10 @@ export class MeetingAttendanceService extends BaseService {
           status,
           participantCount: uniqueCountMap.get(e.id) ?? 0,
           totalDurationSec: agg?._sum?.durationSec ?? 0,
+          invitedCount,
+          attendedInvitedCount,
+          attendancePct:
+            invitedCount > 0 ? Math.round((attendedInvitedCount / invitedCount) * 100) : null,
         };
       });
 
@@ -216,6 +268,11 @@ export class MeetingAttendanceService extends BaseService {
             )
           : 0;
 
+      const totalInvited = rows.reduce((s, r) => s + r.invitedCount, 0);
+      const totalAttendedInvited = rows.reduce((s, r) => s + r.attendedInvitedCount, 0);
+      const overallAttendancePct =
+        totalInvited > 0 ? Math.round((totalAttendedInvited / totalInvited) * 100) : null;
+
       return {
         message: "Meetings fetched",
         statusCode: 200,
@@ -228,8 +285,73 @@ export class MeetingAttendanceService extends BaseService {
             cancelled: rows.filter((r) => r.status === "CANCELLED").length,
             totalParticipants,
             avgDurationSec,
+            overallAttendancePct,
           },
         },
+      };
+    } catch (error) {
+      throw new AppError(error, 500);
+    }
+  }
+
+  /**
+   * Submit (or update) a post-meeting survey for an attendance record.
+   * Public — guests have no auth token. Every field is optional; upserts by
+   * attendanceId so re-submitting just overwrites the previous answer.
+   */
+  public static async submitSurvey(
+    attendanceId: string,
+    body: {
+      rating?: number;
+      comment?: string;
+      name?: string;
+      phoneNumber?: string;
+      hospital?: string;
+      gender?: string;
+      district?: string;
+      sector?: string;
+      cell?: string;
+      village?: string;
+    },
+  ) {
+    try {
+      const attendance = await prisma.meetingAttendance.findUnique({
+        where: { id: attendanceId },
+      });
+      if (!attendance) {
+        return { message: "Attendance record not found", statusCode: 404 };
+      }
+
+      if (
+        body.rating !== undefined &&
+        (!Number.isInteger(body.rating) || body.rating < 1 || body.rating > 5)
+      ) {
+        return { message: "rating must be an integer between 1 and 5", statusCode: 400 };
+      }
+
+      const data = {
+        rating: body.rating,
+        comment: body.comment?.trim() || undefined,
+        name: body.name?.trim() || undefined,
+        phoneNumber: body.phoneNumber?.trim() || undefined,
+        hospital: body.hospital?.trim() || undefined,
+        gender: body.gender?.trim() || undefined,
+        district: body.district?.trim() || undefined,
+        sector: body.sector?.trim() || undefined,
+        cell: body.cell?.trim() || undefined,
+        village: body.village?.trim() || undefined,
+      };
+
+      const survey = await prisma.meetingSurvey.upsert({
+        where: { attendanceId },
+        create: { attendanceId, ...data },
+        update: data,
+      });
+
+      return {
+        message: "Survey submitted successfully",
+        statusCode: 201,
+        data: survey,
       };
     } catch (error) {
       throw new AppError(error, 500);

@@ -23,12 +23,12 @@ import {
   getMyGroup,
   getMyGroupMembers,
   getGroupMonitoring,
-  choRemoveMyMember,
-  choUpdateMyGroup,
+  cehoRemoveMyMember,
+  cehoUpdateMyGroup,
   searchCHWCandidates,
-  choDirectlyAddMember,
-} from "@/services/choGroup.service";
-import { ICHOGroupMember, IStudentSearchResult } from "@/types";
+  cehoDirectlyAddMember,
+} from "@/services/cehoGroup.service";
+import { ICEHOGroupMember, IStudentSearchResult } from "@/types";
 import { MetricCard } from "@/components/common/MetricCard";
 import { Button } from "@/components/common/Button";
 
@@ -52,11 +52,11 @@ const MemberAvatar = ({ name, photo }: { name: string; photo: string | null }) =
   );
 };
 
-const CHOGroupPage = () => {
+const CEHOGroupPage = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
-  const [pendingRemove, setPendingRemove] = useState<ICHOGroupMember | null>(null);
+  const [pendingRemove, setPendingRemove] = useState<ICEHOGroupMember | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState("");
   const [editDistrict, setEditDistrict] = useState("");
@@ -99,28 +99,28 @@ const CHOGroupPage = () => {
   };
 
   const { data: group, isLoading, isError } = useQuery({
-    queryKey: ["cho-group-mine"],
+    queryKey: ["ceho-group-mine"],
     queryFn: getMyGroup,
     retry: false,
   });
 
   const { data: members = [], isLoading: membersLoading, refetch, isRefetching } = useQuery({
-    queryKey: ["cho-group-members"],
+    queryKey: ["ceho-group-members"],
     queryFn: getMyGroupMembers,
   });
 
   const { data: monitoring } = useQuery({
-    queryKey: ["cho-group-monitoring"],
+    queryKey: ["ceho-group-monitoring"],
     queryFn: getGroupMonitoring,
     retry: false,
   });
 
   const { mutate: removeMember, isPending: isRemoving } = useMutation({
-    mutationFn: (studentId: string) => choRemoveMyMember(studentId),
+    mutationFn: (studentId: string) => cehoRemoveMyMember(studentId),
     onSuccess: () => {
       setPendingRemove(null);
-      queryClient.invalidateQueries({ queryKey: ["cho-group-members"] });
-      queryClient.invalidateQueries({ queryKey: ["cho-chw-candidates"] });
+      queryClient.invalidateQueries({ queryKey: ["ceho-group-members"] });
+      queryClient.invalidateQueries({ queryKey: ["ceho-chw-candidates"] });
       toast.success("Member removed from your group.");
     },
     onError: (error: any) => {
@@ -132,7 +132,7 @@ const CHOGroupPage = () => {
   const { mutate: updateGroup, isPending: isUpdating } = useMutation({
     mutationFn: () => {
       const filled = editLocations.filter((l) => l.sector);
-      return choUpdateMyGroup({
+      return cehoUpdateMyGroup({
         name: editName || undefined,
         district: editDistrict || undefined,
         sectors: filled.map((l) => l.sector),
@@ -141,7 +141,7 @@ const CHOGroupPage = () => {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["cho-group-mine"] });
+      queryClient.invalidateQueries({ queryKey: ["ceho-group-mine"] });
       toast.success("Group updated.");
       setIsEditing(false);
     },
@@ -151,19 +151,19 @@ const CHOGroupPage = () => {
   });
 
   const { data: chwCandidates = [], isLoading: candidatesLoading, isFetching: candidatesFetching } = useQuery({
-    queryKey: ["cho-chw-candidates", addDebouncedSearch],
+    queryKey: ["ceho-chw-candidates", addDebouncedSearch],
     queryFn: () => searchCHWCandidates(addDebouncedSearch || undefined),
     enabled: showAddModal,
   });
 
   const { mutate: addMember, isPending: isAdding } = useMutation({
-    mutationFn: (studentId: string) => choDirectlyAddMember(studentId),
+    mutationFn: (studentId: string) => cehoDirectlyAddMember(studentId),
     onSuccess: (_, studentId) => {
       setAddedIds((prev) => new Set([...prev, studentId]));
       setPendingStudent(null);
-      queryClient.invalidateQueries({ queryKey: ["cho-group-members"] });
-      queryClient.invalidateQueries({ queryKey: ["cho-chw-candidates"] });
-      queryClient.invalidateQueries({ queryKey: ["cho-group-mine"] });
+      queryClient.invalidateQueries({ queryKey: ["ceho-group-members"] });
+      queryClient.invalidateQueries({ queryKey: ["ceho-chw-candidates"] });
+      queryClient.invalidateQueries({ queryKey: ["ceho-group-mine"] });
       toast.success("CHW added to your group successfully.");
     },
     onError: (error: any) => {
@@ -199,13 +199,13 @@ const CHOGroupPage = () => {
         <Users className="w-12 h-12 text-gray-300" />
         <p className="text-gray-600 font-semibold">No group assigned yet</p>
         <p className="text-gray-400 text-sm max-w-xs">
-          You don't have a CHO group yet. Contact an administrator to set one up.
+          You don't have a CEHO group yet. Contact an administrator to set one up.
         </p>
       </div>
     );
   }
 
-  const cho = group.cho;
+  const ceho = group.ceho;
   const monitoringMembers = monitoring?.members ?? [];
   const memberCount = (group._count?.members ?? 0) + 1;
 
@@ -225,15 +225,15 @@ const CHOGroupPage = () => {
     m.courseProgress.some((c) => c.progress > 0 && !c.isCompleted),
   ).length;
 
-  const filtered = members.filter((m: ICHOGroupMember) =>
+  const filtered = members.filter((m: ICEHOGroupMember) =>
     m.student.user.fullNames.toLowerCase().includes(search.toLowerCase()),
   );
 
-  const choMatchesSearch =
-    !!cho &&
-    (!search || cho.user.fullNames.toLowerCase().includes(search.toLowerCase()));
+  const cehoMatchesSearch =
+    !!ceho &&
+    (!search || ceho.user.fullNames.toLowerCase().includes(search.toLowerCase()));
 
-  const isEmpty = filtered.length === 0 && !choMatchesSearch;
+  const isEmpty = filtered.length === 0 && !cehoMatchesSearch;
 
   return (
     <div className="space-y-6">
@@ -454,26 +454,26 @@ const CHOGroupPage = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {/* CHO leader card */}
-          {choMatchesSearch && cho && (
+          {/* CEHO leader card */}
+          {cehoMatchesSearch && ceho && (
             <div
-              onClick={() => navigate(`/students/${cho.id}`)}
+              onClick={() => navigate(`/students/${ceho.id}`)}
               className="bg-white rounded-xl border border-[#3363AD]/20 shadow-sm p-4 hover:shadow-md transition-shadow cursor-pointer"
             >
               <div className="flex items-center gap-3 mb-3">
-                <MemberAvatar name={cho.user.fullNames} photo={cho.user.photo} />
+                <MemberAvatar name={ceho.user.fullNames} photo={ceho.user.photo} />
                 <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-gray-900 truncate">{cho.user.fullNames}</p>
+                  <p className="font-semibold text-gray-900 truncate">{ceho.user.fullNames}</p>
                   <span className="text-[10px] font-semibold text-[#3363AD] bg-[#EBF0F9] rounded-full px-2 py-0.5">
-                    Leader (CHO)
+                    Leader (CEHO)
                   </span>
                 </div>
               </div>
               <div className="space-y-1.5 border-t border-gray-50 pt-3">
-                {cho.user.phoneNumber && (
+                {ceho.user.phoneNumber && (
                   <div className="flex items-center gap-2 text-gray-500 text-xs">
                     <Phone className="w-3.5 h-3.5 text-gray-300 shrink-0" />
-                    <span>{cho.user.phoneNumber}</span>
+                    <span>{ceho.user.phoneNumber}</span>
                   </div>
                 )}
               </div>
@@ -481,7 +481,7 @@ const CHOGroupPage = () => {
           )}
 
           {/* CHW member cards */}
-          {filtered.map((member: ICHOGroupMember) => {
+          {filtered.map((member: ICEHOGroupMember) => {
             const u = member.student.user;
             return (
               <div
@@ -838,4 +838,4 @@ const CHOGroupPage = () => {
   );
 };
 
-export default CHOGroupPage;
+export default CEHOGroupPage;

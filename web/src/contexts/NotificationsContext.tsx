@@ -1,9 +1,16 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { createContext, useContext, useCallback, useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
+import { useQueryClient } from "@tanstack/react-query";
 import type { Notification } from "@/types";
 import { getSocketBaseURL } from "@/config/api.config";
 import { getCookieValue } from "@/utils/jwt";
+
+interface UserStatus {
+  userId: string;
+  isOnline: boolean;
+  lastSeen: string | null;
+}
 
 interface NotificationsContextType {
   notifications: Notification[];
@@ -13,6 +20,9 @@ interface NotificationsContextType {
   markAllAsRead: () => void;
   deleteNotification: (notificationId: string) => void;
   clearAllNotifications: () => void;
+  onlineUserIds: Set<string>;
+  lastSeenByUserId: Record<string, string>;
+  requestUserStatus: (userIds: string[]) => Promise<UserStatus[]>;
 }
 
 const NotificationsContext = createContext<NotificationsContextType | undefined>(undefined);
@@ -36,7 +46,10 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [connected, setConnected] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(new Set());
+  const [lastSeenByUserId, setLastSeenByUserId] = useState<Record<string, string>>({});
   const socketRef = useRef<Socket | null>(null);
+  const queryClient = useQueryClient();
 
   const connect = useCallback(() => {
     const token = getToken();
@@ -138,6 +151,29 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
       setNotifications([]);
       setUnreadCount(0);
     });
+
+    // Presence — broadcast globally to every connected client on this namespace.
+    socket.on("user:online", (data: { userId: string }) => {
+      setOnlineUserIds((prev) => new Set(prev).add(data.userId));
+    });
+
+    socket.on("user:offline", (data: { userId: string; lastSeen: string }) => {
+      setOnlineUserIds((prev) => {
+        const next = new Set(prev);
+        next.delete(data.userId);
+        return next;
+      });
+      setLastSeenByUserId((prev) => ({ ...prev, [data.userId]: data.lastSeen }));
+    });
+
+    // Fired for every new message the user receives, on their personal room, regardless
+    // of which page they're on — the one signal that can keep unread badges live without
+    // requiring the Messaging page (and its per-conversation sockets) to be mounted.
+    socket.on("message:new_unread", () => {
+      queryClient.invalidateQueries({ queryKey: ["unread-counts"] });
+      queryClient.invalidateQueries({ queryKey: ["conversations"] });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -226,6 +262,42 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
     socketRef.current?.emit("clear_all_notifications");
   }, []);
 
+  const requestUserStatus = useCallback((userIds: string[]): Promise<UserStatus[]> => {
+    return new Promise((resolve) => {
+      const socket = socketRef.current;
+      if (!socket?.connected || userIds.length === 0) {
+        resolve([]);
+        return;
+      }
+
+      const handleResponse = (statuses: UserStatus[]) => {
+        socket.off("user:status_response", handleResponse);
+        setOnlineUserIds((prev) => {
+          const next = new Set(prev);
+          statuses.forEach((s) => (s.isOnline ? next.add(s.userId) : next.delete(s.userId)));
+          return next;
+        });
+        setLastSeenByUserId((prev) => {
+          const next = { ...prev };
+          statuses.forEach((s) => {
+            if (s.lastSeen) next[s.userId] = s.lastSeen;
+          });
+          return next;
+        });
+        resolve(statuses);
+      };
+
+      socket.on("user:status_response", handleResponse);
+      socket.emit("user:get_status", { userIds });
+
+      // Don't hang forever if the server never replies.
+      setTimeout(() => {
+        socket.off("user:status_response", handleResponse);
+        resolve([]);
+      }, 5000);
+    });
+  }, []);
+
   return (
     <NotificationsContext.Provider
       value={{
@@ -236,6 +308,9 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
         markAllAsRead,
         deleteNotification,
         clearAllNotifications,
+        onlineUserIds,
+        lastSeenByUserId,
+        requestUserStatus,
       }}
     >
       {children}

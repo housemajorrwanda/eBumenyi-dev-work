@@ -26,6 +26,10 @@ import {
 import ProfileAvatar from "@/components/profile/ProfileAvatar";
 import { useProfilePhoto } from "@/hooks/useProfilePhoto";
 import { ChatWidget } from "@/components/chat/ChatWidget";
+import { useUnreadCounts } from "@/hooks/useUnreadCounts";
+import { postHeartbeat } from "@/services/activity.service";
+
+const HEARTBEAT_INTERVAL_MS = 4 * 60 * 1000; // 4 minutes
 
 
 const AdminSidebar = ({
@@ -48,6 +52,8 @@ const AdminSidebar = ({
     return window.innerWidth < 768 ? true : window.innerWidth > 750;
   });
   const { photoUrl } = useProfilePhoto();
+  const { data: unreadCounts } = useUnreadCounts();
+  const totalUnread = unreadCounts?.totalUnread || 0;
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   // track nested open state for submenu category items (e.g. Financial / Physical)
   const [openNested, setOpenNested] = useState<Record<string, boolean>>({});
@@ -315,10 +321,24 @@ const AdminSidebar = ({
                         : "text-gray-700 hover:bg-gray-100"
                     } rounded-lg flex items-center space-x-3 py-2.5 px-4 transition-colors duration-200 group`}
                   >
-                    <span className='w-5 flex-shrink-0 text-gray-600'>
+                    <span className='relative w-5 flex-shrink-0 text-gray-600'>
                       {link.icon}
+                      {!isExpanded && link.label === "Messaging" && totalUnread > 0 && (
+                        <span className='absolute -top-1.5 -right-1.5 min-w-[16px] h-[16px] px-0.5 bg-red-500 rounded-full flex items-center justify-center text-[9px] leading-none font-bold text-white'>
+                          {totalUnread}
+                        </span>
+                      )}
                     </span>
-                    {isExpanded && <span className='text-sm'>{link.label}</span>}
+                    {isExpanded && (
+                      <span className='text-sm flex items-center gap-2'>
+                        {link.label}
+                        {link.label === "Messaging" && totalUnread > 0 && (
+                          <span className='min-w-[18px] h-[18px] px-1 bg-red-500 rounded-full flex items-center justify-center text-[10px] leading-none font-bold text-white'>
+                            {totalUnread}
+                          </span>
+                        )}
+                      </span>
+                    )}
                     {!isExpanded && (
                       <div className='absolute left-20 bg-gray-900 text-white px-2 py-1 rounded text-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap'>
                         {link.label}
@@ -384,6 +404,21 @@ const DashboardLayout = ({
     }
   }, [location.pathname]);
 
+  // Session-duration heartbeat — fire-and-forget telemetry, never blocks the UI.
+  useEffect(() => {
+    if (!user) return;
+
+    const sendHeartbeat = () => {
+      const courseMatch = location.pathname.match(/^\/learn\/([^/]+)/);
+      void postHeartbeat(courseMatch?.[1]);
+    };
+
+    sendHeartbeat();
+    const id = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS);
+    return () => clearInterval(id);
+     
+  }, [user, location.pathname]);
+
   const handleSidebarToggle = (collapsed: boolean) => {
     if (onSidebarToggle) onSidebarToggle(collapsed);
   };
@@ -394,7 +429,7 @@ const DashboardLayout = ({
     {
       label: "Dashboard",
       path: "/",
-      roles: ["ADMIN", "TRAINEE", "TRAINER", "DEVELOPER", "CHO"],
+      roles: ["ADMIN", "TRAINEE", "TRAINER", "DEVELOPER", "CEHO"],
       icon: <Squares2X2Icon className='w-5 h-5' />,
     },
     {
@@ -442,16 +477,16 @@ const DashboardLayout = ({
       label: "My Learning",
       icon: <GraduationCap className='w-4 h-4' />,
       path: "/my-learning",
-      roles: ["TRAINEE", "CHO"],
+      roles: ["TRAINEE", "CEHO"],
     },
     {
       label: "My Group",
       icon: <UsersRound className='w-4 h-4' />,
-      path: "/cho-group",
-      roles: ["CHO"],
+      path: "/ceho-group",
+      roles: ["CEHO"],
     },
     {
-      label: "CHW & CHO",
+      label: "CHW & CEHO",
       icon: <Users className='w-4 h-4' />,
       path: "/students",
       roles: ["ADMIN", "DEVELOPER", "TRAINER", "STAFF"],
@@ -460,7 +495,7 @@ const DashboardLayout = ({
       label: "My Certificates",
       icon: <Award className='w-4 h-4' />,
       path: "/my-certificates",
-      roles: ["TRAINEE", "CHO"],
+      roles: ["TRAINEE", "CEHO"],
     },
     {
       label: "Certificates",
@@ -478,14 +513,14 @@ const DashboardLayout = ({
     {
       label: "Calender",
       path: "/calender",
-      roles: ["ADMIN", "TRAINER", "TRAINEE", "DEVELOPER", "CHO"],
+      roles: ["ADMIN", "TRAINER", "TRAINEE", "DEVELOPER", "CEHO"],
       icon: <Calendar className='w-5 h-5' />,
     },
     {
       label: "Messaging",
       icon: <MessageSquare className='w-4 h-4' />,
       path: "/messaging",
-      roles: ["ADMIN", "TRAINER", "TRAINEE", "DEVELOPER", "CHO", "STAFF"],
+      roles: ["ADMIN", "TRAINER", "TRAINEE", "DEVELOPER", "CEHO", "STAFF"],
     },
     {
       label: "Announcement",
@@ -497,7 +532,7 @@ const DashboardLayout = ({
     {
       label: "My Settings",
       path: "/settings",
-      roles: ["ADMIN", "TRAINER", "TRAINEE", "DEVELOPER", "CHO"],
+      roles: ["ADMIN", "TRAINER", "TRAINEE", "DEVELOPER", "CEHO"],
       icon: <Cog8ToothIcon className='w-5 h-5' />,
     },
   ];
@@ -534,7 +569,9 @@ const DashboardLayout = ({
         />
       )}
 
-      <ChatWidget />
+      {/* The AI assistant FAB is fixed to the same viewport corner as the message
+          composer's send button — keep it off the Messaging page to avoid overlap. */}
+      {!location.pathname.startsWith("/messaging") && <ChatWidget />}
     </div>
   );
 };

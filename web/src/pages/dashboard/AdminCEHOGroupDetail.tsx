@@ -28,11 +28,11 @@ import {
   adminDemoteToCHW,
   adminUpdateGroup,
   adminDeleteGroup,
-} from "@/services/choGroup.service";
+} from "@/services/cehoGroup.service";
 import { getAllStudentsNoPagination, IStudent } from "@/services/students.service";
 import { Button } from "@/components/common/Button";
 import { formatDate } from "@/utils/formats/formats";
-import { ICHOGroupMember } from "@/types";
+import { ICEHOGroupMember } from "@/types";
 
 /* ─── Avatar ────────────────────────────────────────────────────────────────── */
 const Avatar = ({
@@ -94,7 +94,7 @@ const StudentSearchPicker = ({
   };
 
   const { data, isFetching } = useQuery({
-    queryKey: ["cho-group-picker", debounced, roleFilter],
+    queryKey: ["ceho-group-picker", debounced, roleFilter],
     queryFn: () =>
       getAllStudentsNoPagination(
         debounced.length > 1
@@ -168,18 +168,18 @@ const StudentSearchPicker = ({
 };
 
 /* ─── Page ──────────────────────────────────────────────────────────────────── */
-const AdminCHOGroupDetailPage = () => {
+const AdminCEHOGroupDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   // Add / remove members
   const [addStudent, setAddStudent] = useState<IStudent | null>(null);
-  const [pendingRemove, setPendingRemove] = useState<ICHOGroupMember | null>(null);
+  const [pendingRemove, setPendingRemove] = useState<ICEHOGroupMember | null>(null);
 
-  // Demote CHO
+  // Demote CEHO
   const [showDemote, setShowDemote] = useState(false);
-  const [newCHO, setNewCHO] = useState<IStudent | null>(null);
+  const [newCEHO, setNewCEHO] = useState<IStudent | null>(null);
   const [demoteTargetId, setDemoteTargetId] = useState<string | null>(null);
   const [demoteTargetName, setDemoteTargetName] = useState<string>("");
 
@@ -193,7 +193,7 @@ const AdminCHOGroupDetailPage = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const { data: group, isLoading } = useQuery({
-    queryKey: ["admin-cho-group-detail", id],
+    queryKey: ["admin-ceho-group-detail", id],
     queryFn: () => adminGetGroupById(id!),
     enabled: !!id,
   });
@@ -201,8 +201,8 @@ const AdminCHOGroupDetailPage = () => {
   const { mutate: addMember, isPending: isAdding } = useMutation({
     mutationFn: () => adminAddMember(id!, addStudent!.id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-cho-group-detail", id] });
-      queryClient.invalidateQueries({ queryKey: ["admin-cho-groups"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-ceho-group-detail", id] });
+      queryClient.invalidateQueries({ queryKey: ["admin-ceho-groups"] });
       toast.success("CHW added to group.");
       setAddStudent(null);
     },
@@ -214,8 +214,8 @@ const AdminCHOGroupDetailPage = () => {
   const { mutate: removeMember, isPending: isRemoving } = useMutation({
     mutationFn: (studentId: string) => adminRemoveMember(id!, studentId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-cho-group-detail", id] });
-      queryClient.invalidateQueries({ queryKey: ["admin-cho-groups"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-ceho-group-detail", id] });
+      queryClient.invalidateQueries({ queryKey: ["admin-ceho-groups"] });
       toast.success("CHW removed from group.");
       setPendingRemove(null);
     },
@@ -225,19 +225,19 @@ const AdminCHOGroupDetailPage = () => {
     },
   });
 
-  const { mutate: demoteCHO, isPending: isDemoting } = useMutation({
-    mutationFn: () => adminDemoteToCHW(group!.cho!.user!.id, demoteTargetId!),
+  const { mutate: demoteCEHO, isPending: isDemoting } = useMutation({
+    mutationFn: () => adminDemoteToCHW(group!.ceho!.user!.id, demoteTargetId!),
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["admin-cho-group-detail", id] });
-      queryClient.invalidateQueries({ queryKey: ["admin-cho-groups"] });
-      toast.success(`${data.demotedUser.fullNames} demoted. ${data.newCHO.fullNames} is now the CHO.`);
+      queryClient.invalidateQueries({ queryKey: ["admin-ceho-group-detail", id] });
+      queryClient.invalidateQueries({ queryKey: ["admin-ceho-groups"] });
+      toast.success(`${data.demotedUser.fullNames} demoted. ${data.newCEHO.fullNames} is now the CEHO.`);
       setShowDemote(false);
-      setNewCHO(null);
+      setNewCEHO(null);
       setDemoteTargetId(null);
       setDemoteTargetName("");
     },
     onError: (error: any) => {
-      toast.error(error?.response?.data?.message ?? "Failed to demote CHO.");
+      toast.error(error?.response?.data?.message ?? "Failed to demote CEHO.");
     },
   });
 
@@ -254,8 +254,8 @@ const AdminCHOGroupDetailPage = () => {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-cho-group-detail", id] });
-      queryClient.invalidateQueries({ queryKey: ["admin-cho-groups"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-ceho-group-detail", id] });
+      queryClient.invalidateQueries({ queryKey: ["admin-ceho-groups"] });
       toast.success("Group updated.");
       setIsEditing(false);
     },
@@ -267,9 +267,9 @@ const AdminCHOGroupDetailPage = () => {
   const { mutate: deleteGroup, isPending: isDeleting } = useMutation({
     mutationFn: () => adminDeleteGroup(id!),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-cho-groups"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-ceho-groups"] });
       toast.success("Group deleted.");
-      navigate("/admin/cho-groups");
+      navigate("/admin/ceho-groups");
     },
     onError: (error: any) => {
       toast.error(error?.response?.data?.message ?? "Failed to delete group.");
@@ -283,10 +283,10 @@ const AdminCHOGroupDetailPage = () => {
     setIsEditing(true);
   };
 
-  const selectMemberAsDemoteTarget = (m: ICHOGroupMember) => {
+  const selectMemberAsDemoteTarget = (m: ICEHOGroupMember) => {
     setDemoteTargetId(m.studentId);
     setDemoteTargetName(m.student.user.fullNames);
-    setNewCHO(null);
+    setNewCEHO(null);
   };
 
   if (isLoading) {
@@ -305,7 +305,7 @@ const AdminCHOGroupDetailPage = () => {
     return (
       <div className="flex flex-col items-center justify-center py-24 gap-3 text-center">
         <p className="text-gray-500">Group not found.</p>
-        <Button size="sm" variant="ghost" onClick={() => navigate("/admin/cho-groups")}>
+        <Button size="sm" variant="ghost" onClick={() => navigate("/admin/ceho-groups")}>
           <ArrowLeft className="w-4 h-4 mr-1.5" /> Back
         </Button>
       </div>
@@ -313,8 +313,8 @@ const AdminCHOGroupDetailPage = () => {
   }
 
   const members = group.members ?? [];
-  const cho = group.cho?.user;
-  const totalCount = members.length + (cho ? 1 : 0);
+  const ceho = group.ceho?.user;
+  const totalCount = members.length + (ceho ? 1 : 0);
 
   return (
     <div className="space-y-6">
@@ -426,20 +426,20 @@ const AdminCHOGroupDetailPage = () => {
           </div>
         </div>
 
-        {/* CHO card */}
+        {/* CEHO card */}
         <div className="md:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
             Community Health Officer
           </p>
-          {cho ? (
+          {ceho ? (
             <div className="flex items-center gap-4">
-              <Avatar name={cho.fullNames} photo={cho.photo} size="w-14 h-14" />
+              <Avatar name={ceho.fullNames} photo={ceho.photo} size="w-14 h-14" />
               <div className="flex-1 min-w-0">
-                <p className="font-bold text-gray-900 text-lg truncate">{cho.fullNames}</p>
-                {cho.phoneNumber && (
+                <p className="font-bold text-gray-900 text-lg truncate">{ceho.fullNames}</p>
+                {ceho.phoneNumber && (
                   <p className="text-sm text-gray-500 flex items-center gap-1.5 mt-0.5">
                     <Phone className="w-3.5 h-3.5" />
-                    {cho.phoneNumber}
+                    {ceho.phoneNumber}
                   </p>
                 )}
               </div>
@@ -449,7 +449,7 @@ const AdminCHOGroupDetailPage = () => {
                   setShowDemote((v) => !v);
                   setDemoteTargetId(null);
                   setDemoteTargetName("");
-                  setNewCHO(null);
+                  setNewCEHO(null);
                 }}
                 className={`flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-lg transition-colors shrink-0 ${
                   showDemote
@@ -458,19 +458,19 @@ const AdminCHOGroupDetailPage = () => {
                 }`}
               >
                 <ArrowDownCircle className="w-4 h-4" />
-                Demote CHO
+                Demote CEHO
               </button>
             </div>
           ) : (
-            <p className="text-sm text-gray-400">No CHO assigned to this group.</p>
+            <p className="text-sm text-gray-400">No CEHO assigned to this group.</p>
           )}
 
           {/* Demote section */}
-          {showDemote && cho && (
+          {showDemote && ceho && (
             <div className="mt-4 p-4 bg-amber-50 border border-amber-100 rounded-xl space-y-4">
               <p className="text-xs font-semibold text-amber-700 flex items-center gap-1.5">
                 <ArrowDownCircle className="w-3.5 h-3.5" />
-                Select a replacement CHO for {cho.fullNames}
+                Select a replacement CEHO for {ceho.fullNames}
               </p>
 
               {/* Group member suggestions */}
@@ -479,7 +479,7 @@ const AdminCHOGroupDetailPage = () => {
                   <p className="text-xs text-amber-600 font-medium">Members already in this group:</p>
                   <div className="space-y-1.5">
                     {members.map((m) => {
-                      const isSelected = demoteTargetId === m.studentId && !newCHO;
+                      const isSelected = demoteTargetId === m.studentId && !newCEHO;
                       return (
                         <button
                           key={m.studentId}
@@ -517,29 +517,29 @@ const AdminCHOGroupDetailPage = () => {
                 <StudentSearchPicker
                   placeholder="Search CHW by name…"
                   roleFilter="TRAINEE"
-                  selected={newCHO}
+                  selected={newCEHO}
                   onSelect={(s) => {
-                    setNewCHO(s);
+                    setNewCEHO(s);
                     setDemoteTargetId(s.id);
                     setDemoteTargetName(s.fullName);
                   }}
                   onClear={() => {
-                    setNewCHO(null);
+                    setNewCEHO(null);
                     setDemoteTargetId(null);
                     setDemoteTargetName("");
                   }}
                 />
-                {newCHO && (
+                {newCEHO && (
                   <div className="flex items-center gap-2 p-2 bg-white rounded-lg border border-amber-100">
-                    <Avatar name={newCHO.fullName} photo={null} size="w-7 h-7" />
-                    <span className="text-sm font-medium text-gray-800 truncate">{newCHO.fullName}</span>
+                    <Avatar name={newCEHO.fullName} photo={null} size="w-7 h-7" />
+                    <span className="text-sm font-medium text-gray-800 truncate">{newCEHO.fullName}</span>
                   </div>
                 )}
               </div>
 
               {demoteTargetId && (
                 <p className="text-xs text-amber-700 font-medium">
-                  New CHO: <span className="font-bold">{demoteTargetName}</span>
+                  New CEHO: <span className="font-bold">{demoteTargetName}</span>
                 </p>
               )}
 
@@ -550,7 +550,7 @@ const AdminCHOGroupDetailPage = () => {
                   className="flex-1"
                   onClick={() => {
                     setShowDemote(false);
-                    setNewCHO(null);
+                    setNewCEHO(null);
                     setDemoteTargetId(null);
                     setDemoteTargetName("");
                   }}
@@ -563,7 +563,7 @@ const AdminCHOGroupDetailPage = () => {
                   className="flex-1 !bg-amber-500 hover:!bg-amber-600"
                   disabled={!demoteTargetId || isDemoting}
                   isLoading={isDemoting}
-                  onClick={() => demoteCHO()}
+                  onClick={() => demoteCEHO()}
                 >
                   {!isDemoting && <ArrowDownCircle className="w-3.5 h-3.5 mr-1.5" />}
                   Confirm Demotion
@@ -745,7 +745,7 @@ const AdminCHOGroupDetailPage = () => {
                     <Dialog.Title className="text-lg font-bold text-gray-900">Delete Group</Dialog.Title>
                     <Dialog.Description className="text-sm text-gray-500 mt-1">
                       Delete <span className="font-semibold text-gray-800">{group.name}</span>?
-                      This will remove all members and revoke the CHO role. This cannot be undone.
+                      This will remove all members and revoke the CEHO role. This cannot be undone.
                     </Dialog.Description>
                   </div>
                 </div>
@@ -778,4 +778,4 @@ const AdminCHOGroupDetailPage = () => {
   );
 };
 
-export default AdminCHOGroupDetailPage;
+export default AdminCEHOGroupDetailPage;

@@ -37,6 +37,7 @@ import {
 import NotificationsPage from "./NotificationsPage";
 import Help from "./Help";
 import { getProfile, updateAvatar } from "@/services/profile.api";
+import { getPublicHospitals } from "@/services/hospitals.service";
 import api from "@/services/api";
 import { useTheme } from "@/contexts/ThemeContext";
 import { registerPushToken } from "@/hooks/usePushNotifications";
@@ -55,6 +56,7 @@ const profileSchema = z.object({
   gender: z.string().optional(),
   NID: z.string().optional(),
   birthdate: z.string().optional(),
+  hospitalId: z.string().optional().default(""),
 });
 
 type ProfileFormData = z.infer<typeof profileSchema>;
@@ -256,12 +258,22 @@ export const Settings: React.FC = () => {
           gender: profile.gender ?? "",
           NID: profile.NID ?? "",
           birthdate: profile.birthdate?.substring(0, 10) ?? "",
+          hospitalId: profile.hospitalId ?? "",
         }
       : undefined,
   });
 
+  const { data: hospitalOptions = [] } = useQuery({
+    queryKey: ["publicHospitals"],
+    queryFn: () => getPublicHospitals(),
+    staleTime: 5 * 60 * 1000,
+  });
+
   const profileMut = useMutation({
-    mutationFn: (data: ProfileFormData) => api.put("/auth/profile", data),
+    // An empty selection means "leave unchanged" — sending "" would try to
+    // set a literal empty-string foreign key and fail on the backend.
+    mutationFn: (data: ProfileFormData) =>
+      api.put("/auth/profile", { ...data, hospitalId: data.hospitalId || undefined }),
     onSuccess: (res) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const updated = (res.data as any)?.data;
@@ -518,6 +530,26 @@ export const Settings: React.FC = () => {
                             />
                           </div>
                         ))}
+                      </div>
+                    </div>
+
+                    {/* Health Facility */}
+                    <div className="mb-6">
+                      <h3 className="text-sm font-medium text-gray-700 dark:text-slate-300 mb-3">
+                        Health Facility
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs text-gray-600 dark:text-slate-400 mb-1">
+                            Hospital / Health Center
+                          </label>
+                          <select {...rp("hospitalId")} className={inputCls}>
+                            <option value="">Select hospital (optional)</option>
+                            {hospitalOptions.map((h) => (
+                              <option key={h.id} value={h.id}>{h.name}</option>
+                            ))}
+                          </select>
+                        </div>
                       </div>
                     </div>
 

@@ -16,6 +16,7 @@
     "seed:recommendations-test": "psql \"$DATABASE_URL\" -f ./scripts/seed-local-recommendations-test.sql",
     "backfill:section-numbers": "ts-node ./scripts/backfill-section-numbers.ts",
     "update:user-language-rw": "bash ./scripts/update-user-language-rw.sh",
+    "update:cho-to-ceho": "ts-node ./scripts/update-cho-to-ceho.ts",
     "reset": "pnpm exec prisma migrate reset",
     "lint": "pnpm exec eslint ./src --fix",
     "format": "prettier --write ./src",

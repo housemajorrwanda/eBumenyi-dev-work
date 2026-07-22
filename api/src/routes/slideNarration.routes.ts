@@ -175,7 +175,7 @@ router.get(
 router.post(
   "/:id/extract-text",
   requireAuth,
-  checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN),
+  checkRole(roles.STAFF, roles.CEHO, roles.TRAINER, roles.ADMIN),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       await SlideService.getSlideById(req.params.id);

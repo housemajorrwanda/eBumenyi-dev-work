@@ -7,6 +7,7 @@ import {
   UserGroupIcon,
   UsersIcon,
   ClockIcon,
+  ChartPieIcon,
 } from '@heroicons/react/24/outline';
 import api from '@/services/api';
 import ExcelJS from 'exceljs';
@@ -32,6 +33,7 @@ interface AttendanceRecord {
     sector: string | null;
     cell: string | null;
     village: string | null;
+    hospital: { name: string } | null;
     userRoles: UserRoleEntry[];
   };
   event?: {
@@ -42,6 +44,26 @@ interface AttendanceRecord {
   };
 }
 
+interface InvitedUserProfile {
+  id: string;
+  fullNames: string;
+  email: string;
+  gender: string | null;
+  district: string | null;
+  sector: string | null;
+  cell: string | null;
+  village: string | null;
+  hospital: { name: string } | null;
+  userRoles: UserRoleEntry[];
+}
+
+interface InvitedInfo {
+  total: number;
+  attended: number;
+  pct: number | null;
+  absentees: InvitedUserProfile[];
+}
+
 interface AggregatedAttendee {
   key: string;
   userId: string | null;
@@ -49,6 +71,7 @@ interface AggregatedAttendee {
   email: string | null;
   photo: string | null;
   role: string;
+  hospital: string;
   gender: string;
   district: string;
   sector: string;
@@ -84,14 +107,18 @@ const MeetingAttendance: React.FC = () => {
     queryKey: ['attendance', eventId],
     queryFn: async () => {
       const res = await api.get(`/attendance/event/${eventId}`);
-      return (res.data?.data ?? []) as AttendanceRecord[];
+      return {
+        records: (res.data?.data ?? []) as AttendanceRecord[],
+        invited: (res.data?.invited ?? null) as InvitedInfo | null,
+      };
     },
     enabled: !!eventId,
     staleTime: Infinity,        // attendance report is static — don't re-fetch automatically
     refetchOnWindowFocus: false,
   });
 
-  const records = data ?? [];
+  const records = data?.records ?? [];
+  const invited = data?.invited ?? null;
   const eventTitle = records[0]?.event?.title;
 
   // Group by user — sum duration across all sessions in the same meeting.
@@ -137,6 +164,7 @@ const MeetingAttendance: React.FC = () => {
           email: r.user?.email ?? null,
           photo: r.user?.photo ?? null,
           role: r.user?.userRoles?.[0]?.name ?? '—',
+          hospital: r.user?.hospital?.name ?? '—',
           gender: r.user?.gender ?? '—',
           district: r.user?.district ?? '—',
           sector: r.user?.sector ?? '—',
@@ -179,9 +207,11 @@ const MeetingAttendance: React.FC = () => {
 
   const handleExport = async () => {
     const wb = new ExcelJS.Workbook();
-    const ws = wb.addWorksheet('Attendance');
+    const ws = wb.addWorksheet('Attended');
 
     const PRIMARY   = '3363AD';
+    const ABSENT_RED = 'B91C1C';
+    const ABSENT_BG  = 'FEF2F2'; // red-50
     const HOST_BG   = 'FEF3C7'; // amber-100
     const REG_BG    = 'EFF6FF'; // blue-50
     const GUEST_BG  = 'FFF7ED'; // orange-50
@@ -192,6 +222,7 @@ const MeetingAttendance: React.FC = () => {
       { header: 'Name',     key: 'name',     width: 28 },
       { header: 'Email',    key: 'email',    width: 28 },
       { header: 'Role',     key: 'role',     width: 14 },
+      { header: 'Hospital', key: 'hospital', width: 22 },
       { header: 'Gender',   key: 'gender',   width: 10 },
       { header: 'District', key: 'district', width: 16 },
       { header: 'Sector',   key: 'sector',   width: 16 },
@@ -242,6 +273,7 @@ const MeetingAttendance: React.FC = () => {
         name:     a.isHost ? `${a.name} (Host)` : a.name,
         email:    a.email ?? '—',
         role:     a.isGuest ? 'Guest' : displayRole(a.role),
+        hospital: a.hospital,
         gender:   a.gender,
         district: a.district,
         sector:   a.sector,
@@ -274,6 +306,81 @@ const MeetingAttendance: React.FC = () => {
     // ── Freeze panes ───────────────────────────────────────────
     ws.views = [{ state: 'frozen', ySplit: 4 }];
 
+    // ── Absent sheet ───────────────────────────────────────────
+    // Only internally-invited (registered) participants who never joined.
+    // Guests and externally-invited people are never evaluated for absence
+    // since there's no reliable way to match them to an invite record.
+    const absentees = invited?.absentees ?? [];
+    const wsAbsent = wb.addWorksheet('Absent');
+
+    const absentColDefs = [
+      { header: 'Name',     key: 'name',     width: 28 },
+      { header: 'Email',    key: 'email',    width: 28 },
+      { header: 'Role',     key: 'role',     width: 14 },
+      { header: 'Hospital', key: 'hospital', width: 22 },
+      { header: 'Gender',   key: 'gender',   width: 10 },
+      { header: 'District', key: 'district', width: 16 },
+      { header: 'Sector',   key: 'sector',   width: 16 },
+      { header: 'Cell',     key: 'cell',     width: 16 },
+      { header: 'Village',  key: 'village',  width: 16 },
+    ];
+
+    wsAbsent.mergeCells(1, 1, 1, absentColDefs.length);
+    const absentTitleCell = wsAbsent.getCell('A1');
+    absentTitleCell.value = `Absent — Invited but did not attend${eventTitle ? ' — ' + eventTitle : ''}`;
+    absentTitleCell.font = { bold: true, size: 14, color: { argb: WHITE } };
+    absentTitleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: ABSENT_RED } };
+    absentTitleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+    wsAbsent.getRow(1).height = 30;
+
+    wsAbsent.mergeCells(2, 1, 2, absentColDefs.length);
+    const absentSummaryCell = wsAbsent.getCell('A2');
+    absentSummaryCell.value =
+      `Invited: ${invited?.total ?? 0}   |   Attended: ${invited?.attended ?? 0}   |   Absent: ${absentees.length}`;
+    absentSummaryCell.font = { italic: true, size: 10, color: { argb: '64748B' } };
+    absentSummaryCell.alignment = { horizontal: 'center', vertical: 'middle' };
+    absentSummaryCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'F1F5F9' } };
+    wsAbsent.getRow(2).height = 20;
+
+    wsAbsent.addRow([]);
+
+    wsAbsent.columns = absentColDefs.map((c) => ({ key: c.key, width: c.width }));
+    const absentHeaderRow = wsAbsent.addRow(absentColDefs.map((c) => c.header));
+    absentHeaderRow.height = 22;
+    absentHeaderRow.eachCell((cell) => {
+      cell.font = { bold: true, color: { argb: WHITE }, size: 11 };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: ABSENT_RED } };
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell.border = {
+        bottom: { style: 'medium', color: { argb: WHITE } },
+      };
+    });
+
+    absentees.forEach((p, i) => {
+      const row = wsAbsent.addRow({
+        name:     p.fullNames,
+        email:    p.email ?? '—',
+        role:     displayRole(p.userRoles?.[0]?.name ?? '—'),
+        hospital: p.hospital?.name ?? '—',
+        gender:   p.gender ?? '—',
+        district: p.district ?? '—',
+        sector:   p.sector ?? '—',
+        cell:     p.cell ?? '—',
+        village:  p.village ?? '—',
+      });
+      row.height = 18;
+      row.eachCell((cell) => {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: i % 2 === 0 ? WHITE : ABSENT_BG } };
+        cell.font = { color: { argb: DARK } };
+        cell.alignment = { vertical: 'middle' };
+        cell.border = {
+          bottom: { style: 'thin', color: { argb: 'E2E8F0' } },
+        };
+      });
+    });
+
+    wsAbsent.views = [{ state: 'frozen', ySplit: 4 }];
+
     const buffer = await wb.xlsx.writeBuffer();
     const blob = new Blob([buffer], {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -305,7 +412,7 @@ const MeetingAttendance: React.FC = () => {
 
       {/* Stat Cards */}
       {!isLoading && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
               <UserGroupIcon className="w-5 h-5 text-primary" />
@@ -345,6 +452,21 @@ const MeetingAttendance: React.FC = () => {
               <p className="text-xs text-gray-500 mt-0.5">Avg Duration</p>
             </div>
           </div>
+
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-teal-50 flex items-center justify-center flex-shrink-0">
+              <ChartPieIcon className="w-5 h-5 text-teal-600" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-gray-900">
+                {invited && invited.pct !== null ? `${invited.pct}%` : '—'}
+              </p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Attendance Rate
+                {guests.length > 0 && ` · +${guests.length} guest${guests.length === 1 ? '' : 's'}`}
+              </p>
+            </div>
+          </div>
         </div>
       )}
 
@@ -380,6 +502,7 @@ const MeetingAttendance: React.FC = () => {
                 <tr className="border-b border-gray-100 bg-gray-50 text-left">
                   <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Name</th>
                   <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Role</th>
+                  <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Hospital</th>
                   <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Gender</th>
                   <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">District</th>
                   <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Sector</th>
@@ -424,6 +547,7 @@ const MeetingAttendance: React.FC = () => {
                         {attendee.isGuest ? 'Guest' : displayRole(attendee.role)}
                       </span>
                     </td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{attendee.hospital}</td>
                     <td className="px-6 py-4 text-sm text-gray-600 capitalize">
                       {attendee.gender}
                     </td>
@@ -462,6 +586,8 @@ const MeetingAttendance: React.FC = () => {
                     </span>
                   </div>
                   <div className="flex flex-wrap gap-2 text-xs text-gray-500 pl-10">
+                    <span>{attendee.hospital}</span>
+                    <span>·</span>
                     <span className="capitalize">{attendee.gender}</span>
                     <span>·</span>
                     <span>{attendee.district}</span>

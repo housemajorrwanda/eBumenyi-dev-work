@@ -37,7 +37,7 @@ export class DirectChatController {
     checkRole(
       roles.ADMIN,
       roles.STAFF,
-      roles.CHO,
+      roles.CEHO,
       roles.TRAINER,
       roles.TRAINEE,
       roles.DEVELOPER,
@@ -60,7 +60,7 @@ export class DirectChatController {
     checkRole(
       roles.ADMIN,
       roles.STAFF,
-      roles.CHO,
+      roles.CEHO,
       roles.TRAINER,
       roles.TRAINEE,
       roles.DEVELOPER,
@@ -80,7 +80,7 @@ export class DirectChatController {
     checkRole(
       roles.ADMIN,
       roles.STAFF,
-      roles.CHO,
+      roles.CEHO,
       roles.TRAINER,
       roles.TRAINEE,
       roles.DEVELOPER,
@@ -117,7 +117,7 @@ export class DirectChatController {
     checkRole(
       roles.ADMIN,
       roles.STAFF,
-      roles.CHO,
+      roles.CEHO,
       roles.TRAINER,
       roles.TRAINEE,
       roles.DEVELOPER,
@@ -147,7 +147,7 @@ export class DirectChatController {
     checkRole(
       roles.ADMIN,
       roles.STAFF,
-      roles.CHO,
+      roles.CEHO,
       roles.TRAINER,
       roles.TRAINEE,
       roles.DEVELOPER,
@@ -178,7 +178,7 @@ export class DirectChatController {
     checkRole(
       roles.ADMIN,
       roles.STAFF,
-      roles.CHO,
+      roles.CEHO,
       roles.TRAINER,
       roles.TRAINEE,
       roles.DEVELOPER,
@@ -203,7 +203,7 @@ export class DirectChatController {
     checkRole(
       roles.ADMIN,
       roles.STAFF,
-      roles.CHO,
+      roles.CEHO,
       roles.TRAINER,
       roles.TRAINEE,
       roles.DEVELOPER,
@@ -227,7 +227,7 @@ export class DirectChatController {
     checkRole(
       roles.ADMIN,
       roles.STAFF,
-      roles.CHO,
+      roles.CEHO,
       roles.TRAINER,
       roles.TRAINEE,
       roles.DEVELOPER,
@@ -250,7 +250,7 @@ export class DirectChatController {
     checkRole(
       roles.ADMIN,
       roles.STAFF,
-      roles.CHO,
+      roles.CEHO,
       roles.TRAINER,
       roles.TRAINEE,
       roles.DEVELOPER,
@@ -274,7 +274,7 @@ export class DirectChatController {
     checkRole(
       roles.ADMIN,
       roles.STAFF,
-      roles.CHO,
+      roles.CEHO,
       roles.TRAINER,
       roles.TRAINEE,
       roles.DEVELOPER,
@@ -294,7 +294,7 @@ export class DirectChatController {
     checkRole(
       roles.ADMIN,
       roles.STAFF,
-      roles.CHO,
+      roles.CEHO,
       roles.TRAINER,
       roles.TRAINEE,
       roles.DEVELOPER,
@@ -317,7 +317,7 @@ export class DirectChatController {
     checkRole(
       roles.ADMIN,
       roles.STAFF,
-      roles.CHO,
+      roles.CEHO,
       roles.TRAINER,
       roles.TRAINEE,
       roles.DEVELOPER,
@@ -341,7 +341,7 @@ export class DirectChatController {
     checkRole(
       roles.ADMIN,
       roles.STAFF,
-      roles.CHO,
+      roles.CEHO,
       roles.TRAINER,
       roles.TRAINEE,
       roles.DEVELOPER,
@@ -370,7 +370,7 @@ export class DirectChatController {
     checkRole(
       roles.ADMIN,
       roles.STAFF,
-      roles.CHO,
+      roles.CEHO,
       roles.TRAINER,
       roles.TRAINEE,
       roles.DEVELOPER,

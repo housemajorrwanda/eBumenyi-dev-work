@@ -19,8 +19,8 @@ interface CommunicationsCardProps {
 }
 
 const TYPE_COLORS: Record<string, string> = {
-  peer: "#3363AD",
-  group: "#5B86C4",
+  peerToPeer: "#3363AD",
+  chwToSupervisor: "#5B86C4",
   community: "#82A5D6",
 };
 
@@ -73,10 +73,10 @@ export const CommunicationsCard: React.FC<CommunicationsCardProps> = ({
           return (
             <div key={t.type} className='flex items-center gap-3'>
               <span className='w-32 text-xs text-gray-600 shrink-0'>
-                {t.type === "peer"
-                  ? "Direct messages"
-                  : t.type === "group"
-                    ? "Group chats"
+                {t.type === "peerToPeer"
+                  ? "Peer-to-peer"
+                  : t.type === "chwToSupervisor"
+                    ? "CHW ↔ Supervisor"
                     : "Community posts"}
               </span>
               <div className='flex-1 bg-gray-100 rounded-full h-2'>
@@ -137,14 +137,14 @@ export const CommunicationsCard: React.FC<CommunicationsCardProps> = ({
               }}
             />
             <Bar
-              dataKey='direct'
-              name='Direct messages'
+              dataKey='peerToPeer'
+              name='Peer-to-peer'
               stackId='a'
               fill='#3363AD'
             />
             <Bar
-              dataKey='group'
-              name='Group chats'
+              dataKey='chwToSupervisor'
+              name='CHW ↔ Supervisor'
               stackId='a'
               fill='#5B86C4'
             />

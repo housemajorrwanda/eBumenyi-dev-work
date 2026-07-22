@@ -63,7 +63,7 @@ const Announcement: React.FC = () => {
     "all",
     "ADMIN",
     "TRAINER",
-    "CHO",
+    "CEHO",
     "TRAINEE",
     "TESTER",
     "DEVELOPER",

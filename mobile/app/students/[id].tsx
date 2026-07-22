@@ -113,7 +113,7 @@ function translateGender(gender: string): string {
 }
 
 function translateRole(role: string): string {
-  if (role === 'CHO') return 'Umuyobozi(CHO)';
+  if (role === 'CEHO') return 'Umuyobozi(CEHO)';
   if (role === 'CHW' || role === 'TRAINEE' || role === 'TESTER') return 'Umujyanama(CHW)';
   return role;
 }

@@ -8,6 +8,7 @@ import {
   XCircleIcon,
   CalendarDaysIcon,
   MagnifyingGlassIcon,
+  ChartPieIcon,
 } from '@heroicons/react/24/outline';
 import api from '@/services/api';
 
@@ -30,6 +31,7 @@ interface Stats {
   cancelled: number;
   totalParticipants: number;
   avgDurationSec: number;
+  overallAttendancePct: number | null;
 }
 
 const formatTime = (iso: string) =>
@@ -86,6 +88,7 @@ const MeetingsList: React.FC = () => {
         { label: 'Cancelled',          value: stats.cancelled,        icon: XCircleIcon,      color: 'bg-red-50 text-red-500' },
         { label: 'Total Participants', value: stats.totalParticipants, icon: UserGroupIcon,   color: 'bg-purple-50 text-purple-600' },
         { label: 'Avg Duration',       value: formatDuration(stats.avgDurationSec), icon: ClockIcon, color: 'bg-orange-50 text-orange-600' },
+        { label: 'Attendance Rate',    value: stats.overallAttendancePct !== null ? `${stats.overallAttendancePct}%` : '—', icon: ChartPieIcon, color: 'bg-teal-50 text-teal-600' },
       ]
     : [];
 
@@ -99,7 +102,7 @@ const MeetingsList: React.FC = () => {
 
       {/* Stat Cards */}
       {!isLoading && stats && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-4">
           {statCards.map(({ label, value, icon: Icon, color }) => (
             <div key={label} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
               <div className={`w-9 h-9 rounded-lg flex items-center justify-center mb-2 ${color.split(' ')[0]}`}>

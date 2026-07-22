@@ -67,7 +67,7 @@ export class CourseService {
   private static readonly DEFAULT_COURSE_NOTIFY_ROLES = [
     roles.TRAINEE,
     roles.TESTER,
-    roles.CHO,
+    roles.CEHO,
   ];
 
   private static resolveAnalyticsDistrictList(
@@ -225,7 +225,7 @@ export class CourseService {
       roleNames.includes(roles.ADMIN as never) ||
       roleNames.includes(roles.TRAINER as never) ||
       roleNames.includes(roles.STAFF as never) ||
-      roleNames.includes(roles.CHO as never);
+      roleNames.includes(roles.CEHO as never);
 
     if (!canNotify) {
       throw new AppError(
@@ -3905,7 +3905,7 @@ export class CourseService {
 
     // Who counts as a "supervisor" for classifying CHW-to-supervisor vs peer-to-peer
     const supervisorRoles = await prisma.userRole.findMany({
-      where: { name: { in: ["CHO", "TRAINER"] } },
+      where: { name: { in: ["CEHO", "TRAINER"] } },
       select: { userId: true },
     });
     const supervisorIds = new Set(supervisorRoles.map((r) => r.userId));
@@ -4057,14 +4057,14 @@ export class CourseService {
 
   /**
    * Supervisor response rate — a PROXY metric estimated from direct-message
-   * reply times between CHWs and supervisors (CHO/TRAINER), not a formal
+   * reply times between CHWs and supervisors (CEHO/TRAINER), not a formal
    * "this needs a response" tracked construct (none exists in the schema).
    */
   public static async getSupervisorResponseRate(filters?: AnalyticsFilters) {
     const { studentWhere } = CourseService.buildAnalyticsStudentScope(filters);
 
     const supervisorRoles = await prisma.userRole.findMany({
-      where: { name: { in: ["CHO", "TRAINER"] } },
+      where: { name: { in: ["CEHO", "TRAINER"] } },
       select: { userId: true },
     });
     const supervisorIds = new Set(supervisorRoles.map((r) => r.userId));
@@ -4081,7 +4081,7 @@ export class CourseService {
       responseRate: 0,
       avgResponseHours: null as number | null,
       within24hRate: 0,
-      note: "Estimated from message reply times between CHWs and supervisors (CHO/Trainer) in direct chats.",
+      note: "Estimated from message reply times between CHWs and supervisors (CEHO/Trainer) in direct chats.",
     };
 
     if (chwIds.size === 0 || supervisorIds.size === 0) {
@@ -4553,7 +4553,7 @@ export class CourseService {
       chwActivated,
       chwActivatedPrevious,
       chwLoginEvents,
-      // Login/activation — Supervisors (CHO)
+      // Login/activation — Supervisors (CEHO)
       supervisorActivated,
       supervisorActivatedPrevious,
       supervisorLoginEvents,
@@ -4595,18 +4595,18 @@ export class CourseService {
       prisma.attempTest.count({
         where: { finalExamId: { not: null }, ...baseProgressWhere },
       }),
-      // Card 4 — users with CHO role
+      // Card 4 — users with CEHO role
       prisma.userRole.count({
         where: {
-          name: "CHO",
+          name: "CEHO",
           ...(Object.keys(userFilter).length > 0 ? { user: userFilter } : {}),
         },
       }),
       prisma.userRole.count({
-        where: { name: "CHO", user: { ...userFilter, gender: "Male" } },
+        where: { name: "CEHO", user: { ...userFilter, gender: "Male" } },
       }),
       prisma.userRole.count({
-        where: { name: "CHO", user: { ...userFilter, gender: "Female" } },
+        where: { name: "CEHO", user: { ...userFilter, gender: "Female" } },
       }),
       // Login/activation — CHWs
       prisma.student.count({
@@ -4627,16 +4627,16 @@ export class CourseService {
       prisma.loginEvent.count({
         where: { user: { ...userFilter, student: chwStudentFilter } },
       }),
-      // Login/activation — Supervisors (CHO)
+      // Login/activation — Supervisors (CEHO)
       prisma.userRole.count({
         where: {
-          name: "CHO",
+          name: "CEHO",
           user: { ...userFilter, lastLoginAt: { not: null } },
         },
       }),
       prisma.userRole.count({
         where: {
-          name: "CHO",
+          name: "CEHO",
           user: {
             ...userFilter,
             loginEvents: { some: { createdAt: { lt: thirtyDaysAgo } } },
@@ -4645,7 +4645,7 @@ export class CourseService {
       }),
       prisma.loginEvent.count({
         where: {
-          user: { ...userFilter, userRoles: { some: { name: "CHO" } } },
+          user: { ...userFilter, userRoles: { some: { name: "CEHO" } } },
         },
       }),
       prisma.loginEvent.count({ where: { createdAt: { lt: thirtyDaysAgo } } }),

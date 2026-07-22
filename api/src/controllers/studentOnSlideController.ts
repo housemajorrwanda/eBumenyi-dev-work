@@ -23,7 +23,7 @@ export class StudentOnSlideController {
   @Post("/")
   @Security("jwt")
   @Middlewares(
-    checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN),
+    checkRole(roles.STAFF, roles.CEHO, roles.TRAINER, roles.ADMIN),
   )
   public async createStudentOnSlide(@Body() body: CreateStudentOnSlideDto) {
     return StudentOnSlideService.createStudentOnSlide(body);
@@ -54,7 +54,7 @@ export class StudentOnSlideController {
   @Put("/{id}")
   @Security("jwt")
   @Middlewares(
-    checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN),
+    checkRole(roles.STAFF, roles.CEHO, roles.TRAINER, roles.ADMIN),
   )
   public async updateStudentOnSlide(
     @Path() id: string,
@@ -66,7 +66,7 @@ export class StudentOnSlideController {
   @Delete("/{id}")
   @Security("jwt")
   @Middlewares(
-    checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN),
+    checkRole(roles.STAFF, roles.CEHO, roles.TRAINER, roles.ADMIN),
   )
   public async deleteStudentOnSlide(@Path() id: string) {
     return StudentOnSlideService.deleteStudentOnSlide(id);

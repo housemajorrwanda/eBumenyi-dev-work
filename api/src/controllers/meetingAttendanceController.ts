@@ -34,6 +34,19 @@ export class MeetingAttendanceController {
   }
 
   /**
+   * Submit (or update) a post-meeting survey for an attendance record.
+   * No auth — guests submitting from the meeting app have no JWT.
+   * @summary Submit meeting survey
+   */
+  @Post("/:attendanceId/survey")
+  public async submitSurvey(
+    @Path() attendanceId: string,
+    @Request() req: ExpressRequest,
+  ): Promise<any> {
+    return MeetingAttendanceService.submitSurvey(attendanceId, req.body);
+  }
+
+  /**
    * Get all attendance records for an event (by event id or stream room id)
    * @summary Get event attendance
    */

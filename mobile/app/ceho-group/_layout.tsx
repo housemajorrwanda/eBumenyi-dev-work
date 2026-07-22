@@ -1,6 +1,6 @@
 import { Stack } from 'expo-router';
 
-export default function CHOGroupLayout() {
+export default function CEHOGroupLayout() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="index" />

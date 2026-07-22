@@ -5,5 +5,5 @@ export enum roles {
   TRAINER = "TRAINER",
   STAFF = "STAFF",
   TRAINEE = "TRAINEE",
-  CHO = "CHO",
+  CEHO = "CEHO",
 }

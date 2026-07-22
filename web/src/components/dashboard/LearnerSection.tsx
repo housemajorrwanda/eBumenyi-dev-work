@@ -14,6 +14,7 @@ import { useNavigate } from "react-router-dom";
 import { useLearnerDashboard } from "@/hooks/useLearnerDashboard";
 import { LearnerStatsRow } from "./LearnerStatsRow";
 import { MyCertificatesList } from "./MyCertificatesList";
+import { SectionSkeleton } from "./shared/SectionSkeleton";
 import { ICourseStatEntry, ILastViewedLocation } from "@/services/progress.service";
 
 /* ─────────────────────────────────────────────────────────────────── */
@@ -168,6 +169,8 @@ export const LearnerSection: React.FC = () => {
     error,
   } = useLearnerDashboard();
 
+  if (isLoading) return <SectionSkeleton cards={4} rows={2} />;
+
   const enrolledCourses = (studentStats?.courses ?? []).filter((c) => c.isEnrolled);
   const activeCourses = enrolledCourses.filter((c) => !c.isCompleted);
   const completedCourses = enrolledCourses.filter((c) => c.isCompleted);
@@ -182,7 +185,7 @@ export const LearnerSection: React.FC = () => {
       )}
 
       {/* ── Continue hero ────────────────────────────────────────── */}
-      {!isLoading && lastViewed && (
+      {lastViewed && (
         <ContinueLearningCard loc={lastViewed} />
       )}
 
@@ -221,13 +224,7 @@ export const LearnerSection: React.FC = () => {
               </button>
             </div>
 
-            {isLoading ? (
-              <div className="space-y-3 animate-pulse">
-                {[...Array(3)].map((_, i) => (
-                  <div key={i} className="h-20 bg-gray-50 rounded-xl" />
-                ))}
-              </div>
-            ) : activeCourses.length === 0 ? (
+            {activeCourses.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-10 text-center">
                 <div className="w-12 h-12 rounded-xl bg-[#EBF0F9] flex items-center justify-center mb-3">
                   <BookOpen size={20} className="text-[#3363AD]/40" />
@@ -251,7 +248,7 @@ export const LearnerSection: React.FC = () => {
           </div>
 
           {/* Completed courses */}
-          {!isLoading && completedCourses.length > 0 && (
+          {completedCourses.length > 0 && (
             <div className="bg-white rounded-2xl border border-gray-100 p-5">
               <div className="flex items-center gap-2 mb-4">
                 <div className="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center">
@@ -285,33 +282,31 @@ export const LearnerSection: React.FC = () => {
         <div className="lg:col-span-1 space-y-4">
           <MyCertificatesList certificates={certificates} isLoading={isLoading} />
 
-          {!isLoading && (
-            <div className="space-y-2">
-              <button
-                onClick={() => navigate("/my-learning")}
-                className="w-full flex items-center justify-between px-4 py-3 rounded-xl
-                  bg-[#EBF0F9] hover:bg-[#dce6f5] transition-colors text-left group"
-              >
-                <div className="flex items-center gap-2.5">
-                  <GraduationCap size={15} className="text-[#3363AD]" />
-                  <span className="text-sm font-medium text-[#3363AD]">My Courses</span>
-                </div>
-                <ChevronRight size={13} className="text-[#3363AD]/50 group-hover:translate-x-0.5 transition-transform" />
-              </button>
+          <div className="space-y-2">
+            <button
+              onClick={() => navigate("/my-learning")}
+              className="w-full flex items-center justify-between px-4 py-3 rounded-xl
+                bg-[#EBF0F9] hover:bg-[#dce6f5] transition-colors text-left group"
+            >
+              <div className="flex items-center gap-2.5">
+                <GraduationCap size={15} className="text-[#3363AD]" />
+                <span className="text-sm font-medium text-[#3363AD]">My Courses</span>
+              </div>
+              <ChevronRight size={13} className="text-[#3363AD]/50 group-hover:translate-x-0.5 transition-transform" />
+            </button>
 
-              <button
-                onClick={() => navigate("/my-certificates")}
-                className="w-full flex items-center justify-between px-4 py-3 rounded-xl
-                  bg-[#EBF0F9] hover:bg-[#dce6f5] transition-colors text-left group"
-              >
-                <div className="flex items-center gap-2.5">
-                  <Award size={15} className="text-[#3363AD]" />
-                  <span className="text-sm font-medium text-[#3363AD]">All Certificates</span>
-                </div>
-                <ChevronRight size={13} className="text-[#3363AD]/50 group-hover:translate-x-0.5 transition-transform" />
-              </button>
-            </div>
-          )}
+            <button
+              onClick={() => navigate("/my-certificates")}
+              className="w-full flex items-center justify-between px-4 py-3 rounded-xl
+                bg-[#EBF0F9] hover:bg-[#dce6f5] transition-colors text-left group"
+            >
+              <div className="flex items-center gap-2.5">
+                <Award size={15} className="text-[#3363AD]" />
+                <span className="text-sm font-medium text-[#3363AD]">All Certificates</span>
+              </div>
+              <ChevronRight size={13} className="text-[#3363AD]/50 group-hover:translate-x-0.5 transition-transform" />
+            </button>
+          </div>
         </div>
       </div>
     </div>

@@ -26,7 +26,7 @@ export class QuestionnaireController {
   @Middlewares(
     upload.single("questionImage"),
     appendQuestionImage,
-    checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN),
+    checkRole(roles.STAFF, roles.CEHO, roles.TRAINER, roles.ADMIN),
   )
   public async createQuestionnaire(@Body() body: CreateQuestionnaireDto) {
     return QuestionnaireService.createQuestionnaire(body);
@@ -41,7 +41,7 @@ export class QuestionnaireController {
   @Put("/{id}")
   @Security("jwt")
   @Middlewares(
-    checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN),
+    checkRole(roles.STAFF, roles.CEHO, roles.TRAINER, roles.ADMIN),
   )
   public updateQuestionnaire(
     @Path() id: string,
@@ -53,7 +53,7 @@ export class QuestionnaireController {
   @Delete("/{id}")
   @Security("jwt")
   @Middlewares(
-    checkRole(roles.STAFF, roles.CHO, roles.TRAINER, roles.ADMIN),
+    checkRole(roles.STAFF, roles.CEHO, roles.TRAINER, roles.ADMIN),
   )
   public deleteQuestionnaire(@Path() id: string) {
     return QuestionnaireService.deleteQuestionnaire(id);
