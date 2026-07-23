@@ -180,6 +180,34 @@ export class SlideReadAloudService {
     return pickPageText(pageTexts, page, fallback);
   }
 
+  /**
+   * Prefer extracted page text from the slide file (PDF parse / OCR).
+   * Metadata note/description is only a last-resort fallback so we read
+   * what is on screen, not labels like "Slide 1".
+   */
+  private static async extractPageTextsFromFile(
+    file?: string | null,
+  ): Promise<PageMap> {
+    if (!file) return {};
+
+    let pageTexts: PageMap = {};
+
+    if (isPdfUrl(file)) {
+      try {
+        pageTexts = await extractPdfTextFromUrl(file);
+      } catch (error) {
+        console.warn("[read-aloud] PDF parse failed", error);
+      }
+    }
+
+    if (Object.keys(pageTexts).length === 0 && isMlServiceConfigured()) {
+      const ocrResult = await extractTextFromFileUrl(file);
+      pageTexts = ocrResult.pageTexts;
+    }
+
+    return pageTexts;
+  }
+
   private static async resolveTextForContext(
     context: {
       file?: string | null;
@@ -192,21 +220,84 @@ export class SlideReadAloudService {
     let pageTexts = parsePageMap(context.pageTexts);
 
     if (Object.keys(pageTexts).length === 0 && context.file) {
-      if (isPdfUrl(context.file)) {
-        try {
-          pageTexts = await extractPdfTextFromUrl(context.file);
-        } catch (error) {
-          console.warn("[read-aloud] PDF parse failed for remote slide", error);
-        }
-      }
-
-      if (Object.keys(pageTexts).length === 0 && isMlServiceConfigured()) {
-        const ocrResult = await extractTextFromFileUrl(context.file);
-        pageTexts = ocrResult.pageTexts;
-      }
+      pageTexts = await SlideReadAloudService.extractPageTextsFromFile(
+        context.file,
+      );
     }
 
     const fallback = metadataFallback(context.note, context.description);
+    if (Object.keys(pageTexts).length === 0 && fallback) {
+      pageTexts = { "1": fallback };
+    }
+
+    return pickPageText(pageTexts, page, fallback);
+  }
+
+  /**
+   * Ensure we have readable text for a DB slide. If pageTexts was never
+   * extracted (common on apitest), pull it from the file on demand and persist.
+   */
+  private static async resolveTextForSlide(
+    slide: {
+      id: string;
+      file?: string | null;
+      note?: string | null;
+      description?: string | null;
+      pageTexts?: string | null;
+      ocrStatus?: string | null;
+    },
+    page: number,
+    remoteContext?: {
+      file?: string | null;
+      note?: string | null;
+      description?: string | null;
+    },
+  ): Promise<string> {
+    let pageTexts = parsePageMap(slide.pageTexts);
+    const pageKey = String(page);
+    const file = remoteContext?.file || slide.file;
+    const note = remoteContext?.note ?? slide.note;
+    const description = remoteContext?.description ?? slide.description;
+    const fallback = metadataFallback(note, description);
+
+    const storedLooksLikeMetadataOnly =
+      Object.keys(pageTexts).length > 0 &&
+      Boolean(fallback) &&
+      Object.values(pageTexts).every(
+        (value) => value.trim() === fallback.trim(),
+      );
+
+    const needsExtraction =
+      Boolean(file) &&
+      (Object.keys(pageTexts).length === 0 ||
+        storedLooksLikeMetadataOnly ||
+        (!pageTexts[pageKey] && page > 1));
+
+    if (needsExtraction) {
+      const extracted = await SlideReadAloudService.extractPageTextsFromFile(
+        file,
+      );
+      if (Object.keys(extracted).length > 0) {
+        pageTexts = extracted;
+        
+        await prisma.slide.update({
+          where: { id: slide.id },
+          data: {
+            pageTexts: serializePageMap(pageTexts),
+            ocrStatus: "done",
+            narrationPages: null,
+          },
+        });
+      } else if (Object.keys(pageTexts).length === 0) {
+        await prisma.slide
+          .update({
+            where: { id: slide.id },
+            data: { ocrStatus: "failed" },
+          })
+          .catch(() => undefined);
+      }
+    }
+
     if (Object.keys(pageTexts).length === 0 && fallback) {
       pageTexts = { "1": fallback };
     }
@@ -257,13 +348,23 @@ export class SlideReadAloudService {
     const cacheKey = narrationCacheKey(page, voice);
 
     if (slide) {
-      const narrationPages = parsePageMap(slide.narrationPages);
-      const cachedAudio = pickCachedAudio(narrationPages, page, voice);
-      const text = SlideReadAloudService.resolveReadableText(slide, page);
+      const text = await SlideReadAloudService.resolveTextForSlide(
+        slide,
+        page,
+        remoteContext,
+      );
 
       if (!text) {
         throw new AppError("Nta byanditswe biboneka kuri iri somo", 404);
       }
+
+      
+      const freshSlide = await prisma.slide.findUnique({
+        where: { id: slideId },
+        select: { narrationPages: true },
+      });
+      const narrationPages = parsePageMap(freshSlide?.narrationPages);
+      const cachedAudio = pickCachedAudio(narrationPages, page, voice);
 
       if (cachedAudio) {
         return { audioUrl: cachedAudio, text, page, voice, cached: true };
